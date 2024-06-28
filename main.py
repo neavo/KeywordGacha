@@ -33,6 +33,15 @@ except ModuleNotFoundError:
 # INPUT_FILE_NAME = 'all.orig.txt'
 INPUT_FILE_NAME = 'ManualTransFile.json'
 
+# AI客户端初始化
+API_KEY = "sk-no-key-required"
+BASE_URL = "http://localhost:8080/v1"
+MODEL_NAME = "qwen2-7b-instruct"
+client = openai.OpenAI(
+    base_url= BASE_URL,
+    api_key = API_KEY
+)
+
 # 查找人名
 NAME_GACHA = True
 
@@ -51,7 +60,12 @@ RECHECK_BY_LLM = False
 MAX_TOKENS = 512
 
 # 分词等计算任务的并发线程数
+# 暂时只对本地接口生效
+# 暂不支持远程接口，远程接口固定为 1
 MAX_WORKERS = 8
+if not "127.0.0.1" in BASE_URL and not "localhost" in BASE_URL:
+    MAX_WORKERS = 1
+print(MAX_WORKERS)
 
 # 原始文本切片阈值大小
 SPLIT_THRESHOL = 4 * 1024
@@ -71,15 +85,6 @@ BLACK_LIST = [
     "どの", # dono
     ""
 ]
-
-# AI客户端初始化
-API_KEY = "sk-no-key-required"
-BASE_URL = "http://localhost:8080/v1"
-MODEL_NAME = "qwen2-7b-instruct"
-client = openai.OpenAI(
-    base_url= BASE_URL,
-    api_key = API_KEY
-)
 
 class Word:
     def __init__(self):
@@ -119,30 +124,6 @@ class Word:
                     # context已满，替换最短的条目
                     shortest_index = min(range(len(self.context)), key=lambda i: len(self.context[i]))
                     self.context[shortest_index] = line.strip()
-
-
-        # def set_context_from_lines(self, lines: list):
-        #     max_total_chars = 0
-        #     best_context = []
-            
-        #     for index, line in enumerate(lines):
-        #         if self.surface in line:
-        #             # 确保start_index不小于0，避免负索引
-        #             start_index = max(0, index - 4)
-        #             # 确保end_index不大于lines的长度，避免索引超出范围
-        #             end_index = min(len(lines), index + 5)
-                    
-        #             # 获取上下文数组
-        #             context = lines[start_index:end_index]
-        #             # 计算该上下文数组内所有字符串的字符数总和
-        #             total_chars = sum(len(line) for line in context)
-                    
-        #             # 如果当前上下文的字符总数大于之前记录的最大字符总数，则更新best_context
-        #             if total_chars > max_total_chars:
-        #                 max_total_chars = total_chars
-        #                 best_context = context
-            
-        #     self.set_context(best_context)
 
 # 读取TXT文件并返回
 def read_txt_file(filename):
@@ -292,22 +273,25 @@ def is_valid_noun(surface, attribute):
 def extract_nouns_llm(context):
     words = []
     
-    completion = client.chat.completions.create(
-        model = API_KEY,
-        temperature = 0.1,
-        top_p = 0.3,
-        max_tokens = MAX_TOKENS,
-        frequency_penalty = 0.2,
-        messages = [
-            {
-                "role": "system",
-                "content": "请分析以下日语句子，这是一段来自日文游戏的文本，从中识别出所有可能的角色名称。在回答中，只需列出这些可能的角色名称，如果有多个，请使用英文逗号(,)进行分隔。"
-            },
-            {
-                "role": "user", "content": f"{context}"
-            }
-        ]
-    )
+    try:
+        completion = client.chat.completions.create(
+            model = MODEL_NAME,
+            temperature = 0.1,
+            top_p = 0.3,
+            max_tokens = MAX_TOKENS,
+            frequency_penalty = 0.2,
+            messages = [
+                {
+                    "role": "system",
+                    "content": "请分析以下日语句子，这是一段来自日文游戏的文本，从中识别出所有可能的角色名称。在回答中，只需列出这些可能的角色名称，如果有多个，请使用英文逗号(,)进行分隔。"
+                },
+                {
+                    "role": "user", "content": f"{context}"
+                }
+            ]
+        )
+    except Exception as error :
+        print(f'Task generated an exception: {error}')
 
     llmresponse = completion
     usage = completion.usage
@@ -452,7 +436,7 @@ def check_name_with_llm(word):
     content = f"请根据以下上下文，判定词汇「{word.surface}」是否为一个角色姓名\n{''.join(word.context)}"
     
     completion = client.chat.completions.create(
-        model = API_KEY,
+        model = MODEL_NAME,
         temperature = 0,
         messages = [
                 {
