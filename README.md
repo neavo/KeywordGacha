@@ -8,7 +8,7 @@
 ## 要求 ⚡
 - 有效的 Python 环境
 - 兼容 OpenAI 接口格式的大语言模型 API
-- 使用 llama.cpp + Qwen2-7B 本地接口开发，理论上兼容所有 OpenAI 格式的API，但是条件所限未能一一测试欢迎反馈
+- 使用 llama.cpp + Qwen2-7B 本地接口开发，理论上兼容所有 OpenAI 格式的API，欢迎反馈
 
 ## 安装 🛸
 - 下载源码并解压缩
