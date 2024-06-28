@@ -1,4 +1,3 @@
-import os
 import re
 import json
 import openai
@@ -48,14 +47,6 @@ NAME_GACHA = True
 # 查找地名（开发中）
 REGION_GACHA = False
 
-# 使用传统分词
-# 效果较差，仅对比用，不再维护
-# 会采集到大量垃圾信息，应同时开启二次校验
-USE_TRADITIONAL_TOKENIZER = False
-
-# 开启二次校验
-RECHECK_BY_LLM = False
-
 # LLM每次返回的最大Token阈值
 MAX_TOKENS = 512
 
@@ -65,7 +56,6 @@ MAX_TOKENS = 512
 MAX_WORKERS = 8
 if not "127.0.0.1" in BASE_URL and not "localhost" in BASE_URL:
     MAX_WORKERS = 1
-print(MAX_WORKERS)
 
 # 原始文本切片阈值大小
 SPLIT_THRESHOL = 4 * 1024
@@ -326,87 +316,6 @@ def extract_nouns_llm(context):
 
     return words
 
-# 使用 spacy 分词
-def extract_nouns_spacy(tokenizer, text):
-    words = []
-
-    for token in tokenizer(text):
-        # DEBUG
-        # print(token.text, token.lemma_, token.pos_, token.tag_, token.dep_, token.shape_, token.is_alpha, token.is_stop)
-
-        surface = token.text
-        attribute = f"{token.pos_}-{token.tag_}"
-
-        if is_valid_noun(surface, attribute):
-            word = Word()
-            word.set_name(True)
-            word.set_count(1)
-            word.set_surface(surface)
-            word.set_attribute(attribute)
-            words.append(word)            
-
-    return words
-    
-# 使用 janome 分词
-def extract_nouns_janome(tokenizer, text):
-    words = []
-
-    for token in tokenizer.tokenize(text):
-        surface = token.surface
-        attribute = token.part_of_speech.replace(",", "-")
-
-        if is_valid_noun(surface, attribute):
-            word = Word()
-            word.set_name(True)
-            word.set_count(1)
-            word.set_surface(surface)
-            word.set_attribute(attribute)
-            words.append(word)  
-    
-    return words
-
-# 使用 sudachipy 分词
-def extract_nouns_sudachipy(tokenizer, text):
-    words = []
-
-    for token in tokenizer.tokenize(text, SudachipyTokenizer.Tokenizer.SplitMode.C):
-        surface = token.surface()
-        attribute = str(token.part_of_speech()).replace(", ", "-").replace("(", "").replace(")", "").replace("\'", "")
-
-        if is_valid_noun(surface, attribute):
-            word = Word()
-            word.set_name(True)
-            word.set_count(1)
-            word.set_surface(surface)
-            word.set_attribute(attribute)
-            words.append(word)  
-    
-    return words
-
-def process_with_spacy(input_data_splited):
-    datas = []
-    tokenizer_spacy = spacy.load("ja_core_news_lg")
-    for k, v in enumerate(input_data_splited):
-        print(f"正在使用 spacy 对 {k + 1} / {len(input_data_splited)} 段进行分词 ...")
-        datas = datas + extract_nouns_spacy(tokenizer_spacy, v)
-    return datas
-
-def process_with_janome(input_data_splited):
-    datas = []
-    tokenizer_janome = JanomeTokenizer()
-    for k, v in enumerate(input_data_splited):
-        print(f"正在使用 janome 对 {k + 1} / {len(input_data_splited)} 段进行分词 ...")
-        datas = datas + extract_nouns_janome(tokenizer_janome, v)
-    return datas
-
-def process_with_sudachipy(input_data_splited):
-    datas = []
-    tokenizer_sudachipy = SudachipyDictionary.Dictionary(dict="full").create()
-    for k, v in enumerate(input_data_splited):
-        print(f"正在使用 sudachipy 对 {k + 1} / {len(input_data_splited)} 段进行分词 ...")
-        datas = datas + extract_nouns_sudachipy(tokenizer_sudachipy, v)
-    return datas
-
 # 合并具有相同表面形式（surface）的 Word 对象，计数并逆序排序。
 def merge_and_count(words_list):
     surface_to_word = {}
@@ -431,34 +340,8 @@ def merge_and_count(words_list):
 
     return sorted_words
 
-# 判断是否是角色姓名
-def check_name_with_llm(word):
-    content = f"请根据以下上下文，判定词汇「{word.surface}」是否为一个角色姓名\n{''.join(word.context)}"
-    
-    completion = client.chat.completions.create(
-        model = MODEL_NAME,
-        temperature = 0,
-        messages = [
-                {
-                "role": "system",
-                "content": "你擅长日文名词辨识，能依据上下文精确判断词汇属性。回答时仅以「是」或「否」作答，若不确切，回复「是」。"
-            },
-            {
-                "role": "user", "content": content
-            }
-        ]
-    )
-
-    word.set_llmresponse(completion.choices[0].message.content)
-    if word.llmresponse == "是":
-        word.set_name(True)
-    else:
-        word.set_name(False)
-
-    return word
-
 # 将 Word 列表写入文件
-def write_words_to_file(words, filename, detailmode = False):
+def write_words_to_file(words, filename, detailmode):
     with open(filename, 'w', encoding='utf-8') as file:
         if not detailmode: file.write("{")
 
@@ -500,28 +383,12 @@ def main():
 
     # 执行分词，并行处理
     with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        # 传统分词
-        if USE_TRADITIONAL_TOKENIZER:
-            spacy_result = executor.submit(process_with_spacy, input_data_splited)
-            janome_result = executor.submit(process_with_janome, input_data_splited)
-            sudachipy_result = executor.submit(process_with_sudachipy, input_data_splited)
-
-            words_spacy = spacy_result.result()
-            words_janome = janome_result.result()
-            words_sudachipy = sudachipy_result.result()
-        else:
-            words_spacy = []
-            words_janome = []
-            words_sudachipy = []
-
-        # LLM分词
         futures = []
         words_llm = []
         finished_task = 0
 
         for k, text in enumerate(input_data_splited):
             futures.append(executor.submit(extract_nouns_llm, text))   
-
         for future in as_completed(futures):
             try:
                 words_llm.extend(future.result())
@@ -532,40 +399,12 @@ def main():
 
     # 分别处理并统计每个tokenizer的结果
     words_llm_counted = merge_and_count(words_llm)
-    words_spacy_counted = merge_and_count(words_spacy)
-    words_janome_counted = merge_and_count(words_janome)
-    words_sudachipy_counted = merge_and_count(words_sudachipy)
 
     # 合并所有数组
-    words_all = merge_and_count(words_llm_counted + words_spacy_counted + words_janome_counted + words_sudachipy_counted)
+    words_all = merge_and_count(words_llm_counted)
 
     # 筛选并移除 count 小于 COUNT_THRESHOLD 的条目
-    words_filtered = [word for word in words_all if word.count >= COUNT_THRESHOLD]
-
-    # 更新 words_all 为过滤后的列表
-    words_all = words_filtered
-
-    # 二次确认
-    if RECHECK_BY_LLM:
-        # 查找上下文
-        for k, word in enumerate(words_all):
-            print(f"正在查找第 {k + 1} / {len(words_all)} 个条目的上下文 ...")
-            word.set_context_from_lines(input_data)
-
-        # 判断是否是角色姓名，并行处理
-        finished_task = 0
-        with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = []
-            for k, word in enumerate(words_all):
-                futures.append(executor.submit(check_name_with_llm, word))   
-
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                    finished_task = finished_task + 1
-                    print(f"正在判断第 {finished_task} / {len(words_all)} 个条目是否是角色姓名 ...")
-                except Exception as exc:
-                    print(f'Task generated an exception: {exc}')
+    words_all = [word for word in words_all if word.count >= COUNT_THRESHOLD]
 
     # 分离出角色姓名和非角色姓名的单词列表
     names_true = [word for word in words_all if word.name]
@@ -586,9 +425,12 @@ def main():
     write_words_to_file(names_false, names_false_output_file, True)
 
     # 输出日志
+    print()
     print(f"结果已写入到:")
-    print(f"{dictionary_names_true_file}, {names_true_output_file}")
-    print(f"{dictionary_names_false_file}, {names_false_output_file}")
+    print(f"　　{dictionary_names_true_file}")
+    print(f"　　{names_true_output_file}")
+    print(f"　　{dictionary_names_false_file}")
+    print(f"　　{names_false_output_file}")
 
 # 开始运行程序
 if __name__ == '__main__':
