@@ -11,7 +11,6 @@ from concurrent.futures import as_completed
 # 丑陋，但是有效，不服你咬我啊
 G = type('GClass', (), {})()
 
-
 class Word:
     def __init__(self):
         self.name = False
@@ -199,25 +198,22 @@ def is_valid_noun(surface, attribute):
 def extract_nouns_llm(context):
     words = []
     
-    try:
-        completion = G.openai_hanlder.chat.completions.create(
-            model = G.model_name,
-            temperature = 0.1,
-            top_p = 0.3,
-            max_tokens = G.max_tokens,
-            frequency_penalty = 0.2,
-            messages = [
-                {
-                    "role": "system",
-                    "content": "请分析以下日语句子，这是一段来自日文游戏的文本，从中识别出所有可能的角色名称。在回答中，只需列出这些可能的角色名称，如果有多个，请使用英文逗号(,)进行分隔。"
-                },
-                {
-                    "role": "user", "content": f"{context}"
-                }
-            ]
-        )
-    except Exception as error :
-        print(f'Task generated an exception: {error}')
+    completion = G.openai_hanlder.chat.completions.create(
+        model = G.model_name,
+        temperature = 0.1,
+        top_p = 0.3,
+        max_tokens = G.max_tokens,
+        frequency_penalty = 0.2,
+        messages = [
+            {
+                "role": "system",
+                "content": "请分析以下日语句子，这是一段来自日文游戏的文本，从中识别出所有可能的角色名称。在回答中，只需列出这些可能的角色名称，如果有多个，请使用英文逗号(,)进行分隔。"
+            },
+            {
+                "role": "user", "content": f"{context}"
+            }
+        ]
+    )
 
     llmresponse = completion
     usage = completion.usage
@@ -250,6 +246,24 @@ def extract_nouns_llm(context):
             word.set_llmresponse(llmresponse)
             words.append(word)
 
+    return words
+
+# 调用 llm 分词函数，如果失败，则重试
+def extract_nouns_llm_with_retry(context, max_retry):
+    words = []
+
+    for i in range(max_retry):
+        try:
+            words = extract_nouns_llm(context)
+            break
+        except Exception as error:
+            print(error)
+
+            if i + 1 >= max_retry :
+                print("重试次数耗尽，放弃该请求.")
+            else:
+                print(f"请求失败，原因：{error}, 正在重试，第 {i + 1} / {max_retry} 次...")
+    
     return words
 
 # 合并具有相同表面形式（surface）的 Word 对象，计数并逆序排序。
@@ -304,7 +318,7 @@ def write_words_to_file(words, filename, detailmode):
 
 # 主函数
 def main():
-    
+
     # 读取文件
     print(f"正在读取 {G.input_file_name} 文件 ...")
     if G.input_file_name.endswith('.txt'):
@@ -324,14 +338,14 @@ def main():
         finished_task = 0
 
         for k, text in enumerate(input_data_splited):
-            futures.append(executor.submit(extract_nouns_llm, text))   
+            futures.append(executor.submit(extract_nouns_llm_with_retry, text, 3))   
         for future in as_completed(futures):
             try:
                 words_llm.extend(future.result())
                 finished_task = finished_task + 1
                 print(f"正在使用 LLM 对 {finished_task} / {len(input_data_splited)} 段进行分词 ...")
-            except Exception as exc:
-                print(f'Task generated an exception: {exc}')
+            except Exception as error:
+                print(f'Task generated an exception: {error}')
 
     # 分别处理并统计每个tokenizer的结果
     words_llm_counted = merge_and_count(words_llm)
@@ -421,23 +435,24 @@ if __name__ == '__main__':
 
         with open(config_file, 'r', encoding='utf-8') as file:
             config = json.load(file)
-            G.api_key = config["api_key"]
-            G.base_url = config["base_url"]
-            G.model_name = config["model_name"]
-            G.name_gacha = config["name_gacha"]
+            for key in config:
+                setattr(G, key, config[key])
     except FileNotFoundError:
         print(f"文件 {config_file} 未找到.")
-        exit(1)
     except json.JSONDecodeError:
         print(f"文件 {config_file} 不是有效的JSON格式.")
-        exit(1)
 
     # OpenAI SDK
-    G.openai_hanlder = OpenAI(api_key = G.api_key, base_url= G.base_url)
+    G.openai_hanlder = OpenAI(
+        api_key = G.api_key,
+        base_url= G.base_url,
+        timeout = 60,
+        max_retries = 0
+    )
 
     # 异步线程数
     if not "127.0.0.1" in G.api_key and not "localhost" in G.base_url:
-        G.max_workers = 1
+        G.max_workers = 8
     else:
         G.max_workers = 8
 
