@@ -316,19 +316,41 @@ def write_words_to_file(words, filename, detailmode):
 
         if not detailmode: file.write("}")
 
+# 读取数据文件
+def read_data_file():
+    input_data = []
+
+    if os.path.exists("ManualTransFile.json"):
+        user_input = input(f"已找到数据文件 \"ManualTransFile.json\"，按回车直接使用或输入其他文件的路径：").strip('"')
+
+        if user_input:
+            input_file_name = user_input
+        else:
+            input_file_name = "ManualTransFile.json"
+    elif os.path.exists("all.orig.txt"):
+        user_input = input(f"已找到数据文件 \"all.orig.txt\"，按回车直接使用或输入其他文件的路径：").strip('"')
+
+        if user_input:
+            input_file_name = user_input
+        else:
+            input_file_name = "all.orig.txt"
+    else:
+        input_file_name = input("未找到 \"all.orig.txt\" 或 \"ManualTransFile.json\"，请输入数据文件的路径: ").strip('"')
+
+    if G.input_file_name.endswith('.txt'):
+        input_data = read_txt_file(input_file_name)
+    elif G.input_file_name.endswith('.json'):
+        input_data = read_json_file(input_file_name)
+    else:
+        print(f"不支持的文件格式: {input_file_name}")
+
+    return input_data
+
 # 主函数
 def main():
+    input_data = read_data_file()
 
-    # 读取文件
-    print(f"正在读取 {G.input_file_name} 文件 ...")
-    if G.input_file_name.endswith('.txt'):
-            input_data = read_txt_file(G.input_file_name)
-    elif G.input_file_name.endswith('.json'):
-        input_data = read_json_file(G.input_file_name)
-    else:
-        print(f"不支持的文件格式: {G.input_file_name}")
-
-    print("正在分割输入文本 ...")
+    print("正在分割文本 ...")
     input_data_splited = split_by_byte_threshold(input_data, G.split_threshold)
 
     # 执行分词，并行处理
