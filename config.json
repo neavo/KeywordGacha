@@ -1,0 +1,6 @@
+{
+    "api_key": "sk-no-key-required",
+    "base_url": "http://localhost:8080/v1",
+    "model_name": "qwen2-7b-instruct",
+    "name_gacha": true
+}

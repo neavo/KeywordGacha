@@ -1,80 +1,16 @@
+import os
 import re
 import json
-import openai
 import concurrent.futures
+from openai import OpenAI
 from collections import Counter
 from concurrent.futures import as_completed
 
-try:
-    import spacy
-    from sudachipy import tokenizer as SudachipyTokenizer
-    from sudachipy import dictionary as SudachipyDictionary
-    from janome.tokenizer import Tokenizer as JanomeTokenizer
-except ModuleNotFoundError:
-    print("缺少传统分词模式下的依赖模块 ... 如不是使用传统分词可以忽略本提示 ...")
+# 定义全局对象
+# 方便共享全局数据
+# 丑陋，但是有效，不服你咬我啊
+G = type('GClass', (), {})()
 
-# 设置文件名
-# 支持两种不同的文本输入格式，根据后缀名识别
-# 可以直接使用 mtool 导出文本
-#
-# JSON:
-#   {
-#       "原文": "译文",
-#       "原文": "译文",
-#       "原文": "译文"
-#   }
-# 
-# TXT:
-#       原文
-#       原文
-#       原文
-
-# INPUT_FILE_NAME = 'all.orig.txt'
-INPUT_FILE_NAME = 'ManualTransFile.json'
-
-# AI客户端初始化
-API_KEY = "sk-no-key-required"
-BASE_URL = "http://localhost:8080/v1"
-MODEL_NAME = "qwen2-7b-instruct"
-client = openai.OpenAI(
-    base_url= BASE_URL,
-    api_key = API_KEY
-)
-
-# 查找人名
-NAME_GACHA = True
-
-# 查找地名（开发中）
-REGION_GACHA = False
-
-# LLM每次返回的最大Token阈值
-MAX_TOKENS = 512
-
-# 分词等计算任务的并发线程数
-# 暂时只对本地接口生效
-# 暂不支持远程接口，远程接口固定为 1
-MAX_WORKERS = 8
-if not "127.0.0.1" in BASE_URL and not "localhost" in BASE_URL:
-    MAX_WORKERS = 1
-
-# 原始文本切片阈值大小
-SPLIT_THRESHOL = 4 * 1024
-
-# 出现次数过滤阈值大小
-COUNT_THRESHOLD = 5
-
-# 词汇表黑名单
-BLACK_LIST = [
-    "様", # sama
-    "さま", # sama
-    "君", # kun
-    "くん", # kun
-    "桑", # san
-    "さん", # san
-    "殿", # dono
-    "どの", # dono
-    ""
-]
 
 class Word:
     def __init__(self):
@@ -229,14 +165,14 @@ def is_all_chinese_or_kanji(text):
 def is_valid_noun(surface, attribute):
     flag = True
 
-    if surface in BLACK_LIST :
+    if surface in G.black_list :
         flag = False
 
     # if not "角色姓名" in attribute :
     #     flag = False
 
-    if len(surface) <= 1 :
-        flag = False
+    # if len(surface) <= 1 :
+    #     flag = False
 
     if not contains_japanese(surface) :
         flag = False
@@ -254,8 +190,8 @@ def is_valid_noun(surface, attribute):
     # if is_all_chinese_or_kanji(token.text) :
     #     continue
 
-    # if len(token.text) == 1 and not is_chinese_or_kanji(token.text) :
-    #     flag = False
+    if len(surface) == 1 and not is_chinese_or_kanji(surface) :
+        flag = False
 
     return flag
 
@@ -264,11 +200,11 @@ def extract_nouns_llm(context):
     words = []
     
     try:
-        completion = client.chat.completions.create(
-            model = MODEL_NAME,
+        completion = G.openai_hanlder.chat.completions.create(
+            model = G.model_name,
             temperature = 0.1,
             top_p = 0.3,
-            max_tokens = MAX_TOKENS,
+            max_tokens = G.max_tokens,
             frequency_penalty = 0.2,
             messages = [
                 {
@@ -289,7 +225,7 @@ def extract_nouns_llm(context):
     finish_reason = completion.choices[0].finish_reason
 
     # 幻觉，直接抛掉
-    if usage.completion_tokens >= MAX_TOKENS:
+    if usage.completion_tokens >= G.max_tokens:
         return words
 
     for text in message.content.split(","):
@@ -368,21 +304,21 @@ def write_words_to_file(words, filename, detailmode):
 
 # 主函数
 def main():
+    
     # 读取文件
-    print(f"正在读取 {INPUT_FILE_NAME} 文件 ...")
-
-    if INPUT_FILE_NAME.endswith('.json'):
-        input_data = read_json_file(INPUT_FILE_NAME)
-    elif INPUT_FILE_NAME.endswith('.txt'):
-        input_data = read_txt_file(INPUT_FILE_NAME)
+    print(f"正在读取 {G.input_file_name} 文件 ...")
+    if G.input_file_name.endswith('.txt'):
+            input_data = read_txt_file(G.input_file_name)
+    elif G.input_file_name.endswith('.json'):
+        input_data = read_json_file(G.input_file_name)
     else:
-        print(f"不支持的文件格式: {INPUT_FILE_NAME}")
+        print(f"不支持的文件格式: {G.input_file_name}")
 
     print("正在分割输入文本 ...")
-    input_data_splited = split_by_byte_threshold(input_data, SPLIT_THRESHOL)
+    input_data_splited = split_by_byte_threshold(input_data, G.split_threshold)
 
     # 执行分词，并行处理
-    with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=G.max_workers) as executor:
         futures = []
         words_llm = []
         finished_task = 0
@@ -403,8 +339,8 @@ def main():
     # 合并所有数组
     words_all = merge_and_count(words_llm_counted)
 
-    # 筛选并移除 count 小于 COUNT_THRESHOLD 的条目
-    words_all = [word for word in words_all if word.count >= COUNT_THRESHOLD]
+    # 筛选并移除 count 小于 G.count_threshold 的条目
+    words_all = [word for word in words_all if word.count >= G.count_threshold]
 
     # 分离出角色姓名和非角色姓名的单词列表
     names_true = [word for word in words_all if word.name]
@@ -434,4 +370,76 @@ def main():
 
 # 开始运行程序
 if __name__ == '__main__':
+
+    # 输入文件名
+    # 支持两种不同的文本输入格式，根据后缀名识别
+    # 可以直接使用 mtool 导出文本
+    #
+    # JSON:
+    #   {
+    #       "原文": "译文",
+    #       "原文": "译文",
+    #       "原文": "译文"
+    #   }
+    # 
+    # TXT:
+    #       原文
+    #       原文
+    #       原文
+
+    # G.input_file_name = "all.orig.txt"
+    G.input_file_name = "ManualTransFile.json"
+
+    # 每次返回的最大Token阈值
+    G.max_tokens = 512
+
+    # 原始文本切片阈值大小
+    G.split_threshold = 4 * 1024
+
+    # 出现次数过滤阈值大小
+    G.count_threshold = 3
+
+    # 词汇表黑名单
+    G.black_list = [
+        "様", # sama
+        "さま", # sama
+        "君", # kun
+        "くん", # kun
+        "桑", # san
+        "さん", # san
+        "殿", # dono
+        "どの", # dono
+        ""
+    ]
+
+    # 加载配置文件
+    try:
+        if os.path.exists("config_dev.json"):
+            config_file = "config_dev.json"
+        else:
+            config_file = "config.json"
+
+        with open(config_file, 'r', encoding='utf-8') as file:
+            config = json.load(file)
+            G.api_key = config["api_key"]
+            G.base_url = config["base_url"]
+            G.model_name = config["model_name"]
+            G.name_gacha = config["name_gacha"]
+    except FileNotFoundError:
+        print(f"文件 {config_file} 未找到.")
+        exit(1)
+    except json.JSONDecodeError:
+        print(f"文件 {config_file} 不是有效的JSON格式.")
+        exit(1)
+
+    # OpenAI SDK
+    G.openai_hanlder = OpenAI(api_key = G.api_key, base_url= G.base_url)
+
+    # 异步线程数
+    if not "127.0.0.1" in G.api_key and not "localhost" in G.base_url:
+        G.max_workers = 1
+    else:
+        G.max_workers = 8
+
+    # 开始业务逻辑
     main()
