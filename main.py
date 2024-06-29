@@ -3,12 +3,14 @@ import re
 import json
 import asyncio
 import concurrent.futures
-from openai import OpenAI
-from openai import AsyncOpenAI
 from collections import Counter
 from concurrent.futures import as_completed
 
-from model.word import Word
+from openai import OpenAI
+from openai import AsyncOpenAI
+
+from model.Word import Word
+from helper.TextHelper import TextHelper
 
 # 定义全局对象
 # 方便共享全局数据
@@ -72,60 +74,6 @@ def split_by_byte_threshold(strings, threshold):
     
     return result
 
-# 定义日文字符的Unicode范围辅助函数
-def is_japanese(ch):
-    # 平假名
-    if '\u3040' <= ch <= '\u309f':
-        return True
-    # 片假名
-    if '\u30a0' <= ch <= '\u30ff':
-        return True
-    # 日文汉字
-    if '\u4e00' <= ch <= '\u9fff':
-        return True
-    # 日文全角数字
-    if '\u3000' <= ch <= '\u303f':
-        return True
-    # 日文标点符号
-    if '\uff01' <= ch <= '\uff60':
-        return True
-    # 濁音和半濁音符号
-    if '\u309b' <= ch <= '\u309e':
-        return True
-    # 日文半角片假名
-    if '\uff66' <= ch <= '\uff9f':
-        return True
-
-# 判断一个字符是否是中文汉字或日文汉字
-def is_chinese_or_kanji(ch):
-    return '\u4e00' <= ch <= '\u9fff'  # 包括中文汉字和日文汉字
-
-# 检查字符串是否包含至少一个日文字符
-def contains_japanese(text):
-    return any(is_japanese(char) for char in text)
-
-# 判断输入的字符串是否全部是日文
-def is_all_japanese(text):
-    # 遍历字符串中的每个字符
-    for char in text:
-        # 使用已经定义的函数来检查字符是否是中文汉字
-        if not is_japanese(char):
-            # 如果发现非汉字字符，返回False
-            return False
-    # 如果所有字符都是汉字，则返回True
-    return True
-
-# 判断输入的字符串是否全部是汉字
-def is_all_chinese_or_kanji(text):
-    # 遍历字符串中的每个字符
-    for char in text:
-        # 使用已经定义的函数来检查字符是否是中文汉字
-        if not is_chinese_or_kanji(char):
-            # 如果发现非汉字字符，返回False
-            return False
-    # 如果所有字符都是汉字，则返回True
-    return True
-
 # 判断是否是合法的名词
 def is_valid_noun(surface):
     flag = True
@@ -136,7 +84,7 @@ def is_valid_noun(surface):
     # if len(surface) <= 1 :
     #     flag = False
 
-    if not contains_japanese(surface) :
+    if not TextHelper.contains_japanese(surface) :
         flag = False
 
     # っ和ッ结尾的一般是语气词
@@ -146,7 +94,7 @@ def is_valid_noun(surface):
     # if not "NOUN" in token.pos_ and not "PRON" in token.pos_ :
     #     continue
 
-    # if is_all_chinese_or_kanji(token.text) :
+    # if TextHelper.is_all_chinese_or_kanji(token.text) :
     #     continue
 
     if len(surface) == 1 and not is_chinese_or_kanji(surface) :
