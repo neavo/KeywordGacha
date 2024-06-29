@@ -77,27 +77,24 @@ def split_by_byte_threshold(lines, threshold):
 def is_valid_noun(surface):
     flag = True
 
-    if surface in G.black_list :
+    if surface in G.black_list:
         flag = False
 
-    # if len(surface) <= 1 :
-    #     flag = False
+    if len(surface) <= 1 :
+        flag = False
 
-    if not TextHelper.contains_any_japanese(surface) :
+    if not TextHelper.contains_any_japanese(surface):
         flag = False
 
     # っ和ッ结尾的一般是语气词
-    if re.compile(r'^[ぁ-んァ-ン]+[っッ]$').match(surface) :
+    if re.compile(r"^[ぁ-んァ-ン]+[っッ]$").match(surface):
         flag = False
-
-    # if not "NOUN" in token.pos_ and not "PRON" in token.pos_ :
-    #     continue
 
     # if TextHelper.is_all_chinese_or_kanji(token.text) :
     #     continue
 
-    if len(surface) == 1 and not TextHelper.is_chinese_or_kanji(surface) :
-        flag = False
+    # if len(surface) == 1 and not TextHelper.is_chinese_or_kanji(surface):
+    #     flag = False
 
     return flag
 
@@ -203,7 +200,7 @@ def translate_surface_by_llm(orignal, max_retry):
                 messages=[
                     {
                         "role": "system",
-                        "content": "这是一段来自幻想系日文游戏的角色名称，请标注罗马音并给出2种中文翻译。结果只需列出罗马音和翻译，无需额外解释，每项之间用顿号分隔。请严格遵循格式：罗马音、翻译1、翻译2",
+                        "content": G.prompt_surface_translation
                     },
                     {"role": "user", "content": f"{orignal}"},
                 ],
@@ -217,14 +214,7 @@ def translate_surface_by_llm(orignal, max_retry):
                 print(f"[错误] 执行 [后处理任务 - 翻译词语] 任务时 : 请求失败，原因：{error}, 正在进行第 {i + 1} / {max_retry} 次重试 ...")
 
     usage = completion.usage
-    translation = (
-        completion.choices[0]
-        .message.content.strip()
-        .replace("\n", "、")
-        .replace("罗马音：", "")
-        .replace("翻译1：", "")
-        .replace("翻译2：", "")
-    )  # ugly hack
+    translation = completion.choices[0].message.content.strip().replace("\n", "  ")
 
     # 幻觉，直接抛掉
     if usage.completion_tokens >= G.max_tokens_word_extract:
@@ -458,19 +448,6 @@ if __name__ == '__main__':
     # 出现次数过滤阈值大小
     G.count_threshold = 3
 
-    # 词汇表黑名单
-    G.black_list = [
-        "様", # sama
-        "さま", # sama
-        "君", # kun
-        "くん", # kun
-        "桑", # san
-        "さん", # san
-        "殿", # dono
-        "どの", # dono
-        ""
-    ]
-
     # 加载配置文件
     try:
         if os.path.exists("config_dev.json"):
@@ -483,8 +460,14 @@ if __name__ == '__main__':
             for key in config:
                 setattr(G, key, config[key])
 
+        with open("blacklist.txt", 'r', encoding='utf-8') as file:
+            G.black_list = [line.rstrip('\n') for line in file]
+
         with open("prompt\\prompt_context_translation.txt", 'r', encoding='utf-8') as file:
             G.prompt_context_translation = file.read()
+
+        with open("prompt\\prompt_surface_translation.txt", 'r', encoding='utf-8') as file:
+            G.prompt_surface_translation = file.read()
         
     except FileNotFoundError:
         print(f"文件 {config_file} 未找到.")
