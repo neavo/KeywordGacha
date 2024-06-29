@@ -545,9 +545,9 @@ if __name__ == '__main__':
 
     # 异步线程数
     if not "127.0.0.1" in G.api_key and not "localhost" in G.base_url:
-        G.max_workers = 8
+        G.max_workers = 4
     else:
-        G.max_workers = 8
+        G.max_workers = 4
 
     # 开始业务逻辑
     main()
