@@ -1,31 +1,31 @@
 import os
 import re
 import json
-import concurrent.futures
-from openai import OpenAI
 from collections import Counter
-from concurrent.futures import as_completed
-
 
 class Word:
     def __init__(self):
-        self.name = False
         self.count = 0
         self.context = []
+        self.context_translation = []
         self.surface = ""
+        self.surface_translation = ""
         self.llmresponse = ""
 
-    def set_name(self, name: bool):
-        self.name = name
+    # 从原文中提取上下文
+    def set_context(self, surface, original):
+        
+        # 匹配原文
+        matches = []
+        for line in original:
+            if surface in line:
+                matches.append(line.strip())    
 
-    def set_count(self, count: int):
-        self.count = count
-
-    def set_context(self, context: list):
-        self.context = context
-
-    def set_surface(self, surface: str):
-        self.surface = surface
-
-    def set_llmresponse(self, llmresponse: str):
-        self.llmresponse = llmresponse
+        # 按长度降序排序
+        matches.sort(key=lambda x: (len(x), x), reverse=True)
+        
+        # 取前十个最长的字符串
+        top_ten_matches = matches[:10] if len(matches) >= 10 else matches
+        
+        # 赋值给 self.context
+        self.context = top_ten_matches
