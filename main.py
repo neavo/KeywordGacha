@@ -375,54 +375,29 @@ def main():
     # 合并所有数组
     words_all = merge_and_count(words_llm_counted)
 
-    # 筛选并移除 count 小于 G.count_threshold 的条目
-    words_all = [word for word in words_all if word.count >= G.count_threshold]
+    # 筛选并准备写入词典的条目，这里仅筛选而不改变原列表
+    words_with_threshold = [word for word in words_all if word.count >= G.count_threshold]
 
-    # 分离出角色姓名和非角色姓名的单词列表
-    names_true = [word for word in words_all if word.name]
-    names_false = [word for word in words_all if not word.name]
+    # 分离词表
+    names_true_all = [word for word in words_all if word.name]
+    names_true_with_threshold = [word for word in words_with_threshold if word.name]
 
     # 定义输出文件名
-    dictionary_names_true_file = "角色姓名_列表.json"
-    dictionary_names_false_file = "角色姓名_列表_未通过检查.json"
     names_true_output_file = "角色姓名_日志.txt"
-    names_false_output_file = "角色姓名_日志_未通过检查.txt"
+    dictionary_names_true_file = "角色姓名_列表.json"
 
-    # 写入词典
-    write_words_to_file(names_true, dictionary_names_true_file, False)
-    write_words_to_file(names_false, dictionary_names_false_file, False)
-
-    # 写入日志
-    write_words_to_file(names_true, names_true_output_file, True)
-    write_words_to_file(names_false, names_false_output_file, True)
+    # 写入文件
+    write_words_to_file(names_true_all, names_true_output_file, True)
+    write_words_to_file(names_true_with_threshold, dictionary_names_true_file, False)
 
     # 输出日志
     print()
     print(f"结果已写入到:")
-    print(f"　　{dictionary_names_true_file}")
     print(f"　　{names_true_output_file}")
-    print(f"　　{dictionary_names_false_file}")
-    print(f"　　{names_false_output_file}")
+    print(f"　　{dictionary_names_true_file}")
 
 # 开始运行程序
 if __name__ == '__main__':
-
-    # 输入文件名
-    # 支持两种不同的文本输入格式，根据后缀名识别
-    # 可以直接使用 mtool 导出文本
-    #
-    # JSON:
-    #   {
-    #       "原文": "译文",
-    #       "原文": "译文",
-    #       "原文": "译文"
-    #   }
-    # 
-    # TXT:
-    #       原文
-    #       原文
-    #       原文
-
     # G.input_file_name = "all.orig.txt"
     G.input_file_name = "ManualTransFile.json"
 
