@@ -6,49 +6,12 @@ from openai import OpenAI
 from collections import Counter
 from concurrent.futures import as_completed
 
+from model.word import Word 
+
 # 定义全局对象
 # 方便共享全局数据
 # 丑陋，但是有效，不服你咬我啊
 G = type('GClass', (), {})()
-
-class Word:
-    def __init__(self):
-        self.name = False
-        self.count = 0
-        self.context = []
-        self.surface = ""
-        self.attribute = ""
-        self.llmresponse = ""
-
-    def set_name(self, name: bool):
-        self.name = name
-
-    def set_count(self, count: int):
-        self.count = count
-
-    def set_context(self, context: list):
-        self.context = context
-
-    def set_surface(self, surface: str):
-        self.surface = surface
-
-    def set_attribute(self, attribute: str):
-        self.attribute = attribute
-
-    def set_llmresponse(self, llmresponse: str):
-        self.llmresponse = llmresponse
-
-    # 从原始文本中获取上下文
-    def set_context_from_lines(self, lines: list):
-        for line in lines:
-            if self.surface in line:
-                # 如果context未满，直接添加
-                if len(self.context) < 10:
-                    self.context.append(line.strip())
-                else:
-                    # context已满，替换最短的条目
-                    shortest_index = min(range(len(self.context)), key=lambda i: len(self.context[i]))
-                    self.context[shortest_index] = line.strip()
 
 # 读取TXT文件并返回
 def read_txt_file(filename):
