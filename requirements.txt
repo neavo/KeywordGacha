@@ -1,1 +1,3 @@
 openai
+tqdm
+tenacity
