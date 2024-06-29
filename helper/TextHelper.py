@@ -36,7 +36,7 @@ class TextHelper:
 
     # 检查字符串是否包含至少一个日文字符
     @staticmethod
-    def contains_japanese(text):
+    def contains_any_japanese(text):
         return any(TextHelper._is_japanese(char) for char in text)
 
     # 判断输入的字符串是否全部由日文字符组成

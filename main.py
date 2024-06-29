@@ -49,24 +49,23 @@ def read_json_file(filename):
         exit(1)
 
 # 将字符串数组按照字节阈值进行分割。
-def split_by_byte_threshold(strings, threshold):
+def split_by_byte_threshold(lines, threshold):
     result = []  # 存储处理后的字符串段
     current_segment = []  # 临时存储当前段的字符串
     current_size = 0  # 当前段的字节大小
     
-    for string in strings:
-        string = string.strip()
-        string_size = len(string.encode('utf-8'))  # 计算字符串的字节长度
+    for line in lines:
+        line_len = len(line.encode('utf-8'))  # 计算字符串的字节长度
         
         # 如果加上当前字符串会导致超过阈值，则先处理并清空当前段
-        if current_size + string_size > threshold:
+        if current_size + line_len > threshold:
             result.append(''.join(current_segment))  # 拼接并添加到结果列表
             current_segment = []  # 重置当前段
             current_size = 0  # 重置当前段字节大小
         
         # 添加当前字符串到当前段
-        current_segment.append(string)
-        current_size += string_size
+        current_segment.append(line)
+        current_size += line_len
     
     # 添加最后一个段，如果非空
     if current_segment:
@@ -84,7 +83,7 @@ def is_valid_noun(surface):
     # if len(surface) <= 1 :
     #     flag = False
 
-    if not TextHelper.contains_japanese(surface) :
+    if not TextHelper.contains_any_japanese(surface) :
         flag = False
 
     # っ和ッ结尾的一般是语气词
@@ -372,6 +371,15 @@ def read_data_file():
         input_data = read_json_file(input_file_name)
     else:
         print(f"不支持的文件格式: {input_file_name}")
+
+    for k, line in enumerate(input_data):
+        line.strip()
+
+        if len(line) == 0:
+            input_data.pop(k)
+
+        if not TextHelper.contains_any_japanese(line):
+            input_data.pop(k)
 
     return input_data
 
