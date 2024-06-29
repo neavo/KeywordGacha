@@ -97,7 +97,7 @@ def is_valid_noun(surface):
     # if TextHelper.is_all_chinese_or_kanji(token.text) :
     #     continue
 
-    if len(surface) == 1 and not is_chinese_or_kanji(surface) :
+    if len(surface) == 1 and not TextHelper.is_chinese_or_kanji(surface) :
         flag = False
 
     return flag

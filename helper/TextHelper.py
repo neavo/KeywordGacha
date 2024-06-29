@@ -31,7 +31,7 @@ class TextHelper:
 
     # 判断字符是否为中文或日文汉字
     @staticmethod
-    def _is_chinese_or_kanji(ch):
+    def is_chinese_or_kanji(ch):
         return TextHelper.CJK_START <= ch <= TextHelper.CJK_END
 
     # 检查字符串是否包含至少一个日文字符
@@ -47,4 +47,4 @@ class TextHelper:
     # 判断输入的字符串是否全部由中文或日文汉字组成
     @staticmethod
     def is_all_chinese_or_kanji(text):
-        return all(TextHelper._is_chinese_or_kanji(char) for char in text)
+        return all(TextHelper.is_chinese_or_kanji(char) for char in text)
