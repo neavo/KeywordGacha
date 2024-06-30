@@ -8,7 +8,6 @@ from helper.TextHelper import TextHelper
 from model.Word import Word
 from helper.LogHelper import LogHelper
 
-
 class LLM:
 
     MAX_RETRY = 2 # 最大重试次数
@@ -134,9 +133,6 @@ class LLM:
         words = []
         usage, message, llmresponse = await self.request(text)
 
-        if text in ["3", "6", "9"]:
-            raise Exception(f"RAISE - {text}")
-
         # 幻觉，直接抛掉
         if usage.completion_tokens >= self.MAX_TOKENS_WORD_EXTRACT:
             return text, words
@@ -172,7 +168,7 @@ class LLM:
             texts_successed.append(text)
             LogHelper.info(f"[LLM 分词] 已完成 {len(texts_successed)} / {len(texts)} ...")       
         except Exception as error:
-            LogHelper.warning(f"[LLM 分词] 执行失败，如为超过重试次数，稍后将重试 ...{error}")
+            LogHelper.warning(f"[LLM 分词] 执行失败，如未超过重试次数，稍后将重试 ... {error}")
 
         # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
         texts_failed.clear()
