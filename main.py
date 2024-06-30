@@ -9,18 +9,20 @@ from concurrent.futures import as_completed
 from openai import OpenAI
 from openai import AsyncOpenAI
 
+from model.LLM import LLM
 from model.Word import Word
 from helper.TextHelper import TextHelper
+from helper.LogHelper import LogHelper
 
 # 定义全局对象
 # 方便共享全局数据
 # 丑陋，但是有效，不服你咬我啊
-G = type('GClass', (), {})()
+G = type("GClass", (), {})()
 
 # 读取TXT文件并返回
 def read_txt_file(filename):
     try:
-        with open(filename, 'r', encoding='utf-8') as file:
+        with open(filename, "r", encoding="utf-8") as file:
             lines = file.readlines()
         return lines
     except FileNotFoundError:
@@ -31,14 +33,14 @@ def read_txt_file(filename):
 def read_json_file(filename):
     try:
         # 读取并加载JSON文件
-        with open(filename, 'r', encoding='utf-8') as file:
+        with open(filename, "r", encoding="utf-8") as file:
             data = json.load(file)
-        
+
         # 遍历JSON数据，提取所有键
         keys_list = []
         for key in data.keys():
             keys_list.append(key)
-        
+
         # 返回包含所有键的列表
         return keys_list
     except FileNotFoundError:
@@ -53,119 +55,25 @@ def split_by_byte_threshold(lines, threshold):
     result = []  # 存储处理后的字符串段
     current_segment = []  # 临时存储当前段的字符串
     current_size = 0  # 当前段的字节大小
-    
+
     for line in lines:
-        line_len = len(line.encode('utf-8'))  # 计算字符串的字节长度
-        
+        line_len = len(line.encode("utf-8"))  # 计算字符串的字节长度
+
         # 如果加上当前字符串会导致超过阈值，则先处理并清空当前段
         if current_size + line_len > threshold:
-            result.append(''.join(current_segment))  # 拼接并添加到结果列表
+            result.append("".join(current_segment))  # 拼接并添加到结果列表
             current_segment = []  # 重置当前段
             current_size = 0  # 重置当前段字节大小
-        
+
         # 添加当前字符串到当前段
         current_segment.append(line)
         current_size += line_len
-    
+
     # 添加最后一个段，如果非空
     if current_segment:
-        result.append(''.join(current_segment))
-    
+        result.append("".join(current_segment))
+
     return result
-
-# 判断是否是合法的名词
-def is_valid_noun(surface):
-    flag = True
-
-    if surface in G.black_list:
-        flag = False
-
-    if len(surface) <= 1 :
-        flag = False
-
-    if not TextHelper.contains_any_japanese(surface):
-        flag = False
-
-    # っ和ッ结尾的一般是语气词
-    if re.compile(r"^[ぁ-んァ-ン]+[っッ]$").match(surface):
-        flag = False
-
-    # if TextHelper.is_all_chinese_or_kanji(token.text) :
-    #     continue
-
-    # if len(surface) == 1 and not TextHelper.is_chinese_or_kanji(surface):
-    #     flag = False
-
-    return flag
-
-# 使用 llm 分词
-def extract_nouns_llm(context):
-    words = []
-    
-    completion = G.openai_handler.chat.completions.create(
-        model = G.model_name,
-        temperature = 0.1,
-        top_p = 0.3,
-        max_tokens = G.max_tokens_word_extract,
-        frequency_penalty = 0.2,
-        messages = [
-            {
-                "role": "system",
-                "content": "请分析以下日语句子，这是一段来自日文游戏的文本，从中识别出所有可能的角色名称。在回答中，只需列出这些可能的角色名称，如果有多个，请使用英文逗号(,)进行分隔。"
-            },
-            {
-                "role": "user", "content": f"{context}"
-            }
-        ]
-    )
-
-    llmresponse = completion
-    usage = completion.usage
-    message = completion.choices[0].message
-
-    # 幻觉，直接抛掉
-    if usage.completion_tokens >= G.max_tokens_word_extract:
-        return words
-
-    for text in message.content.split(","):
-        surface = text.strip()
-
-        # 跳过空字符串
-        if not surface:
-            continue
-        
-        # 防止模型瞎编出原文中不存在的词
-        if not surface in context:
-            continue
-
-        if is_valid_noun(surface):
-            word = Word()
-            word.count = 1
-            word.surface = surface
-            word.llmresponse = llmresponse
-            word.set_context(surface, G.input_data)
-
-            words.append(word)
-
-    return words
-
-# 调用 llm 分词函数，如果失败，则重试
-def extract_nouns_llm_with_retry(context, max_retry):
-    words = []
-
-    for i in range(max_retry):
-        try:
-            words = extract_nouns_llm(context)
-            break
-        except Exception as error:
-            print(error)
-
-            if i + 1 >= max_retry :
-                print(f"[错误] 执行 [LLM 分词任务] 任务时 : 重试次数耗尽，放弃该请求.")
-            else:
-                print(f"[错误] 执行 [LLM 分词任务] 任务时 : 请求失败，原因：{error}, 正在进行第 {i + 1} / {max_retry} 次重试 ...")
-    
-    return words
 
 # 合并具有相同表面形式（surface）的 Word 对象，计数并逆序排序。
 def merge_and_count(words_list):
@@ -195,29 +103,30 @@ def translate_surface_by_llm(orignal, max_retry):
                 model=G.model_name,
                 temperature=0.1,
                 top_p=0.3,
-                max_tokens=G.max_tokens_word_extract,
+                max_tokens=512,
                 frequency_penalty=0.2,
                 messages=[
-                    {
-                        "role": "system",
-                        "content": G.prompt_surface_translation
-                    },
+                    {"role": "system", "content": G.prompt_translate_context},
                     {"role": "user", "content": f"{orignal}"},
                 ],
             )
 
             break
         except Exception as error:
-            if i + 1 >= max_retry :
-                print(f"[错误] 执行 [后处理任务 - 翻译词语] 任务时 : 重试次数耗尽，放弃该请求.")
+            if i + 1 >= max_retry:
+                print(
+                    f"[错误] 执行 [后处理任务 - 翻译词语] 任务时 : 重试次数耗尽，放弃该请求."
+                )
             else:
-                print(f"[错误] 执行 [后处理任务 - 翻译词语] 任务时 : 请求失败，原因：{error}, 正在进行第 {i + 1} / {max_retry} 次重试 ...")
+                print(
+                    f"[错误] 执行 [后处理任务 - 翻译词语] 任务时 : 请求失败，原因：{error}, 正在进行第 {i + 1} / {max_retry} 次重试 ..."
+                )
 
     usage = completion.usage
     translation = completion.choices[0].message.content.strip().replace("\n", "  ")
 
     # 幻觉，直接抛掉
-    if usage.completion_tokens >= G.max_tokens_word_extract:
+    if usage.completion_tokens >= 512:
         return ""
 
     return translation
@@ -229,15 +138,15 @@ def translate_context_by_llm(orignal, max_retry):
     for i in range(max_retry):
         try:
             completion = G.openai_handler.chat.completions.create(
-                model = G.model_name,
-                temperature = 0.1,
-                top_p = 0.3,
-                max_tokens = G.max_tokens_context_translation,
-                frequency_penalty = 0,
+                model=G.model_name,
+                temperature=0.1,
+                top_p=0.3,
+                max_tokens=G.max_tokens_context_translation,
+                frequency_penalty=0,
                 messages=[
                     {
                         "role": "system",
-                        "content": G.prompt_context_translation,
+                        "content": G.prompt_translate_surface,
                     },
                     {"role": "user", "content": f"{'\n'.join(orignal)}"},
                 ],
@@ -245,10 +154,14 @@ def translate_context_by_llm(orignal, max_retry):
 
             break
         except Exception as error:
-            if i + 1 >= max_retry :
-                print(f"[错误] 执行 [后处理任务 - 翻译上下文] 任务时 : 重试次数耗尽，放弃该请求.")
+            if i + 1 >= max_retry:
+                print(
+                    f"[错误] 执行 [后处理任务 - 翻译上下文] 任务时 : 重试次数耗尽，放弃该请求."
+                )
             else:
-                print(f"[错误] 执行 [后处理任务 - 翻译上下文] 任务时 : 请求失败，原因：{error}, 正在进行第 {i + 1} / {max_retry} 次重试 ...")
+                print(
+                    f"[错误] 执行 [后处理任务 - 翻译上下文] 任务时 : 请求失败，原因：{error}, 正在进行第 {i + 1} / {max_retry} 次重试 ..."
+                )
 
     usage = completion.usage
     content = completion.choices[0].message.content.strip()
@@ -273,7 +186,7 @@ def words_post_process(words):
         for k, word in enumerate(words):
             future = executor.submit(translate_surface_by_llm, word.surface, 3)
             mapping[future] = word
-            futures.append(future)   
+            futures.append(future)
 
         for future in as_completed(futures):
             try:
@@ -283,7 +196,9 @@ def words_post_process(words):
                 mapping_word.surface_translation = result
 
                 finished_task = finished_task + 1
-                print(f"已完成 [后处理任务 - 翻译词语] {finished_task} / {len(futures)} ...")
+                print(
+                    f"已完成 [后处理任务 - 翻译词语] {finished_task} / {len(futures)} ..."
+                )
             except Exception as error:
                 print(f"[错误] 执行 [后处理任务 - 翻译词语] 任务时 : {error}")
 
@@ -295,69 +210,83 @@ def words_post_process(words):
         for k, word in enumerate(words):
             future = executor.submit(translate_context_by_llm, word.context, 3)
             mapping[future] = word
-            futures.append(future)   
+            futures.append(future)
 
         for future in as_completed(futures):
             try:
                 result = future.result()
 
                 mapping_word = mapping[future]
-                mapping_word.context_translation  = result
+                mapping_word.context_translation = result
 
                 finished_task = finished_task + 1
-                print(f"已完成 [后处理任务 - 翻译上下文] {finished_task} / {len(futures)} ...")
+                print(
+                    f"已完成 [后处理任务 - 翻译上下文] {finished_task} / {len(futures)} ..."
+                )
             except Exception as error:
                 print(f"[错误] 执行 [后处理任务 - 翻译上下文] 任务时 : {error}")
-    
+
 # 将 Word 列表写入文件
 def write_words_to_file(words, filename, detailmode):
-    with open(filename, 'w', encoding='utf-8') as file:
-        if not detailmode: file.write("{")
+    with open(filename, "w", encoding="utf-8") as file:
+        if not detailmode:
+            file.write("{")
 
         for k, word in enumerate(words):
             if detailmode:
                 file.write(f"词语原文 : {word.surface}\n")
                 file.write(f"词语翻译 : {word.surface_translation}\n")
                 file.write(f"出现次数 : {word.count}\n")
-                file.write(f"上下文原文 : -----------------------------------------------------\n")
+                file.write(
+                    f"上下文原文 : -----------------------------------------------------\n"
+                )
                 file.write(f"{'    \n'.join(word.context)}\n")
-                file.write(f"上下文翻译 : -----------------------------------------------------\n")
+                file.write(
+                    f"上下文翻译 : -----------------------------------------------------\n"
+                )
                 file.write(f"{'    \n'.join(word.context_translation)}\n")
                 file.write("\n")
             elif k == 0:
                 file.write("\n")
-                file.write(f"    \"{word.surface}\" : \"\",\n")
+                file.write(f'    "{word.surface}" : "",\n')
             elif k != len(words) - 1:
-                file.write(f"    \"{word.surface}\" : \"\",\n")
+                file.write(f'    "{word.surface}" : "",\n')
             else:
-                file.write(f"    \"{word.surface}\" : \"\"\n")
+                file.write(f'    "{word.surface}" : ""\n')
 
-        if not detailmode: file.write("}")
+        if not detailmode:
+            file.write("}")
 
 # 读取数据文件
 def read_data_file():
     input_data = []
 
     if os.path.exists("ManualTransFile.json"):
-        user_input = input(f"已找到数据文件 \"ManualTransFile.json\"，按回车直接使用或输入其他文件的路径：").strip('"')
+        user_input = input(
+            f'已找到数据文件 "ManualTransFile.json"，按回车直接使用或输入其他文件的路径：'
+        ).strip('"')
 
         if user_input:
             input_file_name = user_input
         else:
             input_file_name = "ManualTransFile.json"
     elif os.path.exists("all.orig.txt"):
-        user_input = input(f"已找到数据文件 \"all.orig.txt\"，按回车直接使用或输入其他文件的路径：").strip('"')
+        user_input = input(
+            f'已找到数据文件 "all.orig.txt"，按回车直接使用或输入其他文件的路径：'
+        ).strip('"')
 
         if user_input:
             input_file_name = user_input
         else:
             input_file_name = "all.orig.txt"
     else:
-        input_file_name = input("未找到 \"all.orig.txt\" 或 \"ManualTransFile.json\"，请输入数据文件的路径: ").strip('"')
+        input_file_name = input(
+            '未找到 "all.orig.txt" 或 "ManualTransFile.json"，请输入数据文件的路径: '
+        ).strip('"')
 
-    if input_file_name.endswith('.txt'):
+    if input_file_name.endswith(".txt"):
         input_data = read_txt_file(input_file_name)
-    elif input_file_name.endswith('.json'):
+    elif input_file_name.endswith(".json"):
         input_data = read_json_file(input_file_name)
     else:
         print(f"不支持的文件格式: {input_file_name}")
@@ -374,33 +303,22 @@ def read_data_file():
     return input_data
 
 # 主函数
-def main():
-    G.input_data = read_data_file()
+async def main():
+    fulltext = read_data_file()
+    LogHelper.info("正在对文件中的文本进行预处理 ...")
+    input_data_splited = split_by_byte_threshold(fulltext, G.split_threshold)
 
-    print("正在读取文件中的文本 ...")
-    input_data_splited = split_by_byte_threshold(G.input_data, G.split_threshold)
-
-    # 执行分词，并行处理
-    with concurrent.futures.ThreadPoolExecutor(max_workers=G.max_workers) as executor:
-        futures = []
-        words_llm = []
-        finished_task = 0
-
-        for k, text in enumerate(input_data_splited):
-            futures.append(executor.submit(extract_nouns_llm_with_retry, text, 3))   
-        for future in as_completed(futures):
-            try:
-                words_llm.extend(future.result())
-                finished_task = finished_task + 1
-                print(f"已完成 [LLM 分词任务] {finished_task} / {len(input_data_splited)} ...")
-            except Exception as error:
-                print(f'Task generated an exception: {error}')
-
-    # 分别处理并统计每个tokenizer的结果
-    words_llm_counted = merge_and_count(words_llm)
+    LogHelper.info("即将开始执行 [LLM 分词] ...")
+    llm = LLM(G.api_key, G.base_url, G.model_name)
+    llm.load_black_list("blacklist.txt")
+    llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
+    llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
+    llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
+    
+    words = await llm.extract_words_batch(input_data_splited, fulltext)
 
     # 合并所有数组
-    words_all = merge_and_count(words_llm_counted)
+    words_all = merge_and_count(words)
 
     # 按阈值筛选
     words_with_threshold = [word for word in words_all if word.count >= G.count_threshold]
@@ -423,21 +341,18 @@ def main():
     print(f"　　{dictionary_names_true_file}")
 
 # 开始运行程序
-if __name__ == '__main__':
+if __name__ == "__main__":
     print()
     print()
+    print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print(f"※※※※")
-    print(f"※※※※")
-    print(f"※※※※  ※※※※                  注意             ")
+    print(f"※※※※  ※※※※                  注意              ")
     print(f"※※※※  ※※※※        处理流程将消耗巨量 Token     ")
-    print(f"※※※※  ※※※※    使用在线接口的同学请关注自己的账单")
+    print(f"※※※※  ※※※※    使用在线接口的同学请关注自己的账单 ")
     print(f"※※※※")
-    print(f"※※※※")
+    print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print()
     print()
-
-    # 每次返回的最大Token阈值 - 分词时
-    G.max_tokens_word_extract = 512
 
     # 每次返回的最大Token阈值 - 翻译上下文时
     G.max_tokens_context_translation = 1024
@@ -455,20 +370,17 @@ if __name__ == '__main__':
         else:
             config_file = "config.json"
 
-        with open(config_file, 'r', encoding='utf-8') as file:
+        with open(config_file, "r", encoding="utf-8") as file:
             config = json.load(file)
             for key in config:
                 setattr(G, key, config[key])
 
-        with open("blacklist.txt", 'r', encoding='utf-8') as file:
-            G.black_list = [line.rstrip('\n') for line in file]
+        with open("prompt\\prompt_translate_surface.txt", "r", encoding="utf-8") as file:
+            G.prompt_translate_surface = file.read()
 
-        with open("prompt\\prompt_context_translation.txt", 'r', encoding='utf-8') as file:
-            G.prompt_context_translation = file.read()
+        with open("prompt\\prompt_translate_context.txt", "r", encoding="utf-8") as file:
+            G.prompt_translate_context = file.read()
 
-        with open("prompt\\prompt_surface_translation.txt", 'r', encoding='utf-8') as file:
-            G.prompt_surface_translation = file.read()
-        
     except FileNotFoundError:
         print(f"文件 {config_file} 未找到.")
     except json.JSONDecodeError:
@@ -476,10 +388,7 @@ if __name__ == '__main__':
 
     # OpenAI SDK
     G.openai_handler = OpenAI(
-        api_key = G.api_key,
-        base_url= G.base_url,
-        timeout = 120,
-        max_retries = 0
+        api_key=G.api_key, base_url=G.base_url, timeout=120, max_retries=0
     )
 
     # 异步线程数
@@ -489,4 +398,4 @@ if __name__ == '__main__':
         G.max_workers = 4
 
     # 开始业务逻辑
-    main()
+    asyncio.run(main())
