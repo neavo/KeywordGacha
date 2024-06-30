@@ -163,6 +163,7 @@ class LLM:
 
         return text, words
 
+    # 分词任务完成时的回调
     def _on_extract_words_task_done(self, future, texts, words, texts_failed, texts_successed):
         try:
             text, result = future.result()

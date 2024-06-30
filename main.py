@@ -106,7 +106,7 @@ def translate_surface_by_llm(orignal, max_retry):
                 max_tokens=512,
                 frequency_penalty=0.2,
                 messages=[
-                    {"role": "system", "content": G.prompt_translate_context},
+                    {"role": "system", "content": G.prompt_translate_surface},
                     {"role": "user", "content": f"{orignal}"},
                 ],
             )
@@ -146,7 +146,7 @@ def translate_context_by_llm(orignal, max_retry):
                 messages=[
                     {
                         "role": "system",
-                        "content": G.prompt_translate_surface,
+                        "content": G.prompt_translate_context,
                     },
                     {"role": "user", "content": f"{'\n'.join(orignal)}"},
                 ],
