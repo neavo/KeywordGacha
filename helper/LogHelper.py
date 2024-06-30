@@ -6,7 +6,13 @@ class LogHelper:
     logger.setLevel(logging.DEBUG)
 
     # 创建一个handler
-    file_handler = logging.FileHandler("KeywordGacha.log", encoding='utf-8')
+    file_handler = TimedRotatingFileHandler(
+                        filename = "KeywordGacha.log",
+                        encoding = "utf-8",
+                        when = "H", # 每小时轮转
+                        interval = 1, # 轮转周期为1
+                        backupCount = 24 # 保留24个备份
+                    )
     console_handler = logging.StreamHandler()
 
     # 定义输出格式
