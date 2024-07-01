@@ -1,0 +1,65 @@
+name: Auto Build DEV
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.12
+
+      - name: Install Python
+        run: |
+          python -m pip install --upgrade pip
+
+      - name: Install Requirements
+        run: |
+          pip install -U requirements.txt
+
+      - name: Build EXE
+        run: pyinstaller --distpath dist --name KeywordGacha --clean --noconfirm --onefile main.py
+
+      - name: Zip dist folder
+        run: |
+          Copy-Item -Path "prompt" -Destination "dist\prompt" -Recurse -Force
+          Copy-Item -Path "config.json" -Destination "dist\config.json" -Recurse -Force
+          Copy-Item -Path "blacklist.txt" -Destination "dist\blacklist.txt" -Recurse -Force
+          Compress-Archive -Path "dist" -DestinationPath "KeywordGacha-DEV.zip"
+          
+      - name: Delete release
+        uses: dev-drprasad/delete-tag-and-release@v0.2.1
+        with:
+          tag_name: DEV_BUILD
+          delete_release: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.KeywordGacha }}
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.KeywordGacha }}
+        with:
+          tag_name: DEV_BUILD
+          release_name: KeywordGacha-DEV
+          draft: false
+          prerelease: true
+
+      - name: Upload file
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.KeywordGacha }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./KeywordGacha-DEV.zip
+          asset_name: KeywordGacha-DEV.zip
+          asset_content_type: application/octet-stream
