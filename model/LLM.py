@@ -3,10 +3,10 @@ import random
 import asyncio
 
 from openai import AsyncOpenAI
-from helper.TextHelper import TextHelper
 
 from model.Word import Word
 from helper.LogHelper import LogHelper
+from helper.TextHelper import TextHelper
 
 class LLM:
 
@@ -317,8 +317,13 @@ class LLM:
             return word
 
         context_translation = []
+
         for k, text in enumerate(message.content.strip().split("\n")):
-            context_translation.append(text.strip().replace("\n", ""))
+            text = text.strip()
+            if len(text) == 0:
+                continue
+            context_translation.append(text)
+
         word.context_translation = context_translation
 
         return word
