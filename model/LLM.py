@@ -57,7 +57,7 @@ class LLM:
         self.openai_handler = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
-            timeout=60,
+            timeout=120,
             max_retries=0
         )
 
@@ -311,19 +311,20 @@ class LLM:
     # 上下文翻译任务
     async def translate_context(self, word):
         async with self.semaphore:
-            usage, message, _ = await self.request('\n'.join(word.context), self.TASK_TYPE_TRANSLATE_CONTEXT)
-
-            # 幻觉，直接抛掉
-            if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT:
-                return word
-
             context_translation = []
 
-            for k, text in enumerate(message.content.strip().split("\n")):
-                text = text.strip()
-                if len(text) == 0:
+            for k, line in enumerate(word.context):
+                usage, message, _ = await self.request(line, self.TASK_TYPE_TRANSLATE_CONTEXT)
+
+                # 幻觉，直接抛掉
+                if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT:
                     continue
-                context_translation.append(text)
+
+                line_translation = message.content.strip().replace("\n", "")
+                if len(line_translation) == 0:
+                    continue
+
+                context_translation.append(line_translation)
 
             word.context_translation = context_translation
 
