@@ -215,6 +215,9 @@ async def main():
     LogHelper.info(f"　　{dictionary_names_true_file}")
     LogHelper.info("\n\n")
 
+    # 等待用户推出
+    input("按回车键退出程序...")
+
 # 开始运行程序
 if __name__ == "__main__":
     print()
