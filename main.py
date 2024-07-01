@@ -191,12 +191,14 @@ async def main():
     words_with_threshold = [word for word in words_all if word.count >= COUNT_THRESHOLD]
 
     # 等待翻译词表任务结果
-    LogHelper.info("即将开始执行 [后处理 - 词表翻译] ...")
-    words_with_threshold = await llm.translate_surface_batch(words_with_threshold)
+    if G.translate_surface_mode == 1:
+        LogHelper.info("即将开始执行 [后处理 - 词表翻译] ...")
+        words_with_threshold = await llm.translate_surface_batch(words_with_threshold)
 
     # 等待上下文词表任务结果
-    LogHelper.info("即将开始执行 [后处理 - 上下文翻译] ...")
-    words_with_threshold = await llm.translate_context_batch(words_with_threshold)
+    if G.translate_context_mode == 1:
+        LogHelper.info("即将开始执行 [后处理 - 上下文翻译] ...")
+        words_with_threshold = await llm.translate_context_batch(words_with_threshold)
 
     # 定义输出文件名
     names_true_output_file = "角色姓名_日志.txt"
@@ -207,10 +209,11 @@ async def main():
     write_words_to_file(words_with_threshold, dictionary_names_true_file, False)
 
     # 输出日志
-    LogHelper.info("")
+    LogHelper.info("\n\n")
     LogHelper.info(f"结果已写入到:")
     LogHelper.info(f"　　{names_true_output_file}")
     LogHelper.info(f"　　{dictionary_names_true_file}")
+    LogHelper.info("\n\n")
 
 # 开始运行程序
 if __name__ == "__main__":
