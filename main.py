@@ -6,13 +6,10 @@ import concurrent.futures
 from collections import Counter
 from concurrent.futures import as_completed
 
-from openai import OpenAI
-from openai import AsyncOpenAI
-
 from model.LLM import LLM
 from model.Word import Word
-from helper.TextHelper import TextHelper
 from helper.LogHelper import LogHelper
+from helper.TextHelper import TextHelper
 
 # 定义全局对象
 # 方便共享全局数据
