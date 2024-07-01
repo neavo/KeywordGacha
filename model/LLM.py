@@ -57,7 +57,7 @@ class LLM:
         self.openai_handler = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
-            timeout=120,
+            timeout=60,
             max_retries=0
         )
 
@@ -168,34 +168,35 @@ class LLM:
 
     # 分词任务
     async def extract_words(self, text, fulltext):
-        words = []
-        usage, message, llmresponse = await self.request(text, self.TASK_TYPE_EXTRACT_WORD)
+        async with self.semaphore:
+            words = []
+            usage, message, llmresponse = await self.request(text, self.TASK_TYPE_EXTRACT_WORD)
 
-        # 幻觉，直接抛掉
-        if usage.completion_tokens >= self.MAX_TOKENS_WORD_EXTRACT:
+            # 幻觉，直接抛掉
+            if usage.completion_tokens >= self.MAX_TOKENS_WORD_EXTRACT:
+                return text, words
+
+            for surface in message.content.split(","):
+                surface = surface.strip()
+
+                # 跳过空字符串
+                if not surface:
+                    continue
+
+                # 防止模型瞎编出原文中不存在的词
+                if not surface in text:
+                    continue
+
+                if self.is_valid_noun(surface):
+                    word = Word()
+                    word.count = 1
+                    word.surface = surface
+                    word.llmresponse = llmresponse
+                    word.set_context(surface, fulltext)
+
+                    words.append(word)
+
             return text, words
-
-        for surface in message.content.split(","):
-            surface = surface.strip()
-
-            # 跳过空字符串
-            if not surface:
-                continue
-
-            # 防止模型瞎编出原文中不存在的词
-            if not surface in text:
-                continue
-
-            if self.is_valid_noun(surface):
-                word = Word()
-                word.count = 1
-                word.surface = surface
-                word.llmresponse = llmresponse
-                word.set_context(surface, fulltext)
-
-                words.append(word)
-
-        return text, words
 
     # 分词任务完成时的回调
     def _on_extract_words_task_done(self, future, texts, words, texts_failed, texts_successed):
@@ -221,11 +222,10 @@ class LLM:
             texts_this_round = texts_failed
 
         tasks = []
-        async with self.semaphore:
-            for k, text in enumerate(texts_this_round):
-                task = asyncio.create_task(self.extract_words(text, fulltext))
-                task.add_done_callback(lambda future: self._on_extract_words_task_done(future, texts, words, texts_failed, texts_successed))
-                tasks.append(task)
+        for k, text in enumerate(texts_this_round):
+            task = asyncio.create_task(self.extract_words(text, fulltext))
+            task.add_done_callback(lambda future: self._on_extract_words_task_done(future, texts, words, texts_failed, texts_successed))
+            tasks.append(task)
         await asyncio.gather(*tasks, return_exceptions=True)
 
         return words, texts_failed, texts_successed
@@ -250,15 +250,16 @@ class LLM:
 
     # 词表翻译任务
     async def translate_surface(self, word):
-        usage, message, _ = await self.request(word.surface, self.TASK_TYPE_TRANSLATE_SURFACE)
+        async with self.semaphore:
+            usage, message, _ = await self.request(word.surface, self.TASK_TYPE_TRANSLATE_SURFACE)
 
-        # 幻觉，直接抛掉
-        if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_SURFACE:
+            # 幻觉，直接抛掉
+            if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_SURFACE:
+                return word
+
+            word.surface_translation = message.content.strip().replace("\n", "  ")
+
             return word
-
-        word.surface_translation = message.content.strip().replace("\n", "  ")
-
-        return word
 
     # 词表翻译任务完成时的回调
     def _on_translate_surface_task_done(self, future, words, words_failed, words_successed):
@@ -283,11 +284,10 @@ class LLM:
             words_this_round = words_failed       
 
         tasks = []
-        async with self.semaphore:
-            for k, word in enumerate(words_this_round):
-                task = asyncio.create_task(self.translate_surface(word))
-                task.add_done_callback(lambda future: self._on_translate_surface_task_done(future, words, words_failed, words_successed))
-                tasks.append(task)
+        for k, word in enumerate(words_this_round):
+            task = asyncio.create_task(self.translate_surface(word))
+            task.add_done_callback(lambda future: self._on_translate_surface_task_done(future, words, words_failed, words_successed))
+            tasks.append(task)
         await asyncio.gather(*tasks, return_exceptions=True)
 
         return words_failed, words_successed
@@ -310,23 +310,24 @@ class LLM:
 
     # 上下文翻译任务
     async def translate_context(self, word):
-        usage, message, _ = await self.request('\n'.join(word.context), self.TASK_TYPE_TRANSLATE_CONTEXT)
+        async with self.semaphore:
+            usage, message, _ = await self.request('\n'.join(word.context), self.TASK_TYPE_TRANSLATE_CONTEXT)
 
-        # 幻觉，直接抛掉
-        if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT:
+            # 幻觉，直接抛掉
+            if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT:
+                return word
+
+            context_translation = []
+
+            for k, text in enumerate(message.content.strip().split("\n")):
+                text = text.strip()
+                if len(text) == 0:
+                    continue
+                context_translation.append(text)
+
+            word.context_translation = context_translation
+
             return word
-
-        context_translation = []
-
-        for k, text in enumerate(message.content.strip().split("\n")):
-            text = text.strip()
-            if len(text) == 0:
-                continue
-            context_translation.append(text)
-
-        word.context_translation = context_translation
-
-        return word
 
     # 上下文翻译任务完成时的回调
     def _on_translate_context_task_done(self, future, words, words_failed, words_successed):
@@ -351,11 +352,10 @@ class LLM:
             words_this_round = words_failed       
 
         tasks = []
-        async with self.semaphore:
-            for k, word in enumerate(words_this_round):
-                task = asyncio.create_task(self.translate_context(word))
-                task.add_done_callback(lambda future: self._on_translate_context_task_done(future, words, words_failed, words_successed))
-                tasks.append(task)
+        for k, word in enumerate(words_this_round):
+            task = asyncio.create_task(self.translate_context(word))
+            task.add_done_callback(lambda future: self._on_translate_context_task_done(future, words, words_failed, words_successed))
+            tasks.append(task)
         await asyncio.gather(*tasks, return_exceptions=True)
 
         return words_failed, words_successed
