@@ -209,7 +209,7 @@ async def main():
     write_words_to_file(words_with_threshold, dictionary_names_true_file, False)
 
     # 输出日志
-    LogHelper.info("\n\n")
+    LogHelper.info("")
     LogHelper.info(f"结果已写入到:")
     LogHelper.info(f"　　{names_true_output_file}")
     LogHelper.info(f"　　{dictionary_names_true_file}")
