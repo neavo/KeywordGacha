@@ -19,32 +19,34 @@ jobs:
           python-version: 3.12
 
       - name: Update Python
-        run: |
-          python -m pip install --upgrade pip
+        run: python -m pip install --upgrade pip
 
       - name: Install Requirements
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Build EXE
-        run: |
-          pyinstaller --name KeywordGacha --clean --noconfirm --onefile main.py
+        run: pyinstaller --name KeywordGacha --clean --noconfirm --onefile main.py
 
       - name: Compress Archive
+        id: compress_files
+        shell: pwsh
         run: |
-          # 生成时间戳，格式为YYYYMMDD_HHMMSS，对应东八区时间（北京时间）
+          # 获取当前UTC时间
           $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 
           # 调整为东八区时间（北京时间）
-          $timestamp = ([System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId($timestamp, [System.TimeZoneInfo]::Utc.Id, 'China Standard Time')).ToString("yyyyMMdd_HHmmss")
+          $timestamp = ([System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::ParseExact($timestamp, "yyyyMMdd_HHmmss", $null), [System.TimeZoneInfo]::Utc.Id, 'China Standard Time')).ToString("yyyyMMdd_HHmmss")
 
           # 复制文件到dist目录
-          Copy-Item -Path "prompt" -Destination "dist\" -Recurse -Force
-          Copy-Item -Path "config.json" -Destination "dist\" -Force
-          Copy-Item -Path "blacklist.txt" -Destination "dist\" -Force
+          Copy-Item -Path "prompt" -Destination "dist" -Recurse -Force
+          Copy-Item -Path "config.json" -Destination "dist" -Force
+          Copy-Item -Path "blacklist.txt" -Destination "dist" -Force
 
           # 压缩dist目录下的所有文件，不包括dist目录本身
           Compress-Archive -Path "dist\*" -DestinationPath "KeywordGacha_DEV_$timestamp.zip" -Force
+
+          # 输出 timestamp 变量以供后续步骤使用
+          echo "::set-output name=timestamp::$timestamp"
 
       - name: Delete Previous Release
         uses: dev-drprasad/delete-tag-and-release@v0.2.1
@@ -52,25 +54,25 @@ jobs:
           tag_name: DEV_BUILD
           delete_release: true
         env:
-          GITHUB_TOKEN: ${{ secrets.KEYWORDGACGA_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
 
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.KEYWORDGACGA_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           tag_name: DEV_BUILD
-          release_name: KeywordGacha_DEV
+          release_name: KeywordGacha_DEV_${{ steps.compress_files.outputs.timestamp }}
           draft: false
           prerelease: false
 
       - name: Upload Release
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.KEYWORDGACGA_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_DEV_*.zip
-          asset_name: KeywordGacha_DEV_$timestamp.zip
+          asset_path: ./KeywordGacha_DEV_${{ steps.compress_files.outputs.timestamp }}.zip
+          asset_name: KeywordGacha_DEV_${{ steps.compress_files.outputs.timestamp }}.zip
           asset_content_type: application/octet-stream
