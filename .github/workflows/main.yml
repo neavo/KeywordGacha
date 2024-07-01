@@ -32,14 +32,20 @@ jobs:
 
       - name: Compress Archive
         run: |
+          # 生成时间戳，格式为YYYYMMDD_HHMMSS，对应东八区时间（北京时间）
+          $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+
+          # 调整为东八区时间（北京时间）
+          $timestamp = ([System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId($timestamp, [System.TimeZoneInfo]::Utc.Id, 'China Standard Time')).ToString("yyyyMMdd_HHmmss")
+
           # 复制文件到dist目录
           Copy-Item -Path "prompt" -Destination "dist\" -Recurse -Force
           Copy-Item -Path "config.json" -Destination "dist\" -Force
           Copy-Item -Path "blacklist.txt" -Destination "dist\" -Force
 
           # 压缩dist目录下的所有文件，不包括dist目录本身
-          Compress-Archive -Path "dist\*" -DestinationPath "KeywordGacha_DEV.zip" -Force
-          
+          Compress-Archive -Path "dist\*" -DestinationPath "KeywordGacha_DEV_$timestamp.zip" -Force
+
       - name: Delete Previous Release
         uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
@@ -65,6 +71,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACGA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_DEV.zip
-          asset_name: KeywordGacha_DEV.zip
+          asset_path: ./KeywordGacha_DEV_*.zip
+          asset_name: KeywordGacha_DEV_$timestamp.zip
           asset_content_type: application/octet-stream
