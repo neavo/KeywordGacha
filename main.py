@@ -16,6 +16,12 @@ from helper.TextHelper import TextHelper
 # 丑陋，但是有效，不服你咬我啊
 G = type("GClass", (), {})()
 
+# 原始文本切片阈值
+SPLIT_THRESHOLD = 4 * 1024
+
+# 词频阈值
+COUNT_THRESHOLD = 3
+
 # 读取TXT文件并返回
 def read_txt_file(filename):
     try:
@@ -166,7 +172,7 @@ def read_data_file():
 async def main():
     fulltext = read_data_file()
     LogHelper.info("正在对文件中的文本进行预处理 ...")
-    input_data_splited = split_by_byte_threshold(fulltext, G.split_threshold)
+    input_data_splited = split_by_byte_threshold(fulltext, SPLIT_THRESHOLD)
 
     llm = LLM(G.api_key, G.base_url, G.model_name)
     llm.load_black_list("blacklist.txt")
@@ -182,7 +188,7 @@ async def main():
     words_all = merge_and_count(words)
 
     # 按阈值筛选
-    words_with_threshold = [word for word in words_all if word.count >= G.count_threshold]
+    words_with_threshold = [word for word in words_all if word.count >= COUNT_THRESHOLD]
 
     # 等待翻译词表任务结果
     LogHelper.info("即将开始执行 [后处理 - 词表翻译] ...")
@@ -219,12 +225,6 @@ if __name__ == "__main__":
     print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print()
     print()
-
-    # 原始文本切片阈值大小
-    G.split_threshold = 4 * 1024
-
-    # 出现次数过滤阈值大小
-    G.count_threshold = 3
 
     # 加载配置文件
     try:
