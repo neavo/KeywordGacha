@@ -11,7 +11,7 @@ from helper.TextHelper import TextHelper
 class LLM:
 
     MAX_RETRY = 2 # 最大重试次数
-    MAX_WORKER = 4 # 最大并发工作者数量
+    MAX_WORKER = 4 # 最大并发任务数量
 
     TASK_TYPE_EXTRACT_WORD = 1 # 分词模式
     TASK_TYPE_TRANSLATE_SURFACE = 2 # 翻译词表模式
@@ -320,7 +320,24 @@ class LLM:
                 if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT:
                     continue
 
-                line_translation = message.content.strip().replace("\n", "")
+                # ugly hack
+                replacements = [
+                    "\n",
+                    "第一行翻译文本：",
+                    "第一行翻译文本",
+                    "第一行：",
+                    "第一行",
+                    "第二行翻译文本：",
+                    "第二行翻译文本",
+                    "第二行：",
+                    "第二行",
+                ]
+                # for k, v in enumerate(replacements):
+                #     line_translation = line_translation.replace(v, "")
+
+                line_translation = re.sub('|'.join(replacements), "", message.content).strip()
+
+
                 if len(line_translation) == 0:
                     continue
 
