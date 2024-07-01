@@ -3,6 +3,10 @@
 - 可以一键从长篇文本中抽取角色名称、地域名称、组织名称等专有名词的名词表与参考文献并自动翻译
 - 相较传统工具，KG 具有高命中、词性辨别、相关片段抓取等特色，并且对文本的格式、语言和内容没有任何要求
 - 可以极大的提升 小说、漫画、字幕、游戏脚本 等文本内容的译前准备工作的效率
+
+> <img src="image/01.jpg" style="width: 75%;" alt="image/01.jpg">
+
+> <img src="image/02.png" style="width: 75%;" alt="image/02.png">
   
 ### 要求 🖥️
 - 兼容 OpenAI 接口格式的大语言模型 API，本地与在线接口均可
@@ -47,17 +51,17 @@
 | translate_surface_mode | 词表的后处理模式，默认为 1 即日中翻译，设为 0 可以跳过翻译，抓取中文内容时使用 | 1 |
 | translate_context_mode | 上下文的后处理模式，默认为 1 即日中翻译，设为 0 可以跳过翻译，抓取中文内容时使用 | 1 |
 
-#### 语言能力
+### 语言能力 🗣️
 
 - 依赖于 AI 模型的能力，较新的模型比如 [GPT4o](https://chatgpt.com/)、[Claude 3.5 Sonnet](https://claude.ai/) 等具有超乎想象多语言能力，但是也十分昂贵
 - [Qwen2 开源版](https://github.com/QwenLM/Qwen2) 在处理中文的表现上称得上优秀，处理日文水平也算是差强人意
 - 欢迎多多试用和对比，KG 应用的开发环境是本地的 Qwen2-7B
 
-#### 开发计划
+### 开发计划 🎢
 
 - [ ] 支持 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的 CSV 文本
 - [ ] 添加 对英文文本的支持
 
-#### 友情提醒
+### 友情提醒 💰
   - KG 会将 `全部的文本` 发送至 AI 进行处理，这个过程会消耗大量的 Token
   - 如使用在线接口，请关注你的账单！
