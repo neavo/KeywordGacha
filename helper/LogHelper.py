@@ -1,5 +1,5 @@
 import logging
-from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import RotatingFileHandler
 
 class LogHelper:
     # 创建一个logger
@@ -7,12 +7,11 @@ class LogHelper:
     logger.setLevel(logging.DEBUG)
 
     # 创建一个handler
-    file_handler = TimedRotatingFileHandler(
+    file_handler = RotatingFileHandler(
                         filename = "KeywordGacha.log",
                         encoding = "utf-8",
-                        when = "H", # 每小时轮转
-                        interval = 1, # 轮转周期为1
-                        backupCount = 24 # 保留24个备份
+                        maxBytes = 1 * 1024 * 1024, 
+                        backupCount = 0
                     )
     console_handler = logging.StreamHandler()
 
