@@ -196,7 +196,7 @@ class LLM:
             return text, words
 
     # 分词任务完成时的回调
-    def _on_extract_words_task_done(self, future, texts, words, texts_failed, texts_successed):
+    def on_extract_words_task_done(self, future, texts, words, texts_failed, texts_successed):
         try:
             text, result = future.result()
             words.extend(result)
@@ -212,7 +212,7 @@ class LLM:
                 texts_failed.append(text)
 
     # 批量执行分词任务的具体实现
-    async def _extract_words_batch(self, texts, fulltext, words, texts_failed, texts_successed):
+    async def do_extract_words_batch(self, texts, fulltext, words, texts_failed, texts_successed):
         if len(texts_failed) == 0:
             texts_this_round = texts
         else:
@@ -221,7 +221,7 @@ class LLM:
         tasks = []
         for k, text in enumerate(texts_this_round):
             task = asyncio.create_task(self.extract_words(text, fulltext))
-            task.add_done_callback(lambda future: self._on_extract_words_task_done(future, texts, words, texts_failed, texts_successed))
+            task.add_done_callback(lambda future: self.on_extract_words_task_done(future, texts, words, texts_failed, texts_successed))
             tasks.append(task)
         await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -233,13 +233,13 @@ class LLM:
         texts_failed = []
         texts_successed = []
 
-        words, texts_failed, texts_successed = await self._extract_words_batch(texts, fulltext, words, texts_failed, texts_successed)
+        words, texts_failed, texts_successed = await self.do_extract_words_batch(texts, fulltext, words, texts_failed, texts_successed)
 
         if len(texts_failed) > 0:
             for i in range(self.MAX_RETRY):
                 LogHelper.warning( f"[LLM 分词] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
 
-                words, texts_failed, texts_successed = await self._extract_words_batch(texts, fulltext, words, texts_failed, texts_successed)
+                words, texts_failed, texts_successed = await self.do_extract_words_batch(texts, fulltext, words, texts_failed, texts_successed)
                 if len(texts_failed) == 0:
                     break
 
@@ -259,7 +259,7 @@ class LLM:
             return word
 
     # 词表翻译任务完成时的回调
-    def _on_translate_surface_task_done(self, future, words, words_failed, words_successed):
+    def on_translate_surface_task_done(self, future, words, words_failed, words_successed):
         try:
             word = future.result()
             words_successed.append(word)
@@ -274,7 +274,7 @@ class LLM:
                 words_failed.append(word)
 
     # 批量执行词表翻译任务的具体实现
-    async def _translate_surface_batch(self, words, words_failed, words_successed):
+    async def do_translate_surface_batch(self, words, words_failed, words_successed):
         if len(words_failed) == 0:
             words_this_round = words
         else:
@@ -283,7 +283,7 @@ class LLM:
         tasks = []
         for k, word in enumerate(words_this_round):
             task = asyncio.create_task(self.translate_surface(word))
-            task.add_done_callback(lambda future: self._on_translate_surface_task_done(future, words, words_failed, words_successed))
+            task.add_done_callback(lambda future: self.on_translate_surface_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
         await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -294,13 +294,13 @@ class LLM:
         words_failed = []
         words_successed = []
 
-        words_failed, words_successed = await self._translate_surface_batch(words, words_failed, words_successed)
+        words_failed, words_successed = await self.do_translate_surface_batch(words, words_failed, words_successed)
 
         if len(words_failed) > 0:
             for i in range(self.MAX_RETRY):
                 LogHelper.warning( f"[后处理 - 词表翻译] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
 
-                words_failed, words_successed = await self._translate_surface_batch(words, words_failed, words_successed)
+                words_failed, words_successed = await self.do_translate_surface_batch(words, words_failed, words_successed)
                 if len(words_failed) == 0:
                     break
         return words
@@ -333,7 +333,7 @@ class LLM:
             return word
 
     # 上下文翻译任务完成时的回调
-    def _on_translate_context_task_done(self, future, words, words_failed, words_successed):
+    def on_translate_context_task_done(self, future, words, words_failed, words_successed):
         try:
             word = future.result()
             words_successed.append(word)
@@ -348,7 +348,7 @@ class LLM:
                 words_failed.append(word)
 
     # 批量执行上下文翻译任务的具体实现
-    async def _translate_context_batch(self, words, words_failed, words_successed):
+    async def do_translate_context_batch(self, words, words_failed, words_successed):
         if len(words_failed) == 0:
             words_this_round = words
         else:
@@ -357,7 +357,7 @@ class LLM:
         tasks = []
         for k, word in enumerate(words_this_round):
             task = asyncio.create_task(self.translate_context(word))
-            task.add_done_callback(lambda future: self._on_translate_context_task_done(future, words, words_failed, words_successed))
+            task.add_done_callback(lambda future: self.on_translate_context_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
         await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -368,13 +368,13 @@ class LLM:
         words_failed = []
         words_successed = []
 
-        words_failed, words_successed = await self._translate_context_batch(words, words_failed, words_successed)
+        words_failed, words_successed = await self.do_translate_context_batch(words, words_failed, words_successed)
 
         if len(words_failed) > 0:
             for i in range(self.MAX_RETRY):
                 LogHelper.warning( f"[后处理 - 上下文翻译] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
 
-                words_failed, words_successed = await self._translate_context_batch(words, words_failed, words_successed)
+                words_failed, words_successed = await self.do_translate_context_batch(words, words_failed, words_successed)
                 if len(words_failed) == 0:
                     break
         return words
