@@ -1,5 +1,6 @@
 import os
 import re
+import csv
 import json
 import asyncio
 import concurrent.futures
@@ -29,7 +30,7 @@ def read_txt_file(filename):
             lines = file.readlines()
         return lines
     except FileNotFoundError:
-        print(f"文件 {filename} 不存在.")
+        LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
         exit(1)
 
 # 读取JSON文件并返回
@@ -47,11 +48,32 @@ def read_json_file(filename):
         # 返回包含所有键的列表
         return keys_list
     except FileNotFoundError:
-        print(f"文件 {filename} 未找到.")
+        LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
         exit(1)
     except json.JSONDecodeError:
-        print(f"文件 {filename} 不是有效的JSON格式.")
+        LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
         exit(1)
+
+# 遍历目录文件夹，读取所有csv文件并返回
+def read_csv_files(directory):
+    input_data = []
+
+    try:
+        for root, _, files in os.walk(directory):
+            for file in files:
+                if file.endswith(".csv"):
+                    file_path = os.path.join(root, file)
+                    with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
+                        reader = csv.reader(csvfile)
+
+                        for row in reader:
+                            input_data.append(row[0])
+                        
+    except Exception as error:
+        LogHelper.error(f"读取文件夹 {directory} 时出错 : {str(error)}")
+        exit(1)
+
+    return input_data
 
 # 将字符串数组按照字节阈值进行分割。
 def split_by_byte_threshold(lines, threshold):
@@ -98,18 +120,17 @@ def merge_and_count(words_list):
 
 # 将 Word 列表写入文件
 def write_words_to_file(words, filename, detailmode):
-    with open(filename, "w", encoding="utf-8") as file:
-        if not detailmode:
-            file.write("{")
 
+    with open(filename, "w", encoding="utf-8") as file:
+        file.write("{") if not detailmode else None
         for k, word in enumerate(words):
             if detailmode:
                 file.write(f"词语原文 : {word.surface}\n")
                 file.write(f"词语翻译 : {word.surface_translation}\n")
                 file.write(f"出现次数 : {word.count}\n")
-                file.write(f"上下文原文 : -----------------------------------------------------\n")
+                file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'    \n'.join(word.context)}\n")
-                file.write(f"上下文翻译 : -----------------------------------------------------\n")
+                file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'    \n'.join(word.context_translation)}\n")
                 file.write("\n")
             elif k == 0:
@@ -119,46 +140,47 @@ def write_words_to_file(words, filename, detailmode):
                 file.write(f'    "{word.surface}" : "",\n')
             else:
                 file.write(f'    "{word.surface}" : ""\n')
-
-        if not detailmode:
-            file.write("}")
+        file.write("}") if not detailmode else None
 
 # 读取数据文件
 def read_data_file():
     input_data = []
 
     if os.path.exists("ManualTransFile.json"):
-        user_input = input(
-            f'已找到数据文件 "ManualTransFile.json"，按回车直接使用或输入其他文件的路径：'
-        ).strip('"')
+        user_input = input(f'已找到数据文件 "ManualTransFile.json"，按回车直接使用或输入其他文件的路径：').strip('"')
 
         if user_input:
             input_file_name = user_input
         else:
             input_file_name = "ManualTransFile.json"
     elif os.path.exists("all.orig.txt"):
-        user_input = input(
-            f'已找到数据文件 "all.orig.txt"，按回车直接使用或输入其他文件的路径：'
-        ).strip('"')
+        user_input = input(f'已找到数据文件 "all.orig.txt"，按回车直接使用或输入其他文件的路径：').strip('"')
 
         if user_input:
             input_file_name = user_input
         else:
             input_file_name = "all.orig.txt"
+    elif os.path.exists("data"):
+        user_input = input(f'已找到数据文件夹 "data"，按回车直接使用或输入其他文件的路径：').strip('"')
+
+        if user_input:
+            input_file_name = user_input
+        else:
+            input_file_name = "data"
     else:
-        input_file_name = input(
-            '未找到 "all.orig.txt" 或 "ManualTransFile.json"，请输入数据文件的路径: '
-        ).strip('"')
+        input_file_name = input('请输入数据文件的路径: ').strip('"')
 
     if input_file_name.endswith(".txt"):
         input_data = read_txt_file(input_file_name)
     elif input_file_name.endswith(".json"):
         input_data = read_json_file(input_file_name)
+    elif os.path.isdir(input_file_name):
+        input_data = read_csv_files(input_file_name)
     else:
         print(f"不支持的文件格式: {input_file_name}")
 
     for k, line in enumerate(input_data):
-        line.strip()
+        line = line.strip()
 
         if len(line) == 0:
             input_data.pop(k)
@@ -216,19 +238,25 @@ async def main():
     LogHelper.info("\n\n")
 
     # 等待用户推出
-    input("按回车键退出程序...")
+    os.system("请按任意键继续. . . >nul")
 
 # 开始运行程序
 if __name__ == "__main__":
     print()
     print()
-    print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
+    print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print(f"※※※※")
-    print(f"※※※※  ※※※※                 注意               ")
-    print(f"※※※※  ※※※※        处理流程将消耗巨量 Token     ")
-    print(f"※※※※  ※※※※    使用在线接口的同学请关注自己的账单 ")
+    print(f"※※※※  ※※  \033[38;5;214m!!! 注意 !!!\033[0m")
+    print(f"※※※※  ※※  \033[38;5;214mKeywordGacha 处理流程将消耗巨量 Token\033[0m")
+    print(f"※※※※  ※※  \033[38;5;214m使用在线接口的同学请多多关注自己的账单\033[0m")
     print(f"※※※※")
-    print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
+    print(f"※※※※")
+    print(f"※※※※  ※※  \033[38;5;214m支持 CSV、JSON、纯文本 三种输入格式\033[0m")
+    print(f"※※※※  ※※  \033[38;5;214m输入 JSON、纯文本文件时，请输入目标文件的路径\033[0m")
+    print(f"※※※※  ※※  \033[38;5;214m输入 CSV 文件时，请输入文件夹的路径，会读取文件夹下的所有 CSV 文件\033[0m")
+    print(f"※※※※  ※※  \033[38;5;214m目录下如有 all.orig.txt 文件、ManualTransFile.json 文件或者 data 文件夹，会自动选择\033[0m")
+    print(f"※※※※")
+    print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print()
     print()
 

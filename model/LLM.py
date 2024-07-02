@@ -317,23 +317,11 @@ class LLM:
                 if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT:
                     continue
 
-                # ugly hack
-                replacements = [
-                    "\n",
-                    "第一行翻译文本：",
-                    "第一行翻译文本",
-                    "第一行：",
-                    "第一行",
-                    "第二行翻译文本：",
-                    "第二行翻译文本",
-                    "第二行：",
-                    "第二行",
-                ]
-                # for k, v in enumerate(replacements):
-                #     line_translation = line_translation.replace(v, "")
-
-                line_translation = re.sub('|'.join(replacements), "", message.content).strip()
-
+                # 比之前稍微好了一点，但是还是很丑陋
+                line_translation = message.content.replace("\n", "")
+                line_translation = re.sub(r"(第.行)?翻译文本：?", "", line_translation)
+                line_translation = re.sub(r"第.行：?", "", line_translation)
+                line_translation = line_translation.strip()                
 
                 if len(line_translation) == 0:
                     continue
