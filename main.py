@@ -179,16 +179,25 @@ def read_data_file():
     else:
         print(f"不支持的文件格式: {input_file_name}")
 
+    input_data_filtered = []
     for k, line in enumerate(input_data):
-        line = line.strip()
+        # 【\N[123]】 这种形式是代指角色名字的变量
+        # 直接抹掉就没办法判断角色了
+        # 先把 \N 部分抹掉，保留 ID 部分
+        line = line.strip().replace(r'\\N', '') 
+        line = re.sub(r'(\\\{)|(\\\})', '', line) # 放大或者缩小字体的代码
+        line = re.sub(r'\\[A-Z]{1,2}\[\d+\]', '', line) # 干掉其他乱七八糟的部分代码
+        line = line.strip().replace('\n', '') # 干掉行内换行
 
         if len(line) == 0:
-            input_data.pop(k)
+            continue
 
         if not TextHelper.contains_any_japanese(line):
-            input_data.pop(k)
+            continue
 
-    return input_data
+        input_data_filtered.append(line.strip())
+
+    return input_data_filtered
 
 # 主函数
 async def main():
