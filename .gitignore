@@ -1,9 +1,8 @@
 __pycache__
 
+/*.log
 /角色姓名*
-/main.spec
-/config_dev*
+
+/data*
 /all.orig*
 /ManualTransFile*
-
-/*.log
