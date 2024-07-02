@@ -2,6 +2,7 @@ import os
 import re
 import json
 from collections import Counter
+from collections import OrderedDict
 
 
 class Word:
@@ -26,16 +27,16 @@ class Word:
     # 从原文中提取上下文
     def set_context(self, surface, original):
         # 匹配原文
-        matches = []
-        for line in original:
-            if surface in line:
-                matches.append(line.strip())
-
+        matches = [line.strip() for line in original if surface in line]
+        
+        # 使用OrderedDict去除重复并保持顺序
+        unique_matches = list(OrderedDict.fromkeys(matches))
+        
         # 按长度降序排序
-        matches.sort(key=lambda x: (len(x), x), reverse=True)
+        unique_matches.sort(key=lambda x: (-len(x), x))
 
         # 取前十个最长的字符串
-        top_ten_matches = matches[:10] if len(matches) >= 10 else matches
+        top_ten_matches = unique_matches[:10]
 
         # 赋值给 self.context
         self.context = top_ten_matches
