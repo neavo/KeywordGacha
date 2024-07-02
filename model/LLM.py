@@ -11,7 +11,6 @@ from helper.TextHelper import TextHelper
 class LLM:
 
     MAX_RETRY = 2 # 最大重试次数
-    MAX_WORKER = 4 # 最大并发任务数量
 
     TASK_TYPE_EXTRACT_WORD = 1 # 分词模式
     TASK_TYPE_TRANSLATE_SURFACE = 2 # 翻译词表模式
@@ -35,30 +34,28 @@ class LLM:
     MAX_TOKENS_TRANSLATE_CONTEXT = 1024 
     FREQUENCY_PENALTY_TRANSLATE_CONTEXT = 0
 
-    def __init__(self, api_key, base_url, model_name):
+    def __init__(self, config):
         # 初始化OpenAI API密钥、基础URL和模型名称
-        self.api_key = api_key
-        self.base_url = base_url
-        self.model_name = model_name
+        self.api_key = config.api_key
+        self.base_url = config.base_url
+        self.model_name = config.model_name
         
-        # 初始化OpenAI客户端、并发控制信号量以及各类prompt和黑名单
-        self.openai_handler = None
-        self.semaphore = asyncio.Semaphore(self.MAX_WORKER)
+        # 初始化各类prompt和黑名单
         self.black_list = ""
         self.prompt_extract_words = ""
         self.prompt_translate_surface = ""
         self.prompt_translate_context = ""
 
-        # 初始化OpenAI客户端
-        self.init_openai_handler(self.api_key, self.base_url)
+        # OpenAI客户端相关参数
+        self.openai_handler = None
+        self.semaphore = asyncio.Semaphore(config.max_workers)
 
-    # 使用给定API密钥和基础URL初始化AsyncOpenAI实例
-    def init_openai_handler(self, api_key, base_url):
+        # 初始化OpenAI客户端
         self.openai_handler = AsyncOpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            timeout=120,
-            max_retries=0
+            api_key = self.api_key,
+            base_url = self.base_url,
+            timeout = config.request_timeout,
+            max_retries = 0
         )
 
     # 从指定路径加载黑名单文件内容

@@ -174,7 +174,7 @@ async def main():
     LogHelper.info("正在对文件中的文本进行预处理 ...")
     input_data_splited = split_by_byte_threshold(fulltext, SPLIT_THRESHOLD)
 
-    llm = LLM(G.api_key, G.base_url, G.model_name)
+    llm = LLM(G.config)
     llm.load_black_list("blacklist.txt")
     llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
     llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
@@ -191,12 +191,12 @@ async def main():
     words_with_threshold = [word for word in words_all if word.count >= COUNT_THRESHOLD]
 
     # 等待翻译词表任务结果
-    if G.translate_surface_mode == 1:
+    if G.config.translate_surface_mode == 1:
         LogHelper.info("即将开始执行 [后处理 - 词表翻译] ...")
         words_with_threshold = await llm.translate_surface_batch(words_with_threshold)
 
     # 等待上下文词表任务结果
-    if G.translate_context_mode == 1:
+    if G.config.translate_context_mode == 1:
         LogHelper.info("即将开始执行 [后处理 - 上下文翻译] ...")
         words_with_threshold = await llm.translate_context_batch(words_with_threshold)
 
@@ -234,15 +234,14 @@ if __name__ == "__main__":
 
     # 加载配置文件
     try:
-        if os.path.exists("config_dev.json"):
-            config_file = "config_dev.json"
-        else:
-            config_file = "config.json"
-
+        config_file = "config.json"
+        
         with open(config_file, "r", encoding="utf-8") as file:
             config = json.load(file)
+            G.config = type("GClass", (), {})()
+
             for key in config:
-                setattr(G, key, config[key])
+                setattr(G.config, key, config[key])
     except FileNotFoundError:
         LogHelper.error(f"文件 {config_file} 未找到.")
     except json.JSONDecodeError:
