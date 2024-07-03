@@ -11,7 +11,7 @@ class LogHelper:
                         filename = "KeywordGacha.log",
                         encoding = "utf-8",
                         maxBytes = 1 * 1024 * 1024, 
-                        backupCount = 0
+                        backupCount = 1
                     )
     console_handler = logging.StreamHandler()
 

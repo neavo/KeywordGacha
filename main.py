@@ -3,6 +3,7 @@ import re
 import csv
 import json
 import asyncio
+import traceback
 import concurrent.futures
 from collections import Counter
 from concurrent.futures import as_completed
@@ -247,6 +248,19 @@ async def main():
     # 等待用户推出
     os.system("pause")
 
+# 确保程序出错时可以捕捉到错误日志
+async def run_main():
+    try:
+        await main()
+    except Exception as error:
+        LogHelper.error(traceback.format_exc())
+        print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
+        print(f"※※※※")
+        print(f"※※※※  ※※  \033[38;5;214m出现严重错误，程序即将退出，错误信息已保存至日志文件 KeywordGacha.log ...\033[0m")
+        print(f"※※※※")
+        print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
+        os.system("pause")
+
 # 开始运行程序
 if __name__ == "__main__":
     print()
@@ -287,4 +301,4 @@ if __name__ == "__main__":
         LogHelper.error(f"文件 {config_file} 不是有效的JSON格式.")
 
     # 开始业务逻辑
-    asyncio.run(main())
+    asyncio.run(run_main())
