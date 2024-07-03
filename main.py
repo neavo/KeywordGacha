@@ -31,7 +31,6 @@ def read_txt_file(filename):
         return lines
     except FileNotFoundError:
         LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
-        exit(1)
 
 # 读取JSON文件并返回
 def read_json_file(filename):
@@ -49,10 +48,8 @@ def read_json_file(filename):
         return keys_list
     except FileNotFoundError:
         LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
-        exit(1)
     except json.JSONDecodeError:
         LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
-        exit(1)
 
 # 遍历目录文件夹，读取所有csv文件并返回
 def read_csv_files(directory):
@@ -71,7 +68,6 @@ def read_csv_files(directory):
                         
     except Exception as error:
         LogHelper.error(f"读取文件夹 {directory} 时出错 : {str(error)}")
-        exit(1)
 
     return input_data
 
