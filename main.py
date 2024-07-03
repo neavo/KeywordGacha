@@ -221,7 +221,7 @@ async def main():
     # 按阈值筛选，但是保证至少10个
     words_with_threshold = [word for word in words_all if word.count >= COUNT_THRESHOLD]
     words_all_filtered = [word for word in words_all if word not in words_with_threshold]
-    words_with_threshold.extend(words_all_filtered[:10 - len(words_with_threshold)])
+    words_with_threshold.extend(words_all_filtered[:max(0, 10 - len(words_with_threshold))])
 
     # 等待翻译词表任务结果
     if G.config.translate_surface_mode == 1:
