@@ -12,16 +12,24 @@ from helper.TextHelper import TextHelper
 class LLM:
 
     MAX_RETRY = 2 # 最大重试次数
+    DEGRADATION_FLAG = "[☀️DEGRADATION☀️]" # 用于标识退化
 
-    TASK_TYPE_EXTRACT_WORD = 1 # 分词模式
-    TASK_TYPE_TRANSLATE_SURFACE = 2 # 翻译词表模式
-    TASK_TYPE_TRANSLATE_CONTEXT = 3 # 翻译上下文模式
+    TASK_TYPE_EXTRACT_WORD = 10 # 分词模式
+    TASK_TYPE_EXTRACT_WORD_DEGRADATION = 11 # 分词模式退化重试
+    TASK_TYPE_TRANSLATE_SURFACE = 20 # 翻译词表模式
+    TASK_TYPE_TRANSLATE_CONTEXT = 30 # 翻译上下文模式
 
     # LLM请求参数配置 - 分词模式
     TEMPERATURE_WORD_EXTRACT = 0
     TOP_P_WORD_EXTRACT = 1
     MAX_TOKENS_WORD_EXTRACT = 512 
     FREQUENCY_PENALTY_WORD_EXTRACT = 0
+
+    # LLM请求参数配置 - 分词模式退化重试
+    TEMPERATURE_WORD_EXTRACT_DEGRADATION = 0
+    TOP_P_WORD_EXTRACT_DEGRADATION = 1
+    MAX_TOKENS_WORD_EXTRACT_DEGRADATION = 512 
+    FREQUENCY_PENALTY_WORD_EXTRACT_DEGRADATION = 0.2
 
     # LLM请求参数配置 - 翻译词表模式
     TEMPERATURE_TRANSLATE_SURFACE = 0
@@ -127,6 +135,12 @@ class LLM:
             top_p = self.TOP_P_WORD_EXTRACT
             max_tokens = self.MAX_TOKENS_WORD_EXTRACT
             frequency_penalty = self.FREQUENCY_PENALTY_WORD_EXTRACT
+        elif type == self.TASK_TYPE_EXTRACT_WORD_DEGRADATION:
+            prmopt = self.prompt_extract_words
+            temperature = self.TEMPERATURE_WORD_EXTRACT_DEGRADATION
+            top_p = self.TOP_P_WORD_EXTRACT_DEGRADATION
+            max_tokens = self.MAX_TOKENS_WORD_EXTRACT_DEGRADATION
+            frequency_penalty = self.FREQUENCY_PENALTY_WORD_EXTRACT_DEGRADATION
         elif type == self.TASK_TYPE_TRANSLATE_SURFACE:
             prmopt = self.prompt_translate_surface
 
@@ -170,11 +184,15 @@ class LLM:
     async def extract_words(self, text, fulltext):
         async with self.semaphore:
             words = []
-            usage, message, llmresponse = await self.request(text, self.TASK_TYPE_EXTRACT_WORD)
 
-            # 幻觉，直接抛掉
+            if not text.startswith(self.DEGRADATION_FLAG):
+                usage, message, llmresponse = await self.request(text, self.TASK_TYPE_EXTRACT_WORD)
+            else:
+                text = text.replace(self.DEGRADATION_FLAG, "")
+                usage, message, llmresponse = await self.request(text, self.TASK_TYPE_EXTRACT_WORD_DEGRADATION)
+
             if usage.completion_tokens >= self.MAX_TOKENS_WORD_EXTRACT:
-                return text, words
+                raise Exception(self.DEGRADATION_FLAG + text) 
 
             for surface in message.content.split(","):
                 surface = surface.strip()
@@ -206,13 +224,12 @@ class LLM:
             texts_successed.append(text)
             LogHelper.info(f"[LLM 分词] 已完成 {len(texts_successed)} / {len(texts)} ...")       
         except Exception as error:
-            LogHelper.error(f"[LLM 分词] 执行失败，如未超过重试次数，稍后将重试 ... {error}")
+            error_message = str(error)
 
-        # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
-        texts_failed.clear()
-        for k, text in enumerate(texts):
-            if text not in texts_successed:
-                texts_failed.append(text)
+            if error_message.startswith(self.DEGRADATION_FLAG):
+                LogHelper.warning(f"[LLM 分词] 收到了不正确的回复，稍后将重试 ...")
+            else:
+                LogHelper.error(f"[LLM 分词] 执行失败，稍后将重试 ... {error_message} ...")
 
     # 批量执行分词任务的具体实现
     async def do_extract_words_batch(self, texts, fulltext, words, texts_failed, texts_successed):
@@ -226,7 +243,23 @@ class LLM:
             task = asyncio.create_task(self.extract_words(text, fulltext))
             task.add_done_callback(lambda future: self.on_extract_words_task_done(future, texts, words, texts_failed, texts_successed))
             tasks.append(task)
-        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 等待所有异步任务完成 
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 取所有未成功任务
+        texts_failed = [text for text in texts if text not in texts_successed]
+
+        # 遍历所有任务的结果，找到标记为退化的任务，并修改列表中的对应的条目
+        for k, result in enumerate(results):
+            if isinstance(result, Exception) and str(result).startswith(self.DEGRADATION_FLAG):
+                pure_text = str(result).replace(self.DEGRADATION_FLAG, "")
+                error_text = str(result)
+
+                for k, text in enumerate(texts_failed):
+                    if text == pure_text:
+                        texts_failed[k] = error_text 
+                        break
 
         return words, texts_failed, texts_successed
 
@@ -268,7 +301,7 @@ class LLM:
             words_successed.append(word)
             LogHelper.info(f"[后处理 - 词表翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
         except Exception as error:
-            LogHelper.error(f"[后处理 - 词表翻译] 执行失败，如未超过重试次数，稍后将重试 ... {error}")
+            LogHelper.error(f"[后处理 - 词表翻译] 执行失败，稍后将重试 ... {error}")
 
         # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
         words_failed.clear()
@@ -367,7 +400,7 @@ class LLM:
             words_successed.append(word)
             LogHelper.info(f"[后处理 - 上下文翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
         except Exception as error:
-            LogHelper.error(f"[后处理 - 上下文翻译] 执行失败，如未超过重试次数，稍后将重试 ... {error}")
+            LogHelper.error(f"[后处理 - 上下文翻译] 执行失败，稍后将重试 ... {error}")
 
         # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
         words_failed.clear()
