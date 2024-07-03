@@ -2,6 +2,7 @@ import re
 import random
 import asyncio
 
+import tiktoken
 from openai import AsyncOpenAI
 
 from model.Word import Word
@@ -31,7 +32,8 @@ class LLM:
     # LLM请求参数配置 - 翻译上下文模式
     TEMPERATURE_TRANSLATE_CONTEXT = 0
     TOP_P_TRANSLATE_CONTEXT = 1
-    MAX_TOKENS_TRANSLATE_CONTEXT = 1024 
+    MAX_TOKENS_TRANSLATE_CONTEXT_REQUEST = 512
+    MAX_TOKENS_TRANSLATE_CONTEXT_RESPONSE = 1024
     FREQUENCY_PENALTY_TRANSLATE_CONTEXT = 0
 
     def __init__(self, config):
@@ -51,6 +53,7 @@ class LLM:
         self.semaphore = asyncio.Semaphore(config.max_workers)
 
         # 初始化OpenAI客户端
+        self.tiktoken_encoding = tiktoken.get_encoding("cl100k_base")
         self.openai_handler = AsyncOpenAI(
             api_key = self.api_key,
             base_url = self.base_url,
@@ -136,7 +139,7 @@ class LLM:
 
             temperature = self.TEMPERATURE_TRANSLATE_CONTEXT
             top_p = self.TOP_P_TRANSLATE_CONTEXT
-            max_tokens = self.MAX_TOKENS_TRANSLATE_CONTEXT
+            max_tokens = self.MAX_TOKENS_TRANSLATE_CONTEXT_RESPONSE
             frequency_penalty = self.FREQUENCY_PENALTY_TRANSLATE_CONTEXT
 
         completion = await self.openai_handler.chat.completions.create(
@@ -305,16 +308,41 @@ class LLM:
                     break
         return words
 
+    def do_context_split_by_token(self, context):
+        current_size = 0
+        current_segment = []
+        context_split_by_token = []
+
+        for line in context:
+            line_token = len(self.tiktoken_encoding.encode(line))
+
+            # 如果当前段的大小加上当前行的大小超过阈值，则需要将当前段添加到结果列表中，并重置当前段
+            if current_size + line_token > self.MAX_TOKENS_TRANSLATE_CONTEXT_REQUEST:
+                context_split_by_token.append("".join(current_segment))
+                current_segment = []
+                current_size = 0
+
+            # 添加当前字符串到当前段
+            current_segment.append(line)
+            current_size += line_token
+
+        # 添加最后一段
+        if current_segment:
+            context_split_by_token.append("".join(current_segment))
+
+        return context_split_by_token
+
     # 上下文翻译任务
     async def translate_context(self, word):
         async with self.semaphore:
             context_translation = []
+            context_split_by_token = self.do_context_split_by_token(word.context)
 
-            for k, line in enumerate(word.context):
+            for k, line in enumerate(context_split_by_token):
                 usage, message, _ = await self.request(line, self.TASK_TYPE_TRANSLATE_CONTEXT)
 
                 # 幻觉，直接抛掉
-                if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT:
+                if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT_RESPONSE:
                     continue
 
                 # 比之前稍微好了一点，但是还是很丑陋
