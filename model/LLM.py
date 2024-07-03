@@ -341,7 +341,8 @@ class LLM:
                     break
         return words
 
-    def do_context_split_by_token(self, context):
+    # 执行上下文任务的合并   
+    def do_context_merge(self, context):
         current_size = 0
         current_segment = []
         context_split_by_token = []
@@ -351,7 +352,7 @@ class LLM:
 
             # 如果当前段的大小加上当前行的大小超过阈值，则需要将当前段添加到结果列表中，并重置当前段
             if current_size + line_token > self.MAX_TOKENS_TRANSLATE_CONTEXT_REQUEST:
-                context_split_by_token.append("".join(current_segment))
+                context_split_by_token.append("\n".join(current_segment))
                 current_segment = []
                 current_size = 0
 
@@ -361,7 +362,7 @@ class LLM:
 
         # 添加最后一段
         if current_segment:
-            context_split_by_token.append("".join(current_segment))
+            context_split_by_token.append("\n".join(current_segment))
 
         return context_split_by_token
 
@@ -369,25 +370,23 @@ class LLM:
     async def translate_context(self, word):
         async with self.semaphore:
             context_translation = []
-            context_split_by_token = self.do_context_split_by_token(word.context)
-
+            context_split_by_token = self.do_context_merge(word.context)
             for k, line in enumerate(context_split_by_token):
                 usage, message, _ = await self.request(line, self.TASK_TYPE_TRANSLATE_CONTEXT)
 
                 # 幻觉，直接抛掉
                 if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT_RESPONSE:
                     continue
+                lines = message.content.split("\n")
+                for k, line in enumerate(lines):
+                    # 比之前稍微好了一点，但是还是很丑陋
+                    line = line.replace("\n", "")
+                    line = re.sub(r"(第.行)?翻译文本：?", "", line)
+                    line = re.sub(r"第.行：?", "", line)
+                    line = line.strip()                
 
-                # 比之前稍微好了一点，但是还是很丑陋
-                line_translation = message.content.replace("\n", "")
-                line_translation = re.sub(r"(第.行)?翻译文本：?", "", line_translation)
-                line_translation = re.sub(r"第.行：?", "", line_translation)
-                line_translation = line_translation.strip()                
-
-                if len(line_translation) == 0:
-                    continue
-
-                context_translation.append(line_translation)
+                    if len(line) > 0:
+                        context_translation.append(line)
 
             word.context_translation = context_translation
 
