@@ -1,5 +1,36 @@
+import re
 import logging
 from logging.handlers import RotatingFileHandler
+
+# 自定义 handler 类
+class ColorStreamHandler(logging.StreamHandler):
+
+    LEVEL_NAME = [
+        " [DEBUG] ",
+        " [INFO] ",
+        " [WARNING] ",
+        " [RROR] ",
+        " [CRITICAL] ",      
+    ]
+
+    COLOR_LEVEL_NAME = [
+        " [\033[94mDEBUG\033[0m] ",         # 蓝色
+        " [\033[92mINFO\033[0m] ",          # 绿色
+        " [\033[93mWARNING\033[0m] ",       # 黄色
+        " [\033[91mRROR\033[0m] ",          # 红色
+        " [\033[1;95mCRITICAL\033[0m] ",    # 亮品红色     
+    ]
+
+    def emit(self, record):
+        message = self.format(record)
+
+        for k, v in enumerate(self.LEVEL_NAME):
+            if v in message:
+                # message = message.replace(v, self.COLOR_LEVEL_NAME[k])
+                message = re.sub(re.escape(v), self.COLOR_LEVEL_NAME[k], message, count = 1)
+                break
+
+        print(message)
 
 class LogHelper:
     # 创建一个logger
@@ -13,7 +44,7 @@ class LogHelper:
                         maxBytes = 1 * 1024 * 1024, 
                         backupCount = 1
                     )
-    console_handler = logging.StreamHandler()
+    console_handler = ColorStreamHandler()
 
     # 定义输出格式
     file_handler_formatter = logging.Formatter(

@@ -8,6 +8,8 @@ import concurrent.futures
 from collections import Counter
 from concurrent.futures import as_completed
 
+from colorama import just_fix_windows_console
+
 from model.LLM import LLM
 from model.Word import Word
 from helper.LogHelper import LogHelper
@@ -254,32 +256,39 @@ async def run_main():
         await main()
     except Exception as error:
         LogHelper.error(traceback.format_exc())
+        print()
+        print()
         print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
         print(f"※※※※")
-        print(f"※※※※  ※※  \033[38;5;214m出现严重错误，程序即将退出，错误信息已保存至日志文件 KeywordGacha.log ...\033[0m")
+        print(f"※※※※  ※※  \033[91m出现严重错误，程序即将退出，错误信息已保存至日志文件 KeywordGacha.log ...\033[0m")
         print(f"※※※※")
         print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
+        print()
+        print()
         os.system("pause")
 
 # 开始运行程序
 if __name__ == "__main__":
+    # 通过 Colorama 实现在较旧的 Windows 控制台下输出彩色字符
+    just_fix_windows_console()
+
     print()
     print()
     print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print(f"※※※※")
-    print(f"※※※※  ※※  \033[38;5;214mKeywordGacha\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214mhttps://github.com/neavo/KeywordGacha\033[0m")
+    print(f"※※※※  ※※  \033[92mKeywordGacha\033[0m")
+    print(f"※※※※  ※※  \033[92mhttps://github.com/neavo/KeywordGacha\033[0m")
     print(f"※※※※")
     print(f"※※※※")
-    print(f"※※※※  ※※  \033[38;5;214m!!! 注意 !!!\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214m处理流程将消耗巨量 Token\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214m使用在线接口的同学请关注自己的账单\033[0m")
+    print(f"※※※※  ※※  \033[92m!!! 注意 !!!\033[0m")
+    print(f"※※※※  ※※  \033[92m处理流程将消耗巨量 Token\033[0m")
+    print(f"※※※※  ※※  \033[92m使用在线接口的同学请关注自己的账单\033[0m")
     print(f"※※※※")
     print(f"※※※※")
-    print(f"※※※※  ※※  \033[38;5;214m支持 CSV、JSON、纯文本 三种输入格式\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214m处理 JSON、纯文本文件时，请输入目标文件的路径\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214m处理 CSV 文件时，请输入目标文件夹的路径，会读取其中所有的 CSV 文件\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214m目录下如有 data 文件夹、all.orig.txt 文件 或者 ManualTransFile.json 文件，会自动选择\033[0m")
+    print(f"※※※※  ※※  \033[92m支持 CSV、JSON、纯文本 三种输入格式\033[0m")
+    print(f"※※※※  ※※  \033[92m处理 JSON、纯文本文件时，请输入目标文件的路径\033[0m")
+    print(f"※※※※  ※※  \033[92m处理 CSV 文件时，请输入目标文件夹的路径，会读取其中所有的 CSV 文件\033[0m")
+    print(f"※※※※  ※※  \033[92m目录下如有 data 文件夹、all.orig.txt 文件 或者 ManualTransFile.json 文件，会自动选择\033[0m")
     print(f"※※※※")
     print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print()
