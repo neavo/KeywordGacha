@@ -8,6 +8,7 @@ import concurrent.futures
 from collections import Counter
 from concurrent.futures import as_completed
 
+import tiktoken
 from colorama import just_fix_windows_console
 
 from model.LLM import LLM
@@ -21,7 +22,8 @@ from helper.TextHelper import TextHelper
 G = type("GClass", (), {})()
 
 # 原始文本切片阈值
-SPLIT_THRESHOLD = 4 * 1024
+# 似乎切的越细，能找到的词越多，失败的概率也会降低
+SPLIT_THRESHOLD = 1024
 
 # 词频阈值
 COUNT_THRESHOLD = 3
@@ -74,30 +76,55 @@ def read_csv_files(directory):
 
     return input_data
 
-# 将字符串数组按照字节阈值进行分割。
-def split_by_byte_threshold(lines, threshold):
-    result = []  # 存储处理后的字符串段
-    current_segment = []  # 临时存储当前段的字符串
-    current_size = 0  # 当前段的字节大小
+# 按阈值分割文本
+def split_by_token_threshold(lines, threshold):
+    tiktoken_encoding = tiktoken.get_encoding("cl100k_base")
+
+    current_size = 0
+    current_segment = []
+    lines_split_by_token = []
 
     for line in lines:
-        line_len = len(line.encode("utf-8"))  # 计算字符串的字节长度
+        line_token = len(tiktoken_encoding.encode(line))
 
-        # 如果加上当前字符串会导致超过阈值，则先处理并清空当前段
-        if current_size + line_len > threshold:
-            result.append("".join(current_segment))  # 拼接并添加到结果列表
-            current_segment = []  # 重置当前段
-            current_size = 0  # 重置当前段字节大小
+        # 如果当前段的大小加上当前行的大小超过阈值，则需要将当前段添加到结果列表中，并重置当前段
+        if current_size + line_token > threshold:
+            lines_split_by_token.append("\n".join(current_segment))
+            current_segment = []
+            current_size = 0
 
         # 添加当前字符串到当前段
         current_segment.append(line)
-        current_size += line_len
+        current_size += line_token
 
-    # 添加最后一个段，如果非空
+    # 添加最后一段
     if current_segment:
-        result.append("".join(current_segment))
+        lines_split_by_token.append("\n".join(current_segment))
 
-    return result
+    return lines_split_by_token
+
+    # result = []  # 存储处理后的字符串段
+    # current_segment = []  # 临时存储当前段的字符串
+    # current_size = 0  # 当前段的字节大小
+
+    # for line in lines:
+    #     line_len = len(line.encode("utf-8"))  # 计算字符串的字节长度
+
+    #     # 如果加上当前字符串会导致超过阈值，则先处理并清空当前段
+    #     if current_size + line_len > threshold:
+    #         result.append("".join(current_segment))  # 拼接并添加到结果列表
+    #         current_segment = []  # 重置当前段
+    #         current_size = 0  # 重置当前段字节大小
+
+    #     # 添加当前字符串到当前段
+    #     current_segment.append(line)
+    #     current_size += line_len
+
+    # # 添加最后一个段，如果非空
+    # if current_segment:
+    #     result.append("".join(current_segment))
+
+    # return result
 
 # 合并具有相同表面形式（surface）的 Word 对象，计数并逆序排序。
 def merge_and_count(words_list):
@@ -202,7 +229,7 @@ def read_data_file():
 async def main():
     fulltext = read_data_file()
     LogHelper.info("正在对文件中的文本进行预处理 ...")
-    input_data_splited = split_by_byte_threshold(fulltext, SPLIT_THRESHOLD)
+    input_data_splited = split_by_token_threshold(fulltext, SPLIT_THRESHOLD)
 
     llm = LLM(G.config)
     llm.load_black_list("blacklist.txt")
