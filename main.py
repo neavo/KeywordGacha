@@ -9,6 +9,8 @@ from collections import Counter
 from concurrent.futures import as_completed
 
 import tiktoken
+import tiktoken_ext
+from tiktoken_ext import openai_public
 from colorama import just_fix_windows_console
 
 from model.LLM import LLM

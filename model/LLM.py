@@ -3,6 +3,8 @@ import random
 import asyncio
 
 import tiktoken
+import tiktoken_ext
+from tiktoken_ext import openai_public
 from openai import AsyncOpenAI
 
 from model.Word import Word
