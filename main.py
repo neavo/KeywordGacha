@@ -183,7 +183,7 @@ def read_data_file():
         # 先把 \N 部分抹掉，保留 ID 部分
         line = line.strip().replace(r'\\N', '') 
         line = re.sub(r'(\\\{)|(\\\})', '', line) # 放大或者缩小字体的代码
-        line = re.sub(r'\\[A-Z]{1,2}\[\d+\]', '', line) # 干掉其他乱七八糟的部分代码
+        line = re.sub(r'\\[A-Z]{1,3}\[\d+\]', '', line, flags=re.IGNORECASE) # 干掉其他乱七八糟的部分代码
         line = line.strip().replace('\n', '') # 干掉行内换行
 
         if len(line) == 0:
