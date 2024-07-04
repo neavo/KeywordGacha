@@ -3,9 +3,13 @@ import re
 import csv
 import json
 import asyncio
+import traceback
 import concurrent.futures
 from collections import Counter
 from concurrent.futures import as_completed
+
+import tiktoken
+from colorama import just_fix_windows_console
 
 from model.LLM import LLM
 from model.Word import Word
@@ -18,7 +22,8 @@ from helper.TextHelper import TextHelper
 G = type("GClass", (), {})()
 
 # 原始文本切片阈值
-SPLIT_THRESHOLD = 4 * 1024
+# 似乎切的越细，能找到的词越多，失败的概率也会降低
+SPLIT_THRESHOLD = 1024
 
 # 词频阈值
 COUNT_THRESHOLD = 3
@@ -31,7 +36,6 @@ def read_txt_file(filename):
         return lines
     except FileNotFoundError:
         LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
-        exit(1)
 
 # 读取JSON文件并返回
 def read_json_file(filename):
@@ -49,10 +53,8 @@ def read_json_file(filename):
         return keys_list
     except FileNotFoundError:
         LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
-        exit(1)
     except json.JSONDecodeError:
         LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
-        exit(1)
 
 # 遍历目录文件夹，读取所有csv文件并返回
 def read_csv_files(directory):
@@ -71,34 +73,58 @@ def read_csv_files(directory):
                         
     except Exception as error:
         LogHelper.error(f"读取文件夹 {directory} 时出错 : {str(error)}")
-        exit(1)
 
     return input_data
 
-# 将字符串数组按照字节阈值进行分割。
-def split_by_byte_threshold(lines, threshold):
-    result = []  # 存储处理后的字符串段
-    current_segment = []  # 临时存储当前段的字符串
-    current_size = 0  # 当前段的字节大小
+# 按阈值分割文本
+def split_by_token_threshold(lines, threshold):
+    tiktoken_encoding = tiktoken.get_encoding("cl100k_base")
+
+    current_size = 0
+    current_segment = []
+    lines_split_by_token = []
 
     for line in lines:
-        line_len = len(line.encode("utf-8"))  # 计算字符串的字节长度
+        line_token = len(tiktoken_encoding.encode(line))
 
-        # 如果加上当前字符串会导致超过阈值，则先处理并清空当前段
-        if current_size + line_len > threshold:
-            result.append("".join(current_segment))  # 拼接并添加到结果列表
-            current_segment = []  # 重置当前段
-            current_size = 0  # 重置当前段字节大小
+        # 如果当前段的大小加上当前行的大小超过阈值，则需要将当前段添加到结果列表中，并重置当前段
+        if current_size + line_token > threshold:
+            lines_split_by_token.append("\n".join(current_segment))
+            current_segment = []
+            current_size = 0
 
         # 添加当前字符串到当前段
         current_segment.append(line)
-        current_size += line_len
+        current_size += line_token
 
-    # 添加最后一个段，如果非空
+    # 添加最后一段
     if current_segment:
-        result.append("".join(current_segment))
+        lines_split_by_token.append("\n".join(current_segment))
 
-    return result
+    return lines_split_by_token
+
+    # result = []  # 存储处理后的字符串段
+    # current_segment = []  # 临时存储当前段的字符串
+    # current_size = 0  # 当前段的字节大小
+
+    # for line in lines:
+    #     line_len = len(line.encode("utf-8"))  # 计算字符串的字节长度
+
+    #     # 如果加上当前字符串会导致超过阈值，则先处理并清空当前段
+    #     if current_size + line_len > threshold:
+    #         result.append("".join(current_segment))  # 拼接并添加到结果列表
+    #         current_segment = []  # 重置当前段
+    #         current_size = 0  # 重置当前段字节大小
+
+    #     # 添加当前字符串到当前段
+    #     current_segment.append(line)
+    #     current_size += line_len
+
+    # # 添加最后一个段，如果非空
+    # if current_segment:
+    #     result.append("".join(current_segment))
+
+    # return result
 
 # 合并具有相同表面形式（surface）的 Word 对象，计数并逆序排序。
 def merge_and_count(words_list):
@@ -186,7 +212,7 @@ def read_data_file():
         # 先把 \N 部分抹掉，保留 ID 部分
         line = line.strip().replace(r'\\N', '') 
         line = re.sub(r'(\\\{)|(\\\})', '', line) # 放大或者缩小字体的代码
-        line = re.sub(r'\\[A-Z]{1,2}\[\d+\]', '', line) # 干掉其他乱七八糟的部分代码
+        line = re.sub(r'\\[A-Z]{1,3}\[\d+\]', '', line, flags=re.IGNORECASE) # 干掉其他乱七八糟的部分代码
         line = line.strip().replace('\n', '') # 干掉行内换行
 
         if len(line) == 0:
@@ -203,7 +229,7 @@ def read_data_file():
 async def main():
     fulltext = read_data_file()
     LogHelper.info("正在对文件中的文本进行预处理 ...")
-    input_data_splited = split_by_byte_threshold(fulltext, SPLIT_THRESHOLD)
+    input_data_splited = split_by_token_threshold(fulltext, SPLIT_THRESHOLD)
 
     llm = LLM(G.config)
     llm.load_black_list("blacklist.txt")
@@ -218,8 +244,10 @@ async def main():
     # 合并与排序
     words_all = merge_and_count(words)
 
-    # 按阈值筛选
+    # 按阈值筛选，但是保证至少10个
     words_with_threshold = [word for word in words_all if word.count >= COUNT_THRESHOLD]
+    words_all_filtered = [word for word in words_all if word not in words_with_threshold]
+    words_with_threshold.extend(words_all_filtered[:max(0, 10 - len(words_with_threshold))])
 
     # 等待翻译词表任务结果
     if G.config.translate_surface_mode == 1:
@@ -249,25 +277,45 @@ async def main():
     # 等待用户推出
     os.system("pause")
 
+# 确保程序出错时可以捕捉到错误日志
+async def run_main():
+    try:
+        await main()
+    except Exception as error:
+        LogHelper.error(traceback.format_exc())
+        print()
+        print()
+        print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
+        print(f"※※※※")
+        print(f"※※※※  ※※  \033[91m出现严重错误，程序即将退出，错误信息已保存至日志文件 KeywordGacha.log ...\033[0m")
+        print(f"※※※※")
+        print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
+        print()
+        print()
+        os.system("pause")
+
 # 开始运行程序
 if __name__ == "__main__":
+    # 通过 Colorama 实现在较旧的 Windows 控制台下输出彩色字符
+    just_fix_windows_console()
+
     print()
     print()
     print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print(f"※※※※")
-    print(f"※※※※  ※※  \033[38;5;214mKeywordGacha\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214mhttps://github.com/neavo/KeywordGacha\033[0m")
+    print(f"※※※※  ※※  \033[92mKeywordGacha\033[0m")
+    print(f"※※※※  ※※  \033[92mhttps://github.com/neavo/KeywordGacha\033[0m")
     print(f"※※※※")
     print(f"※※※※")
-    print(f"※※※※  ※※  \033[38;5;214m!!! 注意 !!!\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214m处理流程将消耗巨量 Token\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214m使用在线接口的同学请关注自己的账单\033[0m")
+    print(f"※※※※  ※※  \033[92m!!! 注意 !!!\033[0m")
+    print(f"※※※※  ※※  \033[92m处理流程将消耗巨量 Token\033[0m")
+    print(f"※※※※  ※※  \033[92m使用在线接口的同学请关注自己的账单\033[0m")
     print(f"※※※※")
     print(f"※※※※")
-    print(f"※※※※  ※※  \033[38;5;214m支持 CSV、JSON、纯文本 三种输入格式\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214m处理 JSON、纯文本文件时，请输入目标文件的路径\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214m处理 CSV 文件时，请输入目标文件夹的路径，会读取其中所有的 CSV 文件\033[0m")
-    print(f"※※※※  ※※  \033[38;5;214m目录下如有 data 文件夹、all.orig.txt 文件 或者 ManualTransFile.json 文件，会自动选择\033[0m")
+    print(f"※※※※  ※※  \033[92m支持 CSV、JSON、纯文本 三种输入格式\033[0m")
+    print(f"※※※※  ※※  \033[92m处理 JSON、纯文本文件时，请输入目标文件的路径\033[0m")
+    print(f"※※※※  ※※  \033[92m处理 CSV 文件时，请输入目标文件夹的路径，会读取其中所有的 CSV 文件\033[0m")
+    print(f"※※※※  ※※  \033[92m目录下如有 data 文件夹、all.orig.txt 文件 或者 ManualTransFile.json 文件，会自动选择\033[0m")
     print(f"※※※※")
     print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print()
@@ -289,4 +337,4 @@ if __name__ == "__main__":
         LogHelper.error(f"文件 {config_file} 不是有效的JSON格式.")
 
     # 开始业务逻辑
-    asyncio.run(main())
+    asyncio.run(run_main())
