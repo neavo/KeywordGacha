@@ -105,29 +105,6 @@ def split_by_token_threshold(lines, threshold):
 
     return lines_split_by_token
 
-    # result = []  # 存储处理后的字符串段
-    # current_segment = []  # 临时存储当前段的字符串
-    # current_size = 0  # 当前段的字节大小
-
-    # for line in lines:
-    #     line_len = len(line.encode("utf-8"))  # 计算字符串的字节长度
-
-    #     # 如果加上当前字符串会导致超过阈值，则先处理并清空当前段
-    #     if current_size + line_len > threshold:
-    #         result.append("".join(current_segment))  # 拼接并添加到结果列表
-    #         current_segment = []  # 重置当前段
-    #         current_size = 0  # 重置当前段字节大小
-
-    #     # 添加当前字符串到当前段
-    #     current_segment.append(line)
-    #     current_size += line_len
-
-    # # 添加最后一个段，如果非空
-    # if current_segment:
-    #     result.append("".join(current_segment))
-
-    # return result
-
 # 合并具有相同表面形式（surface）的 Word 对象，计数并逆序排序。
 def merge_and_count(words_list):
     surface_to_word = {}
@@ -205,7 +182,9 @@ def read_data_file():
     elif os.path.isdir(input_file_name):
         input_data = read_csv_files(input_file_name)
     else:
-        print(f"不支持的文件格式: {input_file_name}")
+        LogHelper.warning(f"不支持的文件格式: {input_file_name}")
+        os.system("pause")
+        exit(1)
 
     input_data_filtered = []
     for k, line in enumerate(input_data):
