@@ -150,7 +150,7 @@ class LLM:
         return flag
 
     # 异步发送请求到OpenAI获取模型回复
-    async def request(self, prompt, content, type):
+    async def request(self, prompt, content, type, retry = False):
         if type == self.TASK_TYPE_EXTRACT_WORD:
             temperature = self.TEMPERATURE_WORD_EXTRACT
             top_p = self.TOP_P_WORD_EXTRACT
@@ -182,7 +182,7 @@ class LLM:
             temperature = temperature,
             top_p = top_p,
             max_tokens = max_tokens,
-            frequency_penalty = frequency_penalty,
+            frequency_penalty = 0.2 if retry else frequency_penalty,
             messages = [
                 {
                     "role": "system",
@@ -202,12 +202,12 @@ class LLM:
         return usage, message, llmresponse
 
     # 分词任务
-    async def extract_words(self, text, fulltext):
+    async def extract_words(self, text, fulltext, retry):
         async with self.semaphore:
             words = []
             prompt = self.prompt_extract_words
             task_type = self.TASK_TYPE_EXTRACT_WORD
-            usage, message, llmresponse = await self.request(prompt, text, task_type)
+            usage, message, llmresponse = await self.request(prompt, text, task_type, retry)
 
             if usage.completion_tokens >= self.MAX_TOKENS_WORD_EXTRACT:
                 raise Exception() 
@@ -247,13 +247,15 @@ class LLM:
     # 批量执行分词任务的具体实现
     async def do_extract_words_batch(self, texts, fulltext, words, texts_failed, texts_successed):
         if len(texts_failed) == 0:
+            retry = False
             texts_this_round = texts
         else:
+            retry = True
             texts_this_round = texts_failed
 
         tasks = []
         for k, text in enumerate(texts_this_round):
-            task = asyncio.create_task(self.extract_words(text, fulltext))
+            task = asyncio.create_task(self.extract_words(text, fulltext, retry))
             task.add_done_callback(lambda future: self.on_extract_words_task_done(future, texts, words, texts_failed, texts_successed))
             tasks.append(task)
 
