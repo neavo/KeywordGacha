@@ -6,12 +6,12 @@
 ## 概述 📢
 - [KeywordGacha](https://github.com/neavo/KeywordGacha)，简称 KG，是一个使用 AI 技术来抽取文本中词汇表的次世代工具
 - 相较传统工具，具有高命中、语义化、智能总结角色信息等特色，对文本的兼容性更好
-- 一键从长篇文本中抽取角色名称、组织名称等专有名词的词汇表，并且自动翻译、自动总结
+- 一键从长篇文本中抽取角色名称、组织名称等专有名词的词汇表，并且 `自动翻译`、`自动总结`
 - 可以极大的提升 小说、漫画、字幕、游戏脚本 等文本内容的译前准备时制作统一词汇表的工作效率
 
 > <img src="image/01.jpg" style="width: 75%;" alt="image/01.jpg">
 
-> <img src="image/02.png" style="width: 75%;" alt="image/02.png">
+> <img src="image/02.jpg" style="width: 75%;" alt="image/02.jpg">
   
 ## 要求 🖥️
 - 兼容 OpenAI 接口格式的大语言模型 API
