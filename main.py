@@ -27,9 +27,6 @@ G = type("GClass", (), {})()
 # 似乎切的越细，能找到的词越多，失败的概率也会降低
 SPLIT_THRESHOLD = 1024
 
-# 词频阈值
-COUNT_THRESHOLD = 3
-
 # 读取TXT文件并返回
 def read_txt_file(filename):
     try:
@@ -225,11 +222,11 @@ async def main():
 
     # 如果内容较长，适当放宽阈值，以避免出现过多词条
     if len(input_data_splited) > 300:
-        SPLIT_THRESHOLD = 5
+        G.count_threshold = 5
     elif len(input_data_splited) > 200:
-        SPLIT_THRESHOLD = 4
-    elif len(input_data_splited) > 100:
-        SPLIT_THRESHOLD = 3
+        G.count_threshold = 4
+    else:
+        G.count_threshold = 3
 
     # 等待分词任务结果
     LogHelper.info("即将开始执行 [LLM 分词] ...")
@@ -239,7 +236,7 @@ async def main():
     words_merged = merge_and_count(words)
 
     # 按阈值筛选，但是保证至少10个
-    words_with_threshold = [word for word in words_merged if word.count >= COUNT_THRESHOLD]
+    words_with_threshold = [word for word in words_merged if word.count >= G.count_threshold]
     words_all_filtered = [word for word in words_merged if word not in words_with_threshold]
     words_with_threshold.extend(words_all_filtered[:max(0, 10 - len(words_with_threshold))])
 
