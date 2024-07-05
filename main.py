@@ -238,12 +238,13 @@ async def main():
     words_no_duplicate = await llm.detect_duplicate_batch(words_with_threshold)
     words_no_duplicate_sorted = merge_and_count(words_no_duplicate)
 
+    # 等待翻译词汇任务结果
     LogHelper.info("即将开始执行 [智能总结] ...")
     words_no_duplicate_sorted = await llm.summarize_context_batch(words_no_duplicate_sorted)
 
-    # 等待翻译词表任务结果
+    # 等待翻译词汇任务结果
     if G.config.translate_surface_mode == 1:
-        LogHelper.info("即将开始执行 [词表翻译] ...")
+        LogHelper.info("即将开始执行 [词汇翻译] ...")
         words_no_duplicate_sorted = await llm.translate_surface_batch(words_no_duplicate_sorted)
 
     # 等待上下文词表任务结果
