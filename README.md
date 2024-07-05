@@ -1,13 +1,13 @@
 # KeywordGacha 📖
-#### 使用 OpenAI 兼容接口来抓取小说、漫画、字幕、游戏脚本等任意文本中的名词表的翻译辅助工具
+#### 使用 OpenAI 兼容接口来抓取小说、漫画、字幕、游戏脚本等任意文本中的词汇表的翻译辅助工具
 
 　　　　
 
 ## 概述 📢
-- [KeywordGacha](https://github.com/neavo/KeywordGacha)，简称KG，是一个使用 AI 技术来抽取文本中名词表的次世代工具
-- 相较传统工具，具有高命中、语义化、自动抓取上下文等特色，对文本的兼容性更好
-- 可以一键从长篇文本中抽取角色名称、组织名称等专有名词的名词表与参考文献并自动翻译
-- 可以极大的提升 小说、漫画、字幕、游戏脚本 等文本内容的译前准备时制作统一名词表的工作效率
+- [KeywordGacha](https://github.com/neavo/KeywordGacha)，简称 KG，是一个使用 AI 技术来抽取文本中词汇表的次世代工具
+- 相较传统工具，具有高命中、语义化、智能总结角色信息等特色，对文本的兼容性更好
+- 一键从长篇文本中抽取角色名称、组织名称等专有名词的词汇表，并且自动翻译、自动总结
+- 可以极大的提升 小说、漫画、字幕、游戏脚本 等文本内容的译前准备时制作统一词汇表的工作效率
 
 > <img src="image/01.jpg" style="width: 75%;" alt="image/01.jpg">
 
@@ -18,13 +18,13 @@
 - KG 的开发环境是本地运行的 [Qwen2-7B-Instruct](https://huggingface.co/Qwen/Qwen2-7B-Instruct-GGUF)
 
 ## 使用 🛸
-- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载 KG，并解压缩到本地
+- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载 KG 并解压缩到本地
 - 打开配置文件 `config.json` ，填入 API 信息，如使用本地接口则不需要修改
 - 双击 `KeywordGacha.exe`，按提示操作即可
 - 流程执行完毕后，会生成结果文件 `角色姓名_日志.txt` 与 `角色姓名_列表.json`
-- `角色姓名_日志.txt` 中包含抓取到的名词的列表，以及用于参考翻译的相关片段和翻译参考
-- 参考日志中的各项信息完成 `角色姓名_列表.json` 后，就可以直接导入到 [AiNiee](https://github.com/NEKOparapa/AiNiee) 等翻译器中使用了
-- 注意，为保证质量，KG 并不会直接为你填充名词表类翻译，请查看日志后手动完成名词表，
+- `角色姓名_日志.txt` 中包含抓取到的词汇的原文、上下文、翻译建议、角色信息总结等信息
+- 参考日志中的信息完成 `角色姓名_列表.json` 后，可以直接导入到 [AiNiee](https://github.com/NEKOparapa/AiNiee) 等翻译器中使用
+- 注意，为保证质量，KG 并不会直接为你填充词汇表类翻译，请认真审阅日志后手动完成词汇表
 
 ## 效果 ⚡
 - 抓取和翻译效果取决于模型本身的水平，使用 💪 ~~更昂贵~~ 更强力  的 模型可以显著提升效果
@@ -35,8 +35,9 @@
 - 所以务必严格按照 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 内的说明一步一步搭建环境，请勿直接复制其他应用中的配置
 
 ## 近期更新
-- 20240705
-  - 一些优化和调整，没有新功能
+- 20240706
+  - 新增 智能总结 功能
+  - 新增 重复词根检测 功能
 
 - 20240702
   - 增加 请求超时时间、并发任务数量 的设置项目
@@ -44,7 +45,7 @@
   - 调整 优化了对混杂有游戏代码的文本的兼容性
 
 ## 文本格式 🆗
-- 目前支持三种不同的输入文本格式
+- 目前支持三种不同的输入文本格式，其中 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的 CSV 文件的抓取效果似乎比较好
 - 文件中 每一行/每一条 应只包含一个句子，太长的话请先手动处理一下
 - 如当前目录下有 `all.orig.txt` 或 `ManualTransFile.json` 文件，会自动识别
 - 当文件后缀名为 .json 时，会将其内容按以下模式处理，这也是 [MTool](https://afdian.net/a/AdventCirno) 导出翻译原文的格式
@@ -67,7 +68,7 @@
 
 - 当路径为一个文件夹时，会读取其内所有的 .csv 文件中每一行的第一列，使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 可以抓取这样的文本
   
-```
+```csv
       原文,<无视剩下的列>
       原文,<无视剩下的列>
       原文,<无视剩下的列>
@@ -84,15 +85,15 @@
         "max_workers": 4, // 网络请求等任务并发执行的最大数量，如果频繁出现网络超时或者拒绝服务错误，可以调小这个值
         "request_timeout": 120, // 网络请求等任务并发执行的最大数量，如果频繁出现网络超时或者拒绝服务错误，可以调大这个值
 
-        "translate_surface_mode": "1", // 词表的后处理模式，默认为 1 即日中翻译，设为 0 可以跳过翻译，抓取中文内容时使用
-        "translate_context_mode": "1", // 上下文的后处理模式，默认为 1 即日中翻译，设为 0 可以跳过翻译，抓取中文内容时使用
+        "translate_surface_mode": "1", // 词汇的后处理模式，默认为 1 即日中翻译，设为 0 可以跳过此步骤，以节约 Token 与 时间
+        "translate_context_mode": "1", // 上下文的后处理模式，默认为 1 即日中翻译，设为 0 可以跳过此步骤，以节约 Token 与 时间
     }
   ```
 
 ## 语言能力 🗣️
 
 - 较新的模型比如 [GPT4o](https://chatgpt.com/)、[Claude 3.5 Sonnet](https://claude.ai/) 等具有超乎想象多语言能力，但是也十分昂贵
-- [Qwen2](https://github.com/QwenLM/Qwen2) 在处理中文的表现上称得上优秀，处理日文水平也算堪用
+- [Qwen2](https://github.com/QwenLM/Qwen2) 在处理中文的表现上称得上优秀，处理日文水平也算堪用，7B 版本只需要 8G 显存，推荐使用
 
 ## 开发计划 🎢
 
@@ -101,8 +102,8 @@
 - [ ] 添加 对英文文本的支持
 
 ## 问题反馈 😥
-  - KG 运行时的日志将保存在程序目录下的 KeywordGacha.log 文件内
-  - 反馈问题的时候请附上日志文件
+  - 运行时的日志保存在程序目录下的 `KeywordGacha.log` `KeywordGacha.log.1` 等文件
+  - 反馈问题的时候请附上这些日志文件
 
 ## 友情提醒 💰
   - KG 会将 `全部的文本` 发送至 AI 进行处理，这个过程会消耗大量的 Token
