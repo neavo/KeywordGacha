@@ -14,36 +14,41 @@ from helper.TextHelper import TextHelper
 class LLM:
 
     MAX_RETRY = 2 # 最大重试次数
-    DEGRADATION_FLAG = "[☀️DEGRADATION☀️]" # 用于标识退化
 
-    TASK_TYPE_EXTRACT_WORD = 10 # 分词模式
-    TASK_TYPE_EXTRACT_WORD_DEGRADATION = 11 # 分词模式退化重试
-    TASK_TYPE_TRANSLATE_SURFACE = 20 # 翻译词表模式
-    TASK_TYPE_TRANSLATE_CONTEXT = 30 # 翻译上下文模式
+    TASK_TYPE_EXTRACT_WORD = 10 # 分词
+    TASK_TYPE_DETECT_DUPLICATE = 20 # 检测重复词根
+    TASK_TYPE_SUMMAIRZE_CONTEXT = 30 # 智能总结
+    TASK_TYPE_TRANSLATE_SURFACE = 40 # 翻译词汇
+    TASK_TYPE_TRANSLATE_CONTEXT = 50 # 翻译上下文
 
-    # LLM请求参数配置 - 分词模式
+    # LLM请求参数配置 - 分词
     TEMPERATURE_WORD_EXTRACT = 0
     TOP_P_WORD_EXTRACT = 1
     MAX_TOKENS_WORD_EXTRACT = 512 
     FREQUENCY_PENALTY_WORD_EXTRACT = 0
 
-    # LLM请求参数配置 - 分词模式退化重试
-    TEMPERATURE_WORD_EXTRACT_DEGRADATION = 0
-    TOP_P_WORD_EXTRACT_DEGRADATION = 1
-    MAX_TOKENS_WORD_EXTRACT_DEGRADATION = 512 
-    FREQUENCY_PENALTY_WORD_EXTRACT_DEGRADATION = 0.2
+    # LLM请求参数配置 - 检测重复词根
+    TEMPERATURE_SUMMAIRZE_CONTEXT = 0
+    TOP_P_SUMMAIRZE_CONTEXT = 1
+    MAX_TOKENS_SUMMAIRZE_CONTEXT = 512
+    FREQUENCY_PENALTY_SUMMAIRZE_CONTEXT = 0
 
-    # LLM请求参数配置 - 翻译词表模式
+    # LLM请求参数配置 - 智能总结
+    TEMPERATURE_DETECT_DUPLICATE = 0
+    TOP_P_DETECT_DUPLICATE = 1
+    MAX_TOKENS_DETECT_DUPLICATE = 512
+    FREQUENCY_PENALTY_DETECT_DUPLICATE = 0
+
+    # LLM请求参数配置 - 翻译词汇
     TEMPERATURE_TRANSLATE_SURFACE = 0
     TOP_P_TRANSLATE_SURFACE = 1
     MAX_TOKENS_TRANSLATE_SURFACE = 512 
     FREQUENCY_PENALTY_TRANSLATE_SURFACE = 0
 
-    # LLM请求参数配置 - 翻译上下文模式
+    # LLM请求参数配置 - 翻译上下文
     TEMPERATURE_TRANSLATE_CONTEXT = 0
     TOP_P_TRANSLATE_CONTEXT = 1
-    MAX_TOKENS_TRANSLATE_CONTEXT_REQUEST = 512
-    MAX_TOKENS_TRANSLATE_CONTEXT_RESPONSE = 1024
+    MAX_TOKENS_TRANSLATE_CONTEXT = 768
     FREQUENCY_PENALTY_TRANSLATE_CONTEXT = 0
 
     def __init__(self, config):
@@ -84,6 +89,22 @@ class LLM:
         try:
             with open(filepath, "r", encoding="utf-8") as file:
                 self.prompt_extract_words = file.read()
+        except FileNotFoundError:
+            LogHelper.error(f"目标文件不存在 ... ")
+
+    # 根据类型加载不同的prompt模板文件
+    def load_prompt_detect_duplicate(self, filepath):
+        try:
+            with open(filepath, "r", encoding="utf-8") as file:
+                self.prompt_detect_duplicate = file.read()
+        except FileNotFoundError:
+            LogHelper.error(f"目标文件不存在 ... ")
+
+    # 根据类型加载不同的prompt模板文件
+    def load_prompt_summarize_context(self, filepath):
+        try:
+            with open(filepath, "r", encoding="utf-8") as file:
+                self.prompt_summarize_context = file.read()
         except FileNotFoundError:
             LogHelper.error(f"目标文件不存在 ... ")
 
@@ -129,33 +150,31 @@ class LLM:
         return flag
 
     # 异步发送请求到OpenAI获取模型回复
-    async def request(self, content, type):
+    async def request(self, prompt, content, type):
         if type == self.TASK_TYPE_EXTRACT_WORD:
-            prmopt = self.prompt_extract_words
-
             temperature = self.TEMPERATURE_WORD_EXTRACT
             top_p = self.TOP_P_WORD_EXTRACT
             max_tokens = self.MAX_TOKENS_WORD_EXTRACT
             frequency_penalty = self.FREQUENCY_PENALTY_WORD_EXTRACT
-        elif type == self.TASK_TYPE_EXTRACT_WORD_DEGRADATION:
-            prmopt = self.prompt_extract_words
-            temperature = self.TEMPERATURE_WORD_EXTRACT_DEGRADATION
-            top_p = self.TOP_P_WORD_EXTRACT_DEGRADATION
-            max_tokens = self.MAX_TOKENS_WORD_EXTRACT_DEGRADATION
-            frequency_penalty = self.FREQUENCY_PENALTY_WORD_EXTRACT_DEGRADATION
+        elif type == self.TASK_TYPE_SUMMAIRZE_CONTEXT: 
+            temperature = self.TEMPERATURE_SUMMAIRZE_CONTEXT
+            top_p = self.TOP_P_SUMMAIRZE_CONTEXT
+            max_tokens = self.MAX_TOKENS_SUMMAIRZE_CONTEXT
+            frequency_penalty = self.FREQUENCY_PENALTY_SUMMAIRZE_CONTEXT
+        elif type == self.TASK_TYPE_DETECT_DUPLICATE: 
+            temperature = self.TEMPERATURE_DETECT_DUPLICATE
+            top_p = self.TOP_P_DETECT_DUPLICATE
+            max_tokens = self.MAX_TOKENS_DETECT_DUPLICATE
+            frequency_penalty = self.FREQUENCY_PENALTY_DETECT_DUPLICATE
         elif type == self.TASK_TYPE_TRANSLATE_SURFACE:
-            prmopt = self.prompt_translate_surface
-
             temperature = self.TEMPERATURE_TRANSLATE_SURFACE
             top_p = self.TOP_P_TRANSLATE_SURFACE
             max_tokens = self.MAX_TOKENS_TRANSLATE_SURFACE
             frequency_penalty = self.FREQUENCY_PENALTY_TRANSLATE_SURFACE
         elif type == self.TASK_TYPE_TRANSLATE_CONTEXT: 
-            prmopt = self.prompt_translate_context
-
             temperature = self.TEMPERATURE_TRANSLATE_CONTEXT
             top_p = self.TOP_P_TRANSLATE_CONTEXT
-            max_tokens = self.MAX_TOKENS_TRANSLATE_CONTEXT_RESPONSE
+            max_tokens = self.MAX_TOKENS_TRANSLATE_CONTEXT
             frequency_penalty = self.FREQUENCY_PENALTY_TRANSLATE_CONTEXT
 
         completion = await self.openai_handler.chat.completions.create(
@@ -167,7 +186,7 @@ class LLM:
             messages = [
                 {
                     "role": "system",
-                    "content": prmopt,
+                    "content": prompt,
                 },
                 {
                     "role": "user", 
@@ -186,15 +205,12 @@ class LLM:
     async def extract_words(self, text, fulltext):
         async with self.semaphore:
             words = []
-
-            if not text.startswith(self.DEGRADATION_FLAG):
-                usage, message, llmresponse = await self.request(text, self.TASK_TYPE_EXTRACT_WORD)
-            else:
-                text = text.replace(self.DEGRADATION_FLAG, "")
-                usage, message, llmresponse = await self.request(text, self.TASK_TYPE_EXTRACT_WORD_DEGRADATION)
+            prompt = self.prompt_extract_words
+            task_type = self.TASK_TYPE_EXTRACT_WORD
+            usage, message, llmresponse = await self.request(prompt, text, task_type)
 
             if usage.completion_tokens >= self.MAX_TOKENS_WORD_EXTRACT:
-                raise Exception(self.DEGRADATION_FLAG + text) 
+                raise Exception() 
 
             for surface in message.content.split(","):
                 surface = surface.strip()
@@ -226,12 +242,7 @@ class LLM:
             texts_successed.append(text)
             LogHelper.info(f"[LLM 分词] 已完成 {len(texts_successed)} / {len(texts)} ...")       
         except Exception as error:
-            error_message = str(error)
-
-            if error_message.startswith(self.DEGRADATION_FLAG):
-                LogHelper.warning(f"[LLM 分词] 收到了不正确的回复，稍后将重试 ...")
-            else:
-                LogHelper.error(f"[LLM 分词] 执行失败，稍后将重试 ... {error_message} ...")
+            LogHelper.error(f"[LLM 分词] 子任务执行失败，稍后将重试 ... {error}")
 
     # 批量执行分词任务的具体实现
     async def do_extract_words_batch(self, texts, fulltext, words, texts_failed, texts_successed):
@@ -251,17 +262,6 @@ class LLM:
 
         # 取所有未成功任务
         texts_failed = [text for text in texts if text not in texts_successed]
-
-        # 遍历所有任务的结果，找到标记为退化的任务，并修改列表中的对应的条目
-        for k, result in enumerate(results):
-            if isinstance(result, Exception) and str(result).startswith(self.DEGRADATION_FLAG):
-                pure_text = str(result).replace(self.DEGRADATION_FLAG, "")
-                error_text = str(result)
-
-                for k, text in enumerate(texts_failed):
-                    if text == pure_text:
-                        texts_failed[k] = error_text 
-                        break
 
         return words, texts_failed, texts_successed
 
@@ -283,27 +283,28 @@ class LLM:
 
         return words
 
-    # 词表翻译任务
+    # 词汇翻译任务
     async def translate_surface(self, word):
         async with self.semaphore:
-            usage, message, _ = await self.request(word.surface, self.TASK_TYPE_TRANSLATE_SURFACE)
+            prompt = self.prompt_translate_surface.replace("{attribute}", word.attribute)
+            task_type = self.TASK_TYPE_TRANSLATE_SURFACE
+            usage, message, llmresponse = await self.request(prompt, word.surface, task_type)
 
-            # 幻觉，直接抛掉
             if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_SURFACE:
-                return word
+                raise Exception()
 
             word.surface_translation = message.content.strip().replace("\n", "  ")
 
             return word
 
-    # 词表翻译任务完成时的回调
+    # 词汇翻译任务完成时的回调
     def on_translate_surface_task_done(self, future, words, words_failed, words_successed):
         try:
             word = future.result()
             words_successed.append(word)
-            LogHelper.info(f"[后处理 - 词表翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
+            LogHelper.info(f"[词汇翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
         except Exception as error:
-            LogHelper.error(f"[后处理 - 词表翻译] 执行失败，稍后将重试 ... {error}")
+            LogHelper.error(f"[词汇翻译] 子任务执行失败，稍后将重试 ... {error}")
 
         # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
         words_failed.clear()
@@ -311,7 +312,7 @@ class LLM:
             if word not in words_successed:
                 words_failed.append(word)
 
-    # 批量执行词表翻译任务的具体实现
+    # 批量执行词汇翻译任务的具体实现
     async def do_translate_surface_batch(self, words, words_failed, words_successed):
         if len(words_failed) == 0:
             words_this_round = words
@@ -327,7 +328,7 @@ class LLM:
 
         return words_failed, words_successed
 
-    # 批量执行词表翻译任务 
+    # 批量执行词汇翻译任务 
     async def translate_surface_batch(self, words):
         words_failed = []
         words_successed = []
@@ -336,59 +337,34 @@ class LLM:
 
         if len(words_failed) > 0:
             for i in range(self.MAX_RETRY):
-                LogHelper.warning( f"[后处理 - 词表翻译] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
+                LogHelper.warning( f"[词汇翻译] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
 
                 words_failed, words_successed = await self.do_translate_surface_batch(words, words_failed, words_successed)
                 if len(words_failed) == 0:
                     break
         return words
 
-    # 执行上下文任务的合并   
-    def do_context_merge(self, context):
-        current_size = 0
-        current_segment = []
-        context_split_by_token = []
-
-        for line in context:
-            line_token = len(self.tiktoken_encoding.encode(line))
-
-            # 如果当前段的大小加上当前行的大小超过阈值，则需要将当前段添加到结果列表中，并重置当前段
-            if current_size + line_token > self.MAX_TOKENS_TRANSLATE_CONTEXT_REQUEST:
-                context_split_by_token.append("\n".join(current_segment))
-                current_segment = []
-                current_size = 0
-
-            # 添加当前字符串到当前段
-            current_segment.append(line)
-            current_size += line_token
-
-        # 添加最后一段
-        if current_segment:
-            context_split_by_token.append("\n".join(current_segment))
-
-        return context_split_by_token
-
     # 上下文翻译任务
     async def translate_context(self, word):
         async with self.semaphore:
             context_translation = []
-            context_split_by_token = self.do_context_merge(word.context)
-            for k, line in enumerate(context_split_by_token):
-                usage, message, _ = await self.request(line, self.TASK_TYPE_TRANSLATE_CONTEXT)
+            prompt = self.prompt_translate_context
+            task_type = self.TASK_TYPE_TRANSLATE_CONTEXT
+            usage, message, llmresponse = await self.request(prompt, "\n".join(word.context), task_type)
 
-                # 幻觉，直接抛掉
-                if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT_RESPONSE:
-                    continue
-                lines = message.content.split("\n")
-                for k, line in enumerate(lines):
-                    # 比之前稍微好了一点，但是还是很丑陋
-                    line = line.replace("\n", "")
-                    line = re.sub(r"(第.行)?翻译文本：?", "", line)
-                    line = re.sub(r"第.行：?", "", line)
-                    line = line.strip()                
+            if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT:
+                raise Exception()
+            
+            for k, line in enumerate(message.content.split("\n")):
 
-                    if len(line) > 0:
-                        context_translation.append(line)
+                # 比之前稍微好了一点，但是还是很丑陋
+                line = line.replace("\n", "")
+                line = re.sub(r"(第.行)?翻译文本：?", "", line)
+                line = re.sub(r"第.行：?", "", line)
+                line = line.strip()                
+
+                if len(line) > 0:
+                    context_translation.append(line)
 
             word.context_translation = context_translation
 
@@ -399,9 +375,9 @@ class LLM:
         try:
             word = future.result()
             words_successed.append(word)
-            LogHelper.info(f"[后处理 - 上下文翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
+            LogHelper.info(f"[上下文翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
         except Exception as error:
-            LogHelper.error(f"[后处理 - 上下文翻译] 执行失败，稍后将重试 ... {error}")
+            LogHelper.error(f"[上下文翻译] 子任务执行失败，稍后将重试 ... {error}")
 
         # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
         words_failed.clear()
@@ -432,11 +408,171 @@ class LLM:
 
         words_failed, words_successed = await self.do_translate_context_batch(words, words_failed, words_successed)
 
-        if len(words_failed) > 0:
-            for i in range(self.MAX_RETRY):
-                LogHelper.warning( f"[后处理 - 上下文翻译] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
-
+        for i in range(self.MAX_RETRY):
+            if len(words_failed) > 0:
+                LogHelper.warning( f"[上下文翻译] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
                 words_failed, words_successed = await self.do_translate_context_batch(words, words_failed, words_successed)
-                if len(words_failed) == 0:
-                    break
+
+        return words
+
+    # 检测重复词根任务
+    async def detect_duplicate(self, pair):
+        async with self.semaphore:
+            prompt = self.prompt_detect_duplicate
+            task_type = self.TASK_TYPE_DETECT_DUPLICATE
+            usage, message, llmresponse = await self.request(prompt, "\n".join([pair[0].surface, pair[1].surface]), task_type)
+
+            if usage.completion_tokens >= self.MAX_TOKENS_DETECT_DUPLICATE:
+                raise Exception() 
+
+            if len(pair) >= 3:
+                pair[2] = message.content == "是"
+            else:
+                pair.append(message.content == "是")
+            
+            return pair
+
+    # 重复词根检测任务完成时的回调
+    def on_detect_duplicate_task_done(self, future, pairs, pairs_failed, pairs_successed):
+        try:
+            pair = future.result()
+            pairs_successed.append(pair)
+            LogHelper.info(f"[重复词根检测] 已完成 {len(pairs_successed)} / {len(pairs)} ...")       
+        except Exception as error:
+            LogHelper.error(f"[重复词根检测] 子任务执行失败，稍后将重试 ... {error}")
+ 
+     # 实际执行重复词根检测任务
+
+    # 批量执行重复词根检测任务的具体实现
+    async def do_detect_duplicate_task(self, pairs, pairs_failed, pairs_successed):
+        if len(pairs_failed) == 0:
+            pairs_this_round = pairs
+        else:
+            pairs_this_round = pairs_failed       
+
+        tasks = []
+        for k, pair in enumerate(pairs_this_round):
+            task = asyncio.create_task(self.detect_duplicate(pair))
+            task.add_done_callback(lambda future: self.on_detect_duplicate_task_done(future, pairs, pairs_failed, pairs_successed))
+            tasks.append(task)
+
+        # 等待异步任务完成 
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 获得失败任务的列表
+        pairs_successed_prefixes = {tuple(pair[:2]) for pair in pairs_successed}
+        pairs_failed = [pair for pair in pairs if tuple(pair[:2]) not in pairs_successed_prefixes]
+
+        return pairs_failed, pairs_successed
+
+    # 批量执行重复词根检测任务
+    async def detect_duplicate_batch(self, words):
+        pairs_failed = []
+        pairs_successed = []
+        pairs_need_confirm = []
+
+        # 找出具有重复词根的词
+        for k_a, word_a in enumerate(words):
+            for k_b, word_b in enumerate(words[k_a + 1 :]):
+                if word_a.surface in word_b.surface or word_b.surface in word_a.surface:
+                    pairs_need_confirm.append([word_a, word_b])
+
+        # 整理字符串对列表，确保每个条目中较短的字符串在前，较长的在后。
+        pairs_need_confirm = [[x, y] if len(x.surface) <= len(y.surface) else [y, x] for x, y in pairs_need_confirm]
+        
+        pairs_failed, pairs_successed = await self.do_detect_duplicate_task(pairs_need_confirm, pairs_failed, pairs_successed)
+
+        for i in range(self.MAX_RETRY):
+            if len(pairs_failed) > 0:
+                LogHelper.warning( f"[检查重复词根] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
+                pairs_failed, pairs_successed = await self.do_detect_duplicate_task(pairs_need_confirm, pairs_failed, pairs_successed)
+
+        # 筛选判断为重复词的条目
+        pairs_successed = [pair for pair in pairs_successed if pair[2] == True]
+
+        # 排序，长的排在前面
+        pairs_successed = sorted(
+            pairs_successed, key=lambda pair: (pair[0].surface, -len(pair[1].surface))
+        )
+
+        for k, (word_a, word_b, flag) in enumerate(pairs_successed):
+            surface_a = word_a.surface
+            surface_b = word_b.surface
+            LogHelper.info(f"[重复词根检测] 正在处理重复词 {surface_a}, {surface_b} ...")    
+
+            for i, word in enumerate(words):
+                    words[i].surface = surface_a if word.surface == surface_b else words[i].surface
+        
+        return words
+
+    # 智能总结任务 
+    async def summarize_context(self, word):
+        async with self.semaphore:
+            prompt = self.prompt_summarize_context.replace("{surface}", word.surface)
+            task_type = self.TASK_TYPE_SUMMAIRZE_CONTEXT
+            usage, message, _ = await self.request(prompt, "\n".join(word.context), task_type)
+
+            if usage.completion_tokens >= self.MAX_TOKENS_SUMMAIRZE_CONTEXT:
+                raise Exception()
+
+            context_summary = message.content.strip().replace("\n\n", "\n")
+
+            if len(context_summary) == 0:
+                return word
+
+            if "女性" in context_summary:
+                word.attribute = "女性"
+            elif "男性" in context_summary:
+                word.attribute = "男性"
+            else:
+                word.attribute = "未知"
+
+            word.context_summary = context_summary
+
+            return word
+
+    # 智能总结任务完成时的回调
+    def on_summarize_context_task_done(self, future, words, words_failed, words_successed):
+        try:
+            word = future.result()
+            words_successed.append(word)
+            LogHelper.info(f"[智能总结] 已完成 {len(words_successed)} / {len(words)} ...")       
+        except Exception as error:
+            LogHelper.error(f"[智能总结] 子任务执行失败，稍后将重试 ... {error}")
+
+    # 批量执行智能总结任务的具体实现
+    async def do_summarize_context_batch(self, words, words_failed, words_successed):
+        if len(words_failed) == 0:
+            words_this_round = words
+        else:
+            words_this_round = words_failed       
+
+        tasks = []
+        for k, word in enumerate(words_this_round):
+            task = asyncio.create_task(self.summarize_context(word))
+            task.add_done_callback(lambda future: self.on_summarize_context_task_done(future, words, words_failed, words_successed))
+            tasks.append(task)
+
+        # 等待异步任务完成 
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 获得失败任务的列表
+        words_failed = [word_a for word_a in words if not any(word_a.surface == word_b.surface for word_b in words_successed)]
+
+        return words_failed, words_successed
+
+    # 批量执行智能总结任务
+    async def summarize_context_batch(self, words):
+        words_failed = []
+        words_successed = []
+
+        # 第一次请求
+        words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed)
+
+        # 开始重试流程
+        for i in range(self.MAX_RETRY):
+            if len(words_failed) > 0:
+                LogHelper.warning( f"[智能总结] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
+                words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed)
+
         return words

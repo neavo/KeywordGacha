@@ -27,9 +27,6 @@ G = type("GClass", (), {})()
 # 似乎切的越细，能找到的词越多，失败的概率也会降低
 SPLIT_THRESHOLD = 1024
 
-# 词频阈值
-COUNT_THRESHOLD = 3
-
 # 读取TXT文件并返回
 def read_txt_file(filename):
     try:
@@ -105,36 +102,12 @@ def split_by_token_threshold(lines, threshold):
 
     return lines_split_by_token
 
-    # result = []  # 存储处理后的字符串段
-    # current_segment = []  # 临时存储当前段的字符串
-    # current_size = 0  # 当前段的字节大小
-
-    # for line in lines:
-    #     line_len = len(line.encode("utf-8"))  # 计算字符串的字节长度
-
-    #     # 如果加上当前字符串会导致超过阈值，则先处理并清空当前段
-    #     if current_size + line_len > threshold:
-    #         result.append("".join(current_segment))  # 拼接并添加到结果列表
-    #         current_segment = []  # 重置当前段
-    #         current_size = 0  # 重置当前段字节大小
-
-    #     # 添加当前字符串到当前段
-    #     current_segment.append(line)
-    #     current_size += line_len
-
-    # # 添加最后一个段，如果非空
-    # if current_segment:
-    #     result.append("".join(current_segment))
-
-    # return result
-
 # 合并具有相同表面形式（surface）的 Word 对象，计数并逆序排序。
-def merge_and_count(words_list):
+def merge_and_count(words):
     surface_to_word = {}
 
-    for word in words_list:
+    for word in words:
         if word.surface not in surface_to_word:
-            # 初始化 surface 对应的 Word 对象
             surface_to_word[word.surface] = word
         else:
             # 累积 count
@@ -156,10 +129,12 @@ def write_words_to_file(words, filename, detailmode):
                 file.write(f"词语原文 : {word.surface}\n")
                 file.write(f"词语翻译 : {word.surface_translation}\n")
                 file.write(f"出现次数 : {word.count}\n")
+                file.write(f"智能总结 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
+                file.write(f"{word.context_summary}\n")
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                file.write(f"{'    \n'.join(word.context)}\n")
+                file.write(f"{'\n'.join(word.context)}\n")
                 file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                file.write(f"{'    \n'.join(word.context_translation)}\n")
+                file.write(f"{'\n'.join(word.context_translation)}\n")
                 file.write("\n")
             elif k == 0:
                 file.write("\n")
@@ -205,7 +180,9 @@ def read_data_file():
     elif os.path.isdir(input_file_name):
         input_data = read_csv_files(input_file_name)
     else:
-        print(f"不支持的文件格式: {input_file_name}")
+        LogHelper.warning(f"不支持的文件格式: {input_file_name}")
+        os.system("pause")
+        exit(1)
 
     input_data_filtered = []
     for k, line in enumerate(input_data):
@@ -229,45 +206,66 @@ def read_data_file():
 
 # 主函数
 async def main():
+    # 初始化 LLM 对象
+    llm = LLM(G.config)
+    llm.load_black_list("blacklist.txt")
+    llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
+    llm.load_prompt_detect_duplicate("prompt\\prompt_detect_duplicate.txt")
+    llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
+    llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
+    llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
+
+    # 切分文本
     fulltext = read_data_file()
     LogHelper.info("正在对文件中的文本进行预处理 ...")
     input_data_splited = split_by_token_threshold(fulltext, SPLIT_THRESHOLD)
 
-    llm = LLM(G.config)
-    llm.load_black_list("blacklist.txt")
-    llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
-    llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
-    llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
-    
+    # 如果内容较长，适当放宽阈值，以避免出现过多词条
+    if len(input_data_splited) > 300:
+        G.count_threshold = 5
+    elif len(input_data_splited) > 200:
+        G.count_threshold = 4
+    else:
+        G.count_threshold = 3
+
     # 等待分词任务结果
     LogHelper.info("即将开始执行 [LLM 分词] ...")
     words = await llm.extract_words_batch(input_data_splited, fulltext)
 
-    # 合并与排序
-    words_all = merge_and_count(words)
+    # 先合并一次重复词条，便于后续操作
+    words_merged = merge_and_count(words)
 
     # 按阈值筛选，但是保证至少10个
-    words_with_threshold = [word for word in words_all if word.count >= COUNT_THRESHOLD]
-    words_all_filtered = [word for word in words_all if word not in words_with_threshold]
+    words_with_threshold = [word for word in words_merged if word.count >= G.count_threshold]
+    words_all_filtered = [word for word in words_merged if word not in words_with_threshold]
     words_with_threshold.extend(words_all_filtered[:max(0, 10 - len(words_with_threshold))])
 
-    # 等待翻译词表任务结果
+    # 等待重复词根检测任务结果，完成后再对重复词进行一次合并
+    LogHelper.info("即将开始执行 [重复词根检测] ...")
+    words_no_duplicate = await llm.detect_duplicate_batch(words_with_threshold)
+    words_no_duplicate_sorted = merge_and_count(words_no_duplicate)
+
+    # 等待翻译词汇任务结果
+    LogHelper.info("即将开始执行 [智能总结] ...")
+    words_no_duplicate_sorted = await llm.summarize_context_batch(words_no_duplicate_sorted)
+
+    # 等待翻译词汇任务结果
     if G.config.translate_surface_mode == 1:
-        LogHelper.info("即将开始执行 [后处理 - 词表翻译] ...")
-        words_with_threshold = await llm.translate_surface_batch(words_with_threshold)
+        LogHelper.info("即将开始执行 [词汇翻译] ...")
+        words_no_duplicate_sorted = await llm.translate_surface_batch(words_no_duplicate_sorted)
 
     # 等待上下文词表任务结果
     if G.config.translate_context_mode == 1:
-        LogHelper.info("即将开始执行 [后处理 - 上下文翻译] ...")
-        words_with_threshold = await llm.translate_context_batch(words_with_threshold)
+        LogHelper.info("即将开始执行 [上下文翻译] ...")
+        words_no_duplicate_sorted = await llm.translate_context_batch(words_no_duplicate_sorted)
 
     # 定义输出文件名
     names_true_output_file = "角色姓名_日志.txt"
     dictionary_names_true_file = "角色姓名_列表.json"
 
     # 写入文件
-    write_words_to_file(words_with_threshold, names_true_output_file, True)
-    write_words_to_file(words_with_threshold, dictionary_names_true_file, False)
+    write_words_to_file(words_no_duplicate_sorted, names_true_output_file, True)
+    write_words_to_file(words_no_duplicate_sorted, dictionary_names_true_file, False)
 
     # 输出日志
     LogHelper.info("")

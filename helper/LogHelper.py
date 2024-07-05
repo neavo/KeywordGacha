@@ -2,14 +2,13 @@ import re
 import logging
 from logging.handlers import RotatingFileHandler
 
-# 自定义 handler 类
 class ColorStreamHandler(logging.StreamHandler):
 
     LEVEL_NAME = [
         " [DEBUG] ",
         " [INFO] ",
         " [WARNING] ",
-        " [RROR] ",
+        " [ERROR] ",
         " [CRITICAL] ",      
     ]
 
@@ -17,7 +16,7 @@ class ColorStreamHandler(logging.StreamHandler):
         " [\033[94mDEBUG\033[0m] ",         # 蓝色
         " [\033[92mINFO\033[0m] ",          # 绿色
         " [\033[93mWARNING\033[0m] ",       # 黄色
-        " [\033[91mRROR\033[0m] ",          # 红色
+        " [\033[91mERROR\033[0m] ",         # 红色
         " [\033[1;95mCRITICAL\033[0m] ",    # 亮品红色     
     ]
 
