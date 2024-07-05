@@ -9,18 +9,22 @@ class Word:
     def __init__(self):
         self.count = 0
         self.context = []
+        self.context_summary = ""
         self.context_translation = []
         self.surface = ""
         self.surface_translation = ""
+        self.attribute = ""
         self.llmresponse = ""
 
     def __str__(self):
         return (
             f"Word(count={self.count},"
             f"context={self.context},"
+            f"context_summary={self.context_summary},"
             f"context_translation={self.context_translation},"
             f"surface={self.surface},"
             f"surface_translation={self.surface_translation},"
+            f"attribute={self.attribute},"
             f"llmresponse={self.llmresponse})"
         )
 

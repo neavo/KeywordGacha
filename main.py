@@ -132,10 +132,12 @@ def write_words_to_file(words, filename, detailmode):
                 file.write(f"词语原文 : {word.surface}\n")
                 file.write(f"词语翻译 : {word.surface_translation}\n")
                 file.write(f"出现次数 : {word.count}\n")
+                file.write(f"智能总结 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
+                file.write(f"{word.context_summary}\n")
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                file.write(f"{'    \n'.join(word.context)}\n")
+                file.write(f"{'\n'.join(word.context)}\n")
                 file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                file.write(f"{'    \n'.join(word.context_translation)}\n")
+                file.write(f"{'\n'.join(word.context_translation)}\n")
                 file.write("\n")
             elif k == 0:
                 file.write("\n")
@@ -211,6 +213,7 @@ async def main():
     llm.load_black_list("blacklist.txt")
     llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
     llm.load_prompt_detect_duplicate("prompt\\prompt_detect_duplicate.txt")
+    llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
     llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
     llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
 
@@ -235,14 +238,17 @@ async def main():
     words_no_duplicate = await llm.detect_duplicate_batch(words_with_threshold)
     words_no_duplicate_sorted = merge_and_count(words_no_duplicate)
 
+    LogHelper.info("即将开始执行 [智能总结] ...")
+    words_no_duplicate_sorted = await llm.summarize_context_batch(words_no_duplicate_sorted)
+
     # 等待翻译词表任务结果
     if G.config.translate_surface_mode == 1:
-        LogHelper.info("即将开始执行 [后处理 - 词表翻译] ...")
+        LogHelper.info("即将开始执行 [词表翻译] ...")
         words_no_duplicate_sorted = await llm.translate_surface_batch(words_no_duplicate_sorted)
 
     # 等待上下文词表任务结果
     if G.config.translate_context_mode == 1:
-        LogHelper.info("即将开始执行 [后处理 - 上下文翻译] ...")
+        LogHelper.info("即将开始执行 [上下文翻译] ...")
         words_no_duplicate_sorted = await llm.translate_context_batch(words_no_duplicate_sorted)
 
     # 定义输出文件名
