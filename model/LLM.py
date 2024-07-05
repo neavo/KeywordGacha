@@ -20,6 +20,7 @@ class LLM:
     TASK_TYPE_EXTRACT_WORD_DEGRADATION = 11 # 分词模式退化重试
     TASK_TYPE_TRANSLATE_SURFACE = 20 # 翻译词表模式
     TASK_TYPE_TRANSLATE_CONTEXT = 30 # 翻译上下文模式
+    TASK_TYPE_DETECT_DUPLICATE = 40 # 检测重复词根模式
 
     # LLM请求参数配置 - 分词模式
     TEMPERATURE_WORD_EXTRACT = 0
@@ -45,6 +46,12 @@ class LLM:
     MAX_TOKENS_TRANSLATE_CONTEXT_REQUEST = 512
     MAX_TOKENS_TRANSLATE_CONTEXT_RESPONSE = 1024
     FREQUENCY_PENALTY_TRANSLATE_CONTEXT = 0
+
+    # LLM请求参数配置 - 检测重复词根模式
+    TEMPERATURE_DETECT_DUPLICATE = 0
+    TOP_P_DETECT_DUPLICATE = 1
+    MAX_TOKENS_DETECT_DUPLICATE = 512
+    FREQUENCY_PENALTY_DETECT_DUPLICATE = 0
 
     def __init__(self, config):
         # 初始化OpenAI API密钥、基础URL和模型名称
@@ -84,6 +91,14 @@ class LLM:
         try:
             with open(filepath, "r", encoding="utf-8") as file:
                 self.prompt_extract_words = file.read()
+        except FileNotFoundError:
+            LogHelper.error(f"目标文件不存在 ... ")
+
+    # 根据类型加载不同的prompt模板文件
+    def load_prompt_detect_duplicate(self, filepath):
+        try:
+            with open(filepath, "r", encoding="utf-8") as file:
+                self.prompt_detect_duplicate = file.read()
         except FileNotFoundError:
             LogHelper.error(f"目标文件不存在 ... ")
 
@@ -157,6 +172,13 @@ class LLM:
             top_p = self.TOP_P_TRANSLATE_CONTEXT
             max_tokens = self.MAX_TOKENS_TRANSLATE_CONTEXT_RESPONSE
             frequency_penalty = self.FREQUENCY_PENALTY_TRANSLATE_CONTEXT
+        elif type == self.TASK_TYPE_DETECT_DUPLICATE: 
+            prmopt = self.prompt_detect_duplicate
+
+            temperature = self.TEMPERATURE_DETECT_DUPLICATE
+            top_p = self.TOP_P_DETECT_DUPLICATE
+            max_tokens = self.MAX_TOKENS_DETECT_DUPLICATE
+            frequency_penalty = self.FREQUENCY_PENALTY_DETECT_DUPLICATE
 
         completion = await self.openai_handler.chat.completions.create(
             model = self.model_name,
@@ -311,7 +333,7 @@ class LLM:
             if word not in words_successed:
                 words_failed.append(word)
 
-    # 批量执行词表翻译任务的具体实现
+    # 实际执行词表翻译任务
     async def do_translate_surface_batch(self, words, words_failed, words_successed):
         if len(words_failed) == 0:
             words_this_round = words
@@ -409,7 +431,7 @@ class LLM:
             if word not in words_successed:
                 words_failed.append(word)
 
-    # 批量执行上下文翻译任务的具体实现
+    # 实际执行上下文翻译任务
     async def do_translate_context_batch(self, words, words_failed, words_successed):
         if len(words_failed) == 0:
             words_this_round = words
@@ -432,11 +454,98 @@ class LLM:
 
         words_failed, words_successed = await self.do_translate_context_batch(words, words_failed, words_successed)
 
-        if len(words_failed) > 0:
-            for i in range(self.MAX_RETRY):
+        for i in range(self.MAX_RETRY):
+            if len(words_failed) > 0:
                 LogHelper.warning( f"[后处理 - 上下文翻译] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
-
                 words_failed, words_successed = await self.do_translate_context_batch(words, words_failed, words_successed)
-                if len(words_failed) == 0:
-                    break
+
+        return words
+
+    # 检测重复词根任务
+    async def detect_duplicate(self, pair):
+        async with self.semaphore:
+            content = "\n".join([pair[0].surface, pair[1].surface])
+            usage, message, llmresponse = await self.request((content), self.TASK_TYPE_DETECT_DUPLICATE)
+
+            if usage.completion_tokens >= self.MAX_TOKENS_DETECT_DUPLICATE:
+                raise Exception() 
+
+            if len(pair) >= 3:
+                pair[2] = message.content == "是"
+            else:
+                pair.append(message.content == "是")
+            
+            return pair
+
+    # 重复词根检测任务完成时的回调
+    def on_detect_duplicate_task_done(self, future, pairs, pairs_failed, pairs_successed):
+        try:
+            pair = future.result()
+            pairs_successed.append(pair)
+            LogHelper.info(f"[重复词根检测] 已完成 {len(pairs_successed)} / {len(pairs)} ...")       
+        except Exception as error:
+            LogHelper.error(f"[重复词根检测] 执行失败，稍后将重试 ... {error}")
+ 
+     # 实际执行重复词根检测任务
+
+    # 实际执行重复词根检测任务 
+    async def do_detect_duplicate_task(self, pairs, pairs_failed, pairs_successed):
+        if len(pairs_failed) == 0:
+            pairs_this_round = pairs
+        else:
+            pairs_this_round = pairs_failed       
+
+        tasks = []
+        for k, pair in enumerate(pairs_this_round):
+            task = asyncio.create_task(self.detect_duplicate(pair))
+            task.add_done_callback(lambda future: self.on_detect_duplicate_task_done(future, pairs, pairs_failed, pairs_successed))
+            tasks.append(task)
+
+        # 等待异步任务完成 
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 取所有未成功任务
+        pairs_successed_prefixes = {tuple(pair[:2]) for pair in pairs_successed}
+        pairs_failed = [pair for pair in pairs if tuple(pair[:2]) not in pairs_successed_prefixes]
+
+        return pairs_failed, pairs_successed
+
+    # 批量执行重复词根检测任务
+    async def detect_duplicate_batch(self, words):
+        pairs_failed = []
+        pairs_successed = []
+        pairs_need_confirm = []
+
+        # 找出具有重复词根的词
+        for k_a, word_a in enumerate(words):
+            for k_b, word_b in enumerate(words[k_a + 1 :]):
+                if word_a.surface in word_b.surface or word_b.surface in word_a.surface:
+                    pairs_need_confirm.append([word_a, word_b])
+
+        # 整理字符串对列表，确保每个条目中较短的字符串在前，较长的在后。
+        pairs_need_confirm = [[x, y] if len(x.surface) <= len(y.surface) else [y, x] for x, y in pairs_need_confirm]
+        
+        pairs_failed, pairs_successed = await self.do_detect_duplicate_task(pairs_need_confirm, pairs_failed, pairs_successed)
+
+        for i in range(self.MAX_RETRY):
+            if len(pairs_failed) > 0:
+                LogHelper.warning( f"[检查重复词根] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
+                pairs_failed, pairs_successed = await self.do_detect_duplicate_task(pairs_need_confirm, pairs_failed, pairs_successed)
+
+        # 筛选判断为重复词的条目
+        pairs_successed = [pair for pair in pairs_successed if pair[2] == True]
+
+        # 排序，长的排在前面
+        pairs_successed = sorted(
+            pairs_successed, key=lambda pair: (pair[0].surface, -len(pair[1].surface))
+        )
+
+        for k, (word_a, word_b, flag) in enumerate(pairs_successed):
+            surface_a = word_a.surface
+            surface_b = word_b.surface
+            LogHelper.info(f"[重复词根检测] 正在处理重复词 {surface_a}, {surface_b} ...")    
+
+            for i, word in enumerate(words):
+                    words[i].surface = surface_a if word.surface == surface_b else words[i].surface
+        
         return words

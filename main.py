@@ -106,12 +106,11 @@ def split_by_token_threshold(lines, threshold):
     return lines_split_by_token
 
 # 合并具有相同表面形式（surface）的 Word 对象，计数并逆序排序。
-def merge_and_count(words_list):
+def merge_and_count(words):
     surface_to_word = {}
 
-    for word in words_list:
+    for word in words:
         if word.surface not in surface_to_word:
-            # 初始化 surface 对应的 Word 对象
             surface_to_word[word.surface] = word
         else:
             # 累积 count
@@ -208,45 +207,51 @@ def read_data_file():
 
 # 主函数
 async def main():
+    llm = LLM(G.config)
+    llm.load_black_list("blacklist.txt")
+    llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
+    llm.load_prompt_detect_duplicate("prompt\\prompt_detect_duplicate.txt")
+    llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
+    llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
+
     fulltext = read_data_file()
     LogHelper.info("正在对文件中的文本进行预处理 ...")
     input_data_splited = split_by_token_threshold(fulltext, SPLIT_THRESHOLD)
 
-    llm = LLM(G.config)
-    llm.load_black_list("blacklist.txt")
-    llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
-    llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
-    llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
-    
     # 等待分词任务结果
     LogHelper.info("即将开始执行 [LLM 分词] ...")
     words = await llm.extract_words_batch(input_data_splited, fulltext)
 
-    # 合并与排序
-    words_all = merge_and_count(words)
+    # 先合并一次重复词条，便于后续操作
+    words_merged = merge_and_count(words)
 
     # 按阈值筛选，但是保证至少10个
-    words_with_threshold = [word for word in words_all if word.count >= COUNT_THRESHOLD]
-    words_all_filtered = [word for word in words_all if word not in words_with_threshold]
+    words_with_threshold = [word for word in words_merged if word.count >= COUNT_THRESHOLD]
+    words_all_filtered = [word for word in words_merged if word not in words_with_threshold]
     words_with_threshold.extend(words_all_filtered[:max(0, 10 - len(words_with_threshold))])
+
+    # 等待重复词根检测任务结果，完成后再对重复词进行一次合并
+    LogHelper.info("即将开始执行 [重复词根检测] ...")
+    words_no_duplicate = await llm.detect_duplicate_batch(words_with_threshold)
+    words_no_duplicate_sorted = merge_and_count(words_no_duplicate)
 
     # 等待翻译词表任务结果
     if G.config.translate_surface_mode == 1:
         LogHelper.info("即将开始执行 [后处理 - 词表翻译] ...")
-        words_with_threshold = await llm.translate_surface_batch(words_with_threshold)
+        words_no_duplicate_sorted = await llm.translate_surface_batch(words_no_duplicate_sorted)
 
     # 等待上下文词表任务结果
     if G.config.translate_context_mode == 1:
         LogHelper.info("即将开始执行 [后处理 - 上下文翻译] ...")
-        words_with_threshold = await llm.translate_context_batch(words_with_threshold)
+        words_no_duplicate_sorted = await llm.translate_context_batch(words_no_duplicate_sorted)
 
     # 定义输出文件名
     names_true_output_file = "角色姓名_日志.txt"
     dictionary_names_true_file = "角色姓名_列表.json"
 
     # 写入文件
-    write_words_to_file(words_with_threshold, names_true_output_file, True)
-    write_words_to_file(words_with_threshold, dictionary_names_true_file, False)
+    write_words_to_file(words_no_duplicate_sorted, names_true_output_file, True)
+    write_words_to_file(words_no_duplicate_sorted, dictionary_names_true_file, False)
 
     # 输出日志
     LogHelper.info("")
