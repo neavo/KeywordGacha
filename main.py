@@ -209,6 +209,7 @@ def read_data_file():
 
 # 主函数
 async def main():
+    # 初始化 LLM 对象
     llm = LLM(G.config)
     llm.load_black_list("blacklist.txt")
     llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
@@ -217,9 +218,18 @@ async def main():
     llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
     llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
 
+    # 切分文本
     fulltext = read_data_file()
     LogHelper.info("正在对文件中的文本进行预处理 ...")
     input_data_splited = split_by_token_threshold(fulltext, SPLIT_THRESHOLD)
+
+    # 如果内容较长，适当放宽阈值，以避免出现过多词条
+    if len(input_data_splited) > 300:
+        SPLIT_THRESHOLD = 5
+    elif len(input_data_splited) > 200:
+        SPLIT_THRESHOLD = 4
+    elif len(input_data_splited) > 100:
+        SPLIT_THRESHOLD = 3
 
     # 等待分词任务结果
     LogHelper.info("即将开始执行 [LLM 分词] ...")
