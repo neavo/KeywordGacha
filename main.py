@@ -127,14 +127,20 @@ def write_words_to_file(words, filename, detailmode):
         for k, word in enumerate(words):
             if detailmode:
                 file.write(f"词语原文 : {word.surface}\n")
-                file.write(f"词语翻译 : {word.surface_translation}\n")
+
+                if G.config.translate_surface_mode == 1:
+                    file.write(f"词语翻译 : {word.surface_translation}\n")
+                
                 file.write(f"出现次数 : {word.count}\n")
                 file.write(f"智能总结 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{word.context_summary}\n")
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'\n'.join(word.context)}\n")
-                file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                file.write(f"{'\n'.join(word.context_translation)}\n")
+
+                if G.config.translate_context_mode == 1:
+                    file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
+                    file.write(f"{'\n'.join(word.context_translation)}\n")
+                    
                 file.write("\n")
             elif k == 0:
                 file.write("\n")
@@ -308,8 +314,7 @@ if __name__ == "__main__":
     print(f"※※※※  ※※  \033[92mhttps://github.com/neavo/KeywordGacha\033[0m")
     print(f"※※※※")
     print(f"※※※※")
-    print(f"※※※※  ※※  \033[92m!!! 注意 !!!\033[0m")
-    print(f"※※※※  ※※  \033[92m处理流程将消耗巨量 Token\033[0m")
+    print(f"※※※※  ※※  \033[92m处理流程消耗 Token 较多 \033[0m")
     print(f"※※※※  ※※  \033[92m使用在线接口的同学请关注自己的账单\033[0m")
     print(f"※※※※")
     print(f"※※※※")
