@@ -286,11 +286,11 @@ class LLM:
         return words
 
     # 词汇翻译任务
-    async def translate_surface(self, word):
+    async def translate_surface(self, word, retry):
         async with self.semaphore:
             prompt = self.prompt_translate_surface.replace("{attribute}", word.attribute)
             task_type = self.TASK_TYPE_TRANSLATE_SURFACE
-            usage, message, llmresponse = await self.request(prompt, word.surface, task_type)
+            usage, message, llmresponse = await self.request(prompt, word.surface, task_type, retry)
 
             if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_SURFACE:
                 raise Exception()
@@ -317,13 +317,15 @@ class LLM:
     # 批量执行词汇翻译任务的具体实现
     async def do_translate_surface_batch(self, words, words_failed, words_successed):
         if len(words_failed) == 0:
+            retry = False
             words_this_round = words
         else:
+            retry = True
             words_this_round = words_failed       
 
         tasks = []
         for k, word in enumerate(words_this_round):
-            task = asyncio.create_task(self.translate_surface(word))
+            task = asyncio.create_task(self.translate_surface(word, retry))
             task.add_done_callback(lambda future: self.on_translate_surface_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -347,12 +349,12 @@ class LLM:
         return words
 
     # 上下文翻译任务
-    async def translate_context(self, word):
+    async def translate_context(self, word, retry):
         async with self.semaphore:
             context_translation = []
             prompt = self.prompt_translate_context
             task_type = self.TASK_TYPE_TRANSLATE_CONTEXT
-            usage, message, llmresponse = await self.request(prompt, "\n".join(word.context), task_type)
+            usage, message, llmresponse = await self.request(prompt, "\n".join(word.context), task_type, retry)
 
             if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_CONTEXT:
                 raise Exception()
@@ -390,13 +392,15 @@ class LLM:
     # 批量执行上下文翻译任务的具体实现
     async def do_translate_context_batch(self, words, words_failed, words_successed):
         if len(words_failed) == 0:
+            retry = False
             words_this_round = words
         else:
+            retry = True
             words_this_round = words_failed       
 
         tasks = []
         for k, word in enumerate(words_this_round):
-            task = asyncio.create_task(self.translate_context(word))
+            task = asyncio.create_task(self.translate_context(word, retry))
             task.add_done_callback(lambda future: self.on_translate_context_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -418,11 +422,11 @@ class LLM:
         return words
 
     # 检测重复词根任务
-    async def detect_duplicate(self, pair):
+    async def detect_duplicate(self, pair, retry):
         async with self.semaphore:
             prompt = self.prompt_detect_duplicate
             task_type = self.TASK_TYPE_DETECT_DUPLICATE
-            usage, message, llmresponse = await self.request(prompt, "\n".join([pair[0].surface, pair[1].surface]), task_type)
+            usage, message, llmresponse = await self.request(prompt, "\n".join([pair[0].surface, pair[1].surface]), task_type, retry)
 
             if usage.completion_tokens >= self.MAX_TOKENS_DETECT_DUPLICATE:
                 raise Exception() 
@@ -446,13 +450,15 @@ class LLM:
     # 批量执行重复词根检测任务的具体实现
     async def do_detect_duplicate_task(self, pairs, pairs_failed, pairs_successed):
         if len(pairs_failed) == 0:
+            retry = False
             pairs_this_round = pairs
         else:
+            retry = True
             pairs_this_round = pairs_failed       
 
         tasks = []
         for k, pair in enumerate(pairs_this_round):
-            task = asyncio.create_task(self.detect_duplicate(pair))
+            task = asyncio.create_task(self.detect_duplicate(pair, retry))
             task.add_done_callback(lambda future: self.on_detect_duplicate_task_done(future, pairs, pairs_failed, pairs_successed))
             tasks.append(task)
 
@@ -506,11 +512,11 @@ class LLM:
         return words
 
     # 智能总结任务 
-    async def summarize_context(self, word):
+    async def summarize_context(self, word, retry):
         async with self.semaphore:
             prompt = self.prompt_summarize_context.replace("{surface}", word.surface)
             task_type = self.TASK_TYPE_SUMMAIRZE_CONTEXT
-            usage, message, _ = await self.request(prompt, "\n".join(word.context), task_type)
+            usage, message, _ = await self.request(prompt, "\n".join(word.context), task_type, retry)
 
             if usage.completion_tokens >= self.MAX_TOKENS_SUMMAIRZE_CONTEXT:
                 raise Exception()
@@ -543,13 +549,15 @@ class LLM:
     # 批量执行智能总结任务的具体实现
     async def do_summarize_context_batch(self, words, words_failed, words_successed):
         if len(words_failed) == 0:
+            retry = False
             words_this_round = words
         else:
+            retry = True
             words_this_round = words_failed       
 
         tasks = []
         for k, word in enumerate(words_this_round):
-            task = asyncio.create_task(self.summarize_context(word))
+            task = asyncio.create_task(self.summarize_context(word, retry))
             task.add_done_callback(lambda future: self.on_summarize_context_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
 
