@@ -150,7 +150,7 @@ class LLM:
         return flag
 
     # 异步发送请求到OpenAI获取模型回复
-    async def request(self, prompt, content, type):
+    async def request(self, prompt, content, type, retry = False):
         if type == self.TASK_TYPE_EXTRACT_WORD:
             temperature = self.TEMPERATURE_WORD_EXTRACT
             top_p = self.TOP_P_WORD_EXTRACT
@@ -182,7 +182,7 @@ class LLM:
             temperature = temperature,
             top_p = top_p,
             max_tokens = max_tokens,
-            frequency_penalty = frequency_penalty,
+            frequency_penalty = 0.2 if retry else frequency_penalty,
             messages = [
                 {
                     "role": "system",
@@ -202,12 +202,12 @@ class LLM:
         return usage, message, llmresponse
 
     # 分词任务
-    async def extract_words(self, text, fulltext):
+    async def extract_words(self, text, fulltext, retry):
         async with self.semaphore:
             words = []
             prompt = self.prompt_extract_words
             task_type = self.TASK_TYPE_EXTRACT_WORD
-            usage, message, llmresponse = await self.request(prompt, text, task_type)
+            usage, message, llmresponse = await self.request(prompt, text, task_type, retry)
 
             if usage.completion_tokens >= self.MAX_TOKENS_WORD_EXTRACT:
                 raise Exception() 
@@ -242,18 +242,20 @@ class LLM:
             texts_successed.append(text)
             LogHelper.info(f"[LLM 分词] 已完成 {len(texts_successed)} / {len(texts)} ...")       
         except Exception as error:
-            LogHelper.error(f"[LLM 分词] 子任务执行失败，稍后将重试 ... {error}")
+            LogHelper.warning(f"[LLM 分词] 子任务执行失败，稍后将重试 ... {error}")
 
     # 批量执行分词任务的具体实现
     async def do_extract_words_batch(self, texts, fulltext, words, texts_failed, texts_successed):
         if len(texts_failed) == 0:
+            retry = False
             texts_this_round = texts
         else:
+            retry = True
             texts_this_round = texts_failed
 
         tasks = []
         for k, text in enumerate(texts_this_round):
-            task = asyncio.create_task(self.extract_words(text, fulltext))
+            task = asyncio.create_task(self.extract_words(text, fulltext, retry))
             task.add_done_callback(lambda future: self.on_extract_words_task_done(future, texts, words, texts_failed, texts_successed))
             tasks.append(task)
 
@@ -304,7 +306,7 @@ class LLM:
             words_successed.append(word)
             LogHelper.info(f"[词汇翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
         except Exception as error:
-            LogHelper.error(f"[词汇翻译] 子任务执行失败，稍后将重试 ... {error}")
+            LogHelper.warning(f"[词汇翻译] 子任务执行失败，稍后将重试 ... {error}")
 
         # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
         words_failed.clear()
@@ -377,7 +379,7 @@ class LLM:
             words_successed.append(word)
             LogHelper.info(f"[上下文翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
         except Exception as error:
-            LogHelper.error(f"[上下文翻译] 子任务执行失败，稍后将重试 ... {error}")
+            LogHelper.warning(f"[上下文翻译] 子任务执行失败，稍后将重试 ... {error}")
 
         # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
         words_failed.clear()
@@ -439,10 +441,8 @@ class LLM:
             pairs_successed.append(pair)
             LogHelper.info(f"[重复词根检测] 已完成 {len(pairs_successed)} / {len(pairs)} ...")       
         except Exception as error:
-            LogHelper.error(f"[重复词根检测] 子任务执行失败，稍后将重试 ... {error}")
+            LogHelper.warning(f"[重复词根检测] 子任务执行失败，稍后将重试 ... {error}")
  
-     # 实际执行重复词根检测任务
-
     # 批量执行重复词根检测任务的具体实现
     async def do_detect_duplicate_task(self, pairs, pairs_failed, pairs_successed):
         if len(pairs_failed) == 0:
@@ -538,7 +538,7 @@ class LLM:
             words_successed.append(word)
             LogHelper.info(f"[智能总结] 已完成 {len(words_successed)} / {len(words)} ...")       
         except Exception as error:
-            LogHelper.error(f"[智能总结] 子任务执行失败，稍后将重试 ... {error}")
+            LogHelper.warning(f"[智能总结] 子任务执行失败，稍后将重试 ... {error}")
 
     # 批量执行智能总结任务的具体实现
     async def do_summarize_context_batch(self, words, words_failed, words_successed):

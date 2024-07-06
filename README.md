@@ -1,12 +1,15 @@
-# KeywordGacha 📖
-#### 使用 OpenAI 兼容接口来抓取小说、漫画、字幕、游戏脚本等任意文本中的词汇表的翻译辅助工具
+<h1><p align='center' >KeywordGacha</p></h1>
+<div align=center><img src="https://img.shields.io/github/v/release/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/license/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/stars/neavo/KeywordGacha"/></div>
+<p align='center' >使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等任意文本中的词汇表的翻译辅助工具</p>
 
-　　　　
+&ensp;
+&ensp;
+
 
 ## 概述 📢
-- [KeywordGacha](https://github.com/neavo/KeywordGacha)，简称 KG，是一个使用 AI 技术来抽取文本中词汇表的次世代工具
+- [KeywordGacha](https://github.com/neavo/KeywordGacha)，简称 KG，使用 AI 技术来自动生成文本中词汇表的次世代工具
 - 相较传统工具，具有高命中、语义化、智能总结角色信息等特色，对文本的兼容性更好
-- 一键从长篇文本中抽取角色名称、组织名称等专有名词的词汇表，并且 `自动翻译`、`自动总结`
+- 一键从长篇文本中抽取角色名称等专有名词的词汇表，并且 `自动翻译`、`自动总结相关信息`
 - 可以极大的提升 小说、漫画、字幕、游戏脚本 等文本内容的译前准备时制作统一词汇表的工作效率
 
 > <img src="image/01.jpg" style="width: 75%;" alt="image/01.jpg">
@@ -24,15 +27,15 @@
 - 流程执行完毕后，会生成结果文件 `角色姓名_日志.txt` 与 `角色姓名_列表.json`
 - `角色姓名_日志.txt` 中包含抓取到的词汇的原文、上下文、翻译建议、角色信息总结等信息
 - 参考日志中的信息完成 `角色姓名_列表.json` 后，可以直接导入到 [AiNiee](https://github.com/NEKOparapa/AiNiee) 等翻译器中使用
-- 注意，为保证质量，KG 并不会直接为你填充词汇表类翻译，请认真审阅日志后手动完成词汇表
+- 注意，为保证翻译质量，`KG 并不会直接为你填充词汇表内的翻译`，请认真审阅日志后手动完成词汇表
 
 ## 效果 ⚡
 - 抓取和翻译效果取决于模型本身的水平，使用 💪 ~~更昂贵~~ 更强力  的 模型可以显著提升效果
 - 是的，氪金可以变强
 - 但是即使只使用运行在本地电脑上的小规模开源模型，效果和效率也远超传统工具
 - 如果你拥有一块至少 8G 显存的 Nvidia 显卡，可以通过一键包 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 来使用本地模型
-- 注意：用于 `分词` 与用于 `翻译` 的服务器端配置不一样
-- 所以务必严格按照 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 内的说明一步一步搭建环境，请勿直接复制其他应用中的配置
+- 注意：用于 `提取关键字` 与 用于 `翻译` 的服务器端配置不一样
+- 务必严格按照 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 内的说明一步一步搭建环境，请勿直接复制其他应用的配置
 
 ## 近期更新
 - 20240706
@@ -82,11 +85,11 @@
         "base_url": "译文http://localhost:8080/v1", // 你所使用 API 接口的地址，从接口平台方获取，默认为本地接口
         "model_name": "qwen2-7b-instruct", // 你所使用 API 接口的模型名称，从接口平台方获取，默认为本地接口
 
-        "max_workers": 4, // 网络请求等任务并发执行的最大数量，如果频繁出现网络超时或者拒绝服务错误，可以调小这个值
-        "request_timeout": 120, // 网络请求等任务并发执行的最大数量，如果频繁出现网络超时或者拒绝服务错误，可以调大这个值
+        "max_workers": 4, // 网络请求等任务并发执行的最大数量，如果频繁出现网络错误，可以调小这个值
+        "request_timeout": 120, // 网络请求的超时时间，如果频繁出现网络错误，可以调大这个值
 
-        "translate_surface_mode": "1", // 词汇的后处理模式，默认为 1 即日中翻译，设为 0 可以跳过此步骤，以节约 Token 与 时间
-        "translate_context_mode": "1", // 上下文的后处理模式，默认为 1 即日中翻译，设为 0 可以跳过此步骤，以节约 Token 与 时间
+        "translate_surface_mode": "1", // 是否翻译词汇，设为 0 可以跳过此步骤，以节约 Token 与 时间
+        "translate_context_mode": "1", // 是否翻译上下文，设为 0 可以跳过此步骤，以极大的节约 Token 与 时间
     }
   ```
 
