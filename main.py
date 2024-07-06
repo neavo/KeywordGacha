@@ -189,9 +189,10 @@ def read_data_file():
         # 【\N[123]】 这种形式是代指角色名字的变量
         # 直接抹掉就没办法判断角色了
         # 先把 \N 部分抹掉，保留 ID 部分
-        line = line.strip().replace(r'\\N', '') 
+        line = line.strip().replace(r'\\N', '')
         line = re.sub(r'(\\\{)|(\\\})', '', line) # 放大或者缩小字体的代码
         line = re.sub(r'\\[A-Z]{1,3}\[\d+\]', '', line, flags=re.IGNORECASE) # 干掉其他乱七八糟的部分代码
+        line = line.strip().replace("【】", "") # 由于上面的代码移除，可能会产生空人名框的情况，干掉
         line = line.strip().replace('\n', '') # 干掉行内换行
 
         if len(line) == 0:
