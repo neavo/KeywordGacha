@@ -14,6 +14,7 @@ from tiktoken_ext import openai_public
 from colorama import just_fix_windows_console
 
 from model.LLM import LLM
+# from model.NER import NER
 from model.Word import Word
 from helper.LogHelper import LogHelper
 from helper.TextHelper import TextHelper
@@ -25,7 +26,7 @@ G = type("GClass", (), {})()
 
 # 原始文本切片阈值
 # 似乎切的越细，能找到的词越多，失败的概率也会降低
-SPLIT_THRESHOLD = 1024
+SPLIT_THRESHOLD = 1 * 1024
 
 # 读取TXT文件并返回
 def read_txt_file(filename):
@@ -88,7 +89,7 @@ def split_by_token_threshold(lines, threshold):
 
         # 如果当前段的大小加上当前行的大小超过阈值，则需要将当前段添加到结果列表中，并重置当前段
         if current_size + line_token > threshold:
-            lines_split_by_token.append("\n".join(current_segment))
+            lines_split_by_token.append("".join(current_segment))
             current_segment = []
             current_size = 0
 
@@ -98,7 +99,7 @@ def split_by_token_threshold(lines, threshold):
 
     # 添加最后一段
     if current_segment:
-        lines_split_by_token.append("\n".join(current_segment))
+        lines_split_by_token.append("".join(current_segment))
 
     return lines_split_by_token
 
@@ -213,6 +214,10 @@ def read_data_file():
 
 # 主函数
 async def main():
+    # 初始化 NER 对象
+    # ner = NER(G.config)
+    # ner.load_black_list("blacklist.txt")
+
     # 初始化 LLM 对象
     llm = LLM(G.config)
     llm.load_black_list("blacklist.txt")
@@ -238,6 +243,8 @@ async def main():
     # 等待分词任务结果
     LogHelper.info("即将开始执行 [LLM 分词] ...")
     words = await llm.extract_words_batch(input_data_splited, fulltext)
+    # LogHelper.info("即将开始执行 [NER 分词] ...")
+    # words = ner.extract_words_batch(input_data_splited, fulltext)
 
     # 先合并一次重复词条，便于后续操作
     words_merged = merge_and_count(words)
@@ -247,14 +254,17 @@ async def main():
     words_all_filtered = [word for word in words_merged if word not in words_with_threshold]
     words_with_threshold.extend(words_all_filtered[:max(0, 10 - len(words_with_threshold))])
 
-    # 等待重复词根检测任务结果，完成后再对重复词进行一次合并
-    LogHelper.info("即将开始执行 [重复词根检测] ...")
+    # 等待第一类重复词检测任务结果，完成后再对重复词进行一次合并
+    LogHelper.info("即将开始执行 [第一类重复词检测] ...")
     words_no_duplicate = await llm.detect_duplicate_batch(words_with_threshold)
     words_no_duplicate_sorted = merge_and_count(words_no_duplicate)
 
     # 等待翻译词汇任务结果
     LogHelper.info("即将开始执行 [智能总结] ...")
     words_no_duplicate_sorted = await llm.summarize_context_batch(words_no_duplicate_sorted)
+
+    # 筛选出类型为人名的词语
+    words = [word for word in words if word.type == Word.TYPE_PERSON]
 
     # 等待翻译词汇任务结果
     if G.config.translate_surface_mode == 1:

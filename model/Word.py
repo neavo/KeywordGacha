@@ -10,9 +10,11 @@ from tiktoken_ext import openai_public
 
 class Word:
 
-    CONTEXT_TOKEN_THRESHOLD = 768
+    TYPE_PERSON = 1
+    CONTEXT_TOKEN_THRESHOLD = 1024
 
     def __init__(self):
+        self.type = 0
         self.count = 0
         self.context = []
         self.context_summary = ""
@@ -47,14 +49,11 @@ class Word:
         # 按长度降序排序
         unique_matches.sort(key=lambda x: (-len(self.tiktoken_encoding.encode(x)), x))
 
-        # 取按 Token 计算最长的十条，但是 Token 长度之和不超过阈值
+        # 在阈值范围内取 Token 最长的条数
         context = []
         context_length = 0
         for k, line in enumerate(unique_matches):
             line_lenght = len(self.tiktoken_encoding.encode(line))
-
-            if len(context) >= 10:
-                break
 
             if context_length + line_lenght > self.CONTEXT_TOKEN_THRESHOLD:
                 break
