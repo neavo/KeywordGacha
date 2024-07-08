@@ -7,5 +7,6 @@ __pycache__
 /build*
 
 /data*
+/debug*
 /all.orig*
 /ManualTransFile*

@@ -189,7 +189,8 @@ class LLM:
                 raise Exception() 
 
             for surface in message.content.split(","):
-                surface = surface.strip()
+                # 移除首尾标点符号
+                surface = TextHelper.strip_punctuation(surface)
 
                 # 有效性检查
                 if not TextHelper.is_valid_japanese_word(surface, self.black_list):
@@ -270,9 +271,13 @@ class LLM:
             if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_SURFACE:
                 raise Exception()
 
-            data = json.loads(
-                TextHelper.fix_broken_json_string(message.content.strip())
-            )
+            try:
+                data = json.loads(
+                    TextHelper.fix_broken_json_string(message.content.strip())
+                )
+            except Exception as error:
+                LogHelper.debug(message.content.strip())
+                raise error
 
             word.surface_romaji = data["romaji"]
             word.surface_translation = [data["translation_1"], data["translation_2"]]
@@ -497,18 +502,25 @@ class LLM:
         async with self.semaphore:
             prompt = self.prompt_summarize_context.replace("{surface}", word.surface)
             task_type = self.TASK_TYPE_SUMMAIRZE_CONTEXT
-            usage, message, _ = await self.request(prompt, "\n".join(word.context), task_type, retry)
+            usage, message, llmresponse = await self.request(prompt, "\n".join(word.context), task_type, retry)
 
             if usage.completion_tokens >= self.MAX_TOKENS_SUMMAIRZE_CONTEXT:
                 raise Exception()
 
-            context_summary = json.loads(
-                TextHelper.fix_broken_json_string(message.content.strip())
-            )
+            try:
+                context_summary = json.loads(
+                    TextHelper.fix_broken_json_string(message.content.strip())
+                )
+            except Exception as error:
+                LogHelper.debug(message.content.strip())
+                raise error
 
-            if "是" in context_summary["person"]:
+            if "是" in context_summary["person"] or "は" in context_summary["person"]:
                 word.type = Word.TYPE_PERSON
-
+            else:
+                LogHelper.debug(f"context_summary.person = false - {word.surface}")
+                LogHelper.debug(f"context_summary.person = false - {llmresponse}")
+           
             if "女" in context_summary["sex"]:
                 word.attribute = "女"
             elif "男" in context_summary["sex"]:

@@ -34,7 +34,7 @@ class ColorStreamHandler(logging.StreamHandler):
 class LogHelper:
     # 创建一个logger
     logger = logging.getLogger("KeywordGacha")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     # 创建一个handler
     file_handler = RotatingFileHandler(
@@ -63,7 +63,10 @@ class LogHelper:
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
-    # 静态方法定义
+    @staticmethod
+    def setLevel(level):
+        return LogHelper.logger.setLevel(level)
+
     @staticmethod
     def debug(message):
         return LogHelper.logger.debug(message)
