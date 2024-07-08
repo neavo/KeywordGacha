@@ -3,6 +3,7 @@ import re
 import csv
 import json
 import asyncio
+import logging
 import traceback
 import concurrent.futures
 from collections import Counter
@@ -149,6 +150,7 @@ def write_words_to_file(words, filename, detail):
                     file.write(f"{'\n'.join(word.context_translation)}\n")
 
                 file.write(f"\n")
+
 # 读取数据文件
 def read_data_file():
     input_data = []
@@ -212,7 +214,6 @@ def read_data_file():
 # 主函数
 async def main():
 
-
     # 初始化 LLM 对象
     llm = LLM(G.config)
     llm.load_black_list("blacklist.txt")
@@ -268,7 +269,7 @@ async def main():
     words_no_duplicate_sorted = await llm.summarize_context_batch(words_no_duplicate_sorted)
 
     # 筛选出类型为人名的词语
-    words = [word for word in words if word.type == Word.TYPE_PERSON]
+    words_no_duplicate_sorted = [word for word in words_no_duplicate_sorted if word.type == Word.TYPE_PERSON]
 
     # 等待翻译词汇任务结果
     if G.config.translate_surface_mode == 1:
@@ -344,7 +345,7 @@ if __name__ == "__main__":
     # 加载配置文件
     try:
         config_file = "config.json"
-        
+
         with open(config_file, "r", encoding="utf-8") as file:
             config = json.load(file)
             G.config = type("GClass", (), {})()
@@ -355,6 +356,10 @@ if __name__ == "__main__":
         LogHelper.error(f"文件 {config_file} 未找到.")
     except json.JSONDecodeError:
         LogHelper.error(f"文件 {config_file} 不是有效的JSON格式.")
+
+    # 检查 DEBUG 模式
+    if os.path.exists("debug.txt"):
+        LogHelper.setLevel(logging.DEBUG)
 
     # 开始业务逻辑
     asyncio.run(run_main())
