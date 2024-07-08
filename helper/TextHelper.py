@@ -37,6 +37,9 @@ class TextHelper:
     GENERAL_PUNCTUATION = ["\u2000", "\u206F"]
     CJK_SYMBOLS_AND_PUNCTUATION = ["\u3000", "\u303F"]
     HALFWIDTH_AND_FULLWIDTH_FORMS = ["\uFF00", "\uFFEF"]
+    OTHER_CJK_PUNCTUATION = [
+        "\u30FB"    # ・
+    ]
 
     # 英文标点符号
     LATIN_PUNCTUATION_BASIC_1 = ("\u0020", "\u002F")
@@ -53,6 +56,7 @@ class TextHelper:
             TextHelper.GENERAL_PUNCTUATION[0] <= char <= TextHelper.GENERAL_PUNCTUATION[1]
             or TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0] <= char <= TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]
             or TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0] <= char <= TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]
+            or char in TextHelper.OTHER_CJK_PUNCTUATION
         )
 
     # 判断一个字符是否是拉丁标点符号

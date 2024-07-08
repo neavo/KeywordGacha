@@ -240,9 +240,11 @@ async def main():
     LogHelper.info("即将开始执行 [LLM 分词] ...")
     words = await llm.extract_words_batch(input_data_splited, fulltext)
 
-    # 等待查找补充词语任务结果 - 实际不太行，非人名太多
-    # LogHelper.info("即将开始执行 [查找补充词语] ...")
-    # words.extend(TextHelper.find_all_katakana_word(fulltext))
+    # 等待查找补充词语任务结果
+    if G.config.strict_mode == 0:
+        LogHelper.info("严格模式已关闭 ...")
+        LogHelper.info("即将开始执行 [查找补充词语] ...")
+        words.extend(TextHelper.find_all_katakana_word(fulltext))
 
     # NER 相关
     # from model.NER import NER
