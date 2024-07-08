@@ -121,13 +121,15 @@ class TextHelper:
     # 移除开头结尾的标点符号
     @staticmethod
     def strip_punctuation(text):
+        text = text.strip()
+
         while text and TextHelper.is_punctuation(text[0]):
             text = text[1:]
 
         while text and TextHelper.is_punctuation(text[-1]):
             text = text[:-1]
 
-        return text
+        return text.strip()
 
     # 判断是否是一个有意义的日文词语
     @staticmethod
@@ -143,16 +145,6 @@ class TextHelper:
         if not TextHelper.contains_any_japanese(surface):
             flag = False
 
-        # っ和ッ结尾的一般是语气词
-        # if re.compile(r"^[ぁ-んァ-ン]+[っッ]$").match(surface):
-        #     flag = False
-
-        # if TextHelper.is_all_chinese_or_kanji(token.text) :
-        #     continue
-
-        # if len(surface) == 1 and not TextHelper.is_chinese_or_kanji(surface):
-        #     flag = False
-
         return flag
 
     # 找出文本中所有的片假名词
@@ -163,6 +155,8 @@ class TextHelper:
 
         words = []
         for k, v in enumerate(re.findall(r"[\u30A0-\u30FF]+", "\n".join(fulltext))):
+            # 移除首尾标点符号
+            v = TextHelper.strip_punctuation(v)
 
             # 有效性检查
             if not TextHelper.is_valid_japanese_word(v, []):
@@ -180,8 +174,14 @@ class TextHelper:
     # 修复不合规的JSON字符串
     @staticmethod
     def fix_broken_json_string(jsonstring):
-        return re.sub(
+        # 在 Qwen2 7B 回复中发现
+        jsonstring = re.sub(
             r'(?<=: ").+(?=")', # 匹配Json字符中的值不包括双引号的部分
             lambda matches: matches.group(0).replace('\\"', '"').replace('"', '\\"'), 
             jsonstring,
         )
+
+        # 在 GLM4-9B 回复中发现
+        jsonstring = jsonstring.replace("```json", "").replace("```", "")
+
+        return jsonstring
