@@ -412,10 +412,10 @@ class LLM:
             if usage.completion_tokens >= self.MAX_TOKENS_DETECT_DUPLICATE:
                 raise Exception() 
 
-            if len(pair) >= 3:
-                pair[2] = message.content == "是"
+            if len(pair) == 3:
+                pair[2] = "是" in message.content
             else:
-                pair.append(message.content == "是")
+                pair.append("是" in message.content)
             
             return pair
 
