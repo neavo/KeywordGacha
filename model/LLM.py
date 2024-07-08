@@ -270,7 +270,10 @@ class LLM:
             if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_SURFACE:
                 raise Exception()
 
-            word.surface_translation = message.content.strip().replace("\n", "  ")
+            data = json.loads(message.content)
+            word.surface_romaji = data["romaji"]
+            word.surface_translation = [data["translation_1"], data["translation_2"]]
+            word.surface_translation_description = data["description"]
 
             return word
 

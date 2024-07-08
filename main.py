@@ -132,11 +132,12 @@ def write_words_to_file(words, filename, detail):
         else:
             for k, word in enumerate(words):
                 file.write(f"词语原文 : {word.surface}\n")
+                file.write(f"出现次数 : {word.count}\n")
 
                 if G.config.translate_surface_mode == 1:
-                    file.write(f"词语翻译 : {word.surface_translation}\n")
+                    file.write(f"罗马音 : {word.surface_romaji}\n")
+                    file.write(f"词语翻译 : {', '.join(word.surface_translation)}, {word.surface_translation_description}\n")
                 
-                file.write(f"出现次数 : {word.count}\n")
                 file.write(f"角色性别 : {word.attribute}\n")
                 file.write(f"智能总结 : {word.context_summary["summary"]}\n")
 
@@ -147,6 +148,7 @@ def write_words_to_file(words, filename, detail):
                     file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                     file.write(f"{'\n'.join(word.context_translation)}\n")
 
+                file.write(f"\n")
 # 读取数据文件
 def read_data_file():
     input_data = []
@@ -234,15 +236,15 @@ async def main():
         G.count_threshold = 3
 
     # 等待分词任务结果
-    # LogHelper.info("即将开始执行 [LLM 分词] ...")
-    # words = await llm.extract_words_batch(input_data_splited, fulltext)
+    LogHelper.info("即将开始执行 [LLM 分词] ...")
+    words = await llm.extract_words_batch(input_data_splited, fulltext)
 
     # NER 相关
-    from model.NER import NER
-    ner = NER(G.config)
-    ner.load_black_list("blacklist.txt")
-    LogHelper.info("即将开始执行 [NER 分词] ...")
-    words = ner.extract_words_batch(input_data_splited, fulltext)
+    # from model.NER import NER
+    # ner = NER(G.config)
+    # ner.load_black_list("blacklist.txt")
+    # LogHelper.info("即将开始执行 [NER 分词] ...")
+    # words = ner.extract_words_batch(input_data_splited, fulltext)
 
     # 先合并一次重复词条，便于后续操作
     words_merged = merge_and_count(words)
