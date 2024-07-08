@@ -18,7 +18,7 @@ class LLM:
 
     TASK_TYPE_EXTRACT_WORD = 10 # 分词
     TASK_TYPE_DETECT_DUPLICATE = 20 # 检测第一类重复词
-    TASK_TYPE_SUMMAIRZE_CONTEXT = 30 # 智能总结
+    TASK_TYPE_SUMMAIRZE_CONTEXT = 30 # 角色总结
     TASK_TYPE_TRANSLATE_SURFACE = 40 # 翻译词语
     TASK_TYPE_TRANSLATE_CONTEXT = 50 # 翻译上下文
 
@@ -34,7 +34,7 @@ class LLM:
     MAX_TOKENS_SUMMAIRZE_CONTEXT = 512
     FREQUENCY_PENALTY_SUMMAIRZE_CONTEXT = 0
 
-    # LLM请求参数配置 - 智能总结
+    # LLM请求参数配置 - 角色总结
     TEMPERATURE_DETECT_DUPLICATE = 0
     TOP_P_DETECT_DUPLICATE = 1
     MAX_TOKENS_DETECT_DUPLICATE = 512
@@ -492,7 +492,7 @@ class LLM:
         
         return words
 
-    # 智能总结任务 
+    # 角色总结任务 
     async def summarize_context(self, word, retry):
         async with self.semaphore:
             prompt = self.prompt_summarize_context.replace("{surface}", word.surface)
@@ -520,16 +520,16 @@ class LLM:
 
             return word
 
-    # 智能总结任务完成时的回调
+    # 角色总结任务完成时的回调
     def on_summarize_context_task_done(self, future, words, words_failed, words_successed):
         try:
             word = future.result()
             words_successed.append(word)
-            LogHelper.info(f"[智能总结] 已完成 {len(words_successed)} / {len(words)} ...")       
+            LogHelper.info(f"[角色总结] 已完成 {len(words_successed)} / {len(words)} ...")       
         except Exception as error:
-            LogHelper.warning(f"[智能总结] 子任务执行失败，稍后将重试 ... {error}")
+            LogHelper.warning(f"[角色总结] 子任务执行失败，稍后将重试 ... {error}")
 
-    # 批量执行智能总结任务的具体实现
+    # 批量执行角色总结任务的具体实现
     async def do_summarize_context_batch(self, words, words_failed, words_successed):
         if len(words_failed) == 0:
             retry = False
@@ -552,7 +552,7 @@ class LLM:
 
         return words_failed, words_successed
 
-    # 批量执行智能总结任务
+    # 批量执行角色总结任务
     async def summarize_context_batch(self, words):
         words_failed = []
         words_successed = []
@@ -563,7 +563,7 @@ class LLM:
         # 开始重试流程
         for i in range(self.MAX_RETRY):
             if len(words_failed) > 0:
-                LogHelper.warning( f"[智能总结] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
+                LogHelper.warning( f"[角色总结] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
                 words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed)
 
         return words

@@ -139,7 +139,7 @@ def write_words_to_file(words, filename, detail):
                     file.write(f"词语翻译 : {', '.join(word.surface_translation)}, {word.surface_translation_description}\n")
                 
                 file.write(f"角色性别 : {word.attribute}\n")
-                file.write(f"智能总结 : {word.context_summary.get("summary", "")}\n")
+                file.write(f"角色总结 : {word.context_summary.get("summary", "")}\n")
 
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'\n'.join(word.context)}\n")
@@ -264,7 +264,7 @@ async def main():
     words_no_duplicate_sorted = merge_and_count(words_no_duplicate)
 
     # 等待翻译词汇任务结果
-    LogHelper.info("即将开始执行 [智能总结] ...")
+    LogHelper.info("即将开始执行 [角色总结] ...")
     words_no_duplicate_sorted = await llm.summarize_context_batch(words_no_duplicate_sorted)
 
     # 筛选出类型为人名的词语
