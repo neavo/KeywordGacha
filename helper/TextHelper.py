@@ -1,3 +1,5 @@
+import re
+
 class TextHelper:
 
     # 平假名
@@ -152,3 +154,34 @@ class TextHelper:
         #     flag = False
 
         return flag
+
+    # 找出文本中所有的片假名词
+    @staticmethod
+    def find_all_katakana_word(fulltext):
+        # 使用时再导入，避免相互导入死循环
+        from model.Word import Word
+
+        words = []
+        for k, v in enumerate(re.findall(r"[\u30A0-\u30FF]+", "\n".join(fulltext))):
+
+            # 有效性检查
+            if not TextHelper.is_valid_japanese_word(v, []):
+                continue
+
+            word = Word()
+            word.count = 1
+            word.surface = v
+            word.set_context(v, fulltext)
+
+            words.append(word)
+
+        return words
+
+    # 修复不合规的JSON字符串
+    @staticmethod
+    def fix_broken_json_string(jsonstring):
+        return re.sub(
+            r'(?<=: ").+(?=")', # 匹配Json字符中的值不包括双引号的部分
+            lambda matches: matches.group(0).replace('\\"', '"').replace('"', '\\"'), 
+            jsonstring,
+        )

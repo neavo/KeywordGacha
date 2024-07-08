@@ -139,7 +139,7 @@ def write_words_to_file(words, filename, detail):
                     file.write(f"词语翻译 : {', '.join(word.surface_translation)}, {word.surface_translation_description}\n")
                 
                 file.write(f"角色性别 : {word.attribute}\n")
-                file.write(f"智能总结 : {word.context_summary["summary"]}\n")
+                file.write(f"智能总结 : {word.context_summary.get("summary", "")}\n")
 
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'\n'.join(word.context)}\n")
@@ -238,6 +238,10 @@ async def main():
     # 等待分词任务结果
     LogHelper.info("即将开始执行 [LLM 分词] ...")
     words = await llm.extract_words_batch(input_data_splited, fulltext)
+
+    # 等待查找补充词语任务结果 - 实际不太行，非人名太多
+    # LogHelper.info("即将开始执行 [查找补充词语] ...")
+    # words.extend(TextHelper.find_all_katakana_word(fulltext))
 
     # NER 相关
     # from model.NER import NER

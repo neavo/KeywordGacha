@@ -270,7 +270,10 @@ class LLM:
             if usage.completion_tokens >= self.MAX_TOKENS_TRANSLATE_SURFACE:
                 raise Exception()
 
-            data = json.loads(message.content)
+            data = json.loads(
+                TextHelper.fix_broken_json_string(message.content.strip())
+            )
+
             word.surface_romaji = data["romaji"]
             word.surface_translation = [data["translation_1"], data["translation_2"]]
             word.surface_translation_description = data["description"]
@@ -499,20 +502,21 @@ class LLM:
             if usage.completion_tokens >= self.MAX_TOKENS_SUMMAIRZE_CONTEXT:
                 raise Exception()
 
-            context_summary = message.content.strip()
-            context_summary_json = json.loads(context_summary)
+            context_summary = json.loads(
+                TextHelper.fix_broken_json_string(message.content.strip())
+            )
 
-            if "是" in context_summary_json["person"]:
+            if "是" in context_summary["person"]:
                 word.type = Word.TYPE_PERSON
 
-            if "女" in context_summary_json["sex"]:
+            if "女" in context_summary["sex"]:
                 word.attribute = "女"
-            elif "男" in context_summary_json["sex"]:
+            elif "男" in context_summary["sex"]:
                 word.attribute = "男"
             else:
                 word.attribute = "未知"
 
-            word.context_summary = context_summary_json
+            word.context_summary = context_summary
 
             return word
 

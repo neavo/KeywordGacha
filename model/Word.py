@@ -1,7 +1,6 @@
-import os
 import re
 import json
-from threading import Lock, Thread
+from threading import Lock
 from collections import Counter
 from collections import OrderedDict
 
@@ -24,11 +23,11 @@ class Word:
         self.type = 0
         self.count = 0
         self.context = []
-        self.context_summary = ""
+        self.context_summary = {}
         self.context_translation = []
         self.surface = ""
         self.surface_romaji = ""
-        self.surface_translation = ""
+        self.surface_translation = []
         self.surface_translation_description = ""
         self.attribute = ""
         self.llmresponse = ""
