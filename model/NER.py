@@ -20,7 +20,6 @@ class NER:
             # use_gpu = False,
             model_dir = "santaza\\",
             # download_method = None,
-            # langid_clean_text = True,
             tokenize_batch_size = 1024
         )
 
@@ -40,6 +39,7 @@ class NER:
             entitys = self.nlp(text).ents
 
             for i, entity in enumerate(entitys):
+                # 移除首尾标点符号
                 surface = TextHelper.strip_punctuation(entity.text)
 
                 # 有效性检查
