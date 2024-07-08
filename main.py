@@ -121,36 +121,32 @@ def merge_and_count(words):
     return sorted_words
 
 # 将 Word 列表写入文件
-def write_words_to_file(words, filename, detailmode):
-
+def write_words_to_file(words, filename, detail):
     with open(filename, "w", encoding="utf-8") as file:
-        file.write("{") if not detailmode else None
-        for k, word in enumerate(words):
-            if detailmode:
+        if not detail:
+            data = {}
+
+            for k, word in enumerate(words):
+                data[word.surface] = word.surface
+
+            file.write(json.dumps(data, indent = 4, ensure_ascii = False))
+        else:
+            for k, word in enumerate(words):
                 file.write(f"词语原文 : {word.surface}\n")
 
                 if G.config.translate_surface_mode == 1:
                     file.write(f"词语翻译 : {word.surface_translation}\n")
                 
                 file.write(f"出现次数 : {word.count}\n")
-                file.write(f"智能总结 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                file.write(f"{word.context_summary}\n")
+                file.write(f"角色性别 : {word.attribute}\n")
+                file.write(f"智能总结 : {word.context_summary["summary"]}\n")
+
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'\n'.join(word.context)}\n")
 
                 if G.config.translate_context_mode == 1:
                     file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                     file.write(f"{'\n'.join(word.context_translation)}\n")
-                    
-                file.write("\n")
-            elif k == 0:
-                file.write("\n")
-                file.write(f'    "{word.surface}" : "",\n')
-            elif k != len(words) - 1:
-                file.write(f'    "{word.surface}" : "",\n')
-            else:
-                file.write(f'    "{word.surface}" : ""\n')
-        file.write("}") if not detailmode else None
 
 # 读取数据文件
 def read_data_file():
