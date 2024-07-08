@@ -26,7 +26,7 @@ class LLM:
     TEMPERATURE_WORD_EXTRACT = 0
     TOP_P_WORD_EXTRACT = 1
     MAX_TOKENS_WORD_EXTRACT = 512 
-    FREQUENCY_PENALTY_WORD_EXTRACT = 0
+    FREQUENCY_PENALTY_WORD_EXTRACT = 0.1
 
     # LLM请求参数配置 - 检测第一类重复词
     TEMPERATURE_SUMMAIRZE_CONTEXT = 0
@@ -158,7 +158,7 @@ class LLM:
             temperature = temperature,
             top_p = top_p,
             max_tokens = max_tokens,
-            frequency_penalty = 0.2 if retry else frequency_penalty,
+            frequency_penalty = frequency_penalty + 0.2 if retry else frequency_penalty,
             messages = [
                 {
                     "role": "system",
