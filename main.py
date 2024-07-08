@@ -127,7 +127,7 @@ def write_words_to_file(words, filename, detail):
             data = {}
 
             for k, word in enumerate(words):
-                data[word.surface] = word.surface
+                data[word.surface] = ""
 
             file.write(json.dumps(data, indent = 4, ensure_ascii = False))
         else:
