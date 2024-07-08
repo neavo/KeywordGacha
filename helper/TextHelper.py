@@ -100,8 +100,13 @@ class TextHelper:
 
     # 判断字符是否为中日韩汉字
     @staticmethod
-    def is_chinese_or_kanji(ch):
+    def is_cjk(ch):
         return TextHelper.CJK_START <= ch <= TextHelper.CJK_END
+
+    # 判断输入的字符串是否全部由中文或日文汉字组成
+    @staticmethod
+    def is_all_cjk(text):
+        return all(TextHelper.is_cjk(char) for char in text)
 
     # 检查字符串是否包含至少一个日文字符
     @staticmethod
@@ -112,11 +117,6 @@ class TextHelper:
     @staticmethod
     def is_all_japanese(text):
         return all(TextHelper.is_japanese(char) for char in text)
-
-    # 判断输入的字符串是否全部由中文或日文汉字组成
-    @staticmethod
-    def is_all_chinese_or_kanji(text):
-        return all(TextHelper.is_chinese_or_kanji(char) for char in text)
 
     # 移除开头结尾的标点符号
     @staticmethod
@@ -137,7 +137,7 @@ class TextHelper:
         if surface in blacklist:
             flag = False
 
-        if len(surface) < 2:
+        if len(surface) == 1:
             flag = False
 
         if not TextHelper.contains_any_japanese(surface):
