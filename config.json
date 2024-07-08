@@ -1,7 +1,7 @@
 {
     "api_key": "sk-no-key-required",
     "base_url": "http://localhost:8080/v1",
-    "model_name": "qwen2-7b-instruct",
+    "model_name": "glm-4-9b-chat",
     "max_workers": 4,
     "request_timeout": 120,
     "translate_surface_mode": 1,
