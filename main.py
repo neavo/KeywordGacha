@@ -14,7 +14,6 @@ from tiktoken_ext import openai_public
 from colorama import just_fix_windows_console
 
 from model.LLM import LLM
-# from model.NER import NER
 from model.Word import Word
 from helper.LogHelper import LogHelper
 from helper.TextHelper import TextHelper
@@ -210,9 +209,7 @@ def read_data_file():
 
 # 主函数
 async def main():
-    # 初始化 NER 对象
-    # ner = NER(G.config)
-    # ner.load_black_list("blacklist.txt")
+
 
     # 初始化 LLM 对象
     llm = LLM(G.config)
@@ -237,10 +234,15 @@ async def main():
         G.count_threshold = 3
 
     # 等待分词任务结果
-    LogHelper.info("即将开始执行 [LLM 分词] ...")
-    words = await llm.extract_words_batch(input_data_splited, fulltext)
-    # LogHelper.info("即将开始执行 [NER 分词] ...")
-    # words = ner.extract_words_batch(input_data_splited, fulltext)
+    # LogHelper.info("即将开始执行 [LLM 分词] ...")
+    # words = await llm.extract_words_batch(input_data_splited, fulltext)
+
+    # NER 相关
+    from model.NER import NER
+    ner = NER(G.config)
+    ner.load_black_list("blacklist.txt")
+    LogHelper.info("即将开始执行 [NER 分词] ...")
+    words = ner.extract_words_batch(input_data_splited, fulltext)
 
     # 先合并一次重复词条，便于后续操作
     words_merged = merge_and_count(words)

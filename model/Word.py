@@ -48,7 +48,7 @@ class Word:
     # 从原文中提取上下文
     def set_context(self, surface, original):
         if surface in Word.CONTEXT_CACHE:
-            with CONTEXT_CACHE_LOCK:
+            with self.CONTEXT_CACHE_LOCK:
                 self.context = Word.CONTEXT_CACHE.get(surface)
         else:
             # 匹配原文
@@ -75,5 +75,5 @@ class Word:
             self.context = context
 
             # 将结果保存到缓存中
-            with CONTEXT_CACHE_LOCK:
+            with self.CONTEXT_CACHE_LOCK:
                 Word.CONTEXT_CACHE[surface] = context
