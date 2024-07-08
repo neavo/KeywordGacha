@@ -17,8 +17,9 @@
 > <img src="image/02.jpg" style="width: 75%;" alt="image/02.jpg">
   
 ## 要求 🖥️
-- 兼容 OpenAI 接口格式的大语言模型 API
-- KG 的开发环境是本地运行的 [Qwen2-7B-Instruct](https://huggingface.co/Qwen/Qwen2-7B-Instruct-GGUF)
+- 需要一个兼容 OpenAI 格式的大语言模型接口
+- 与主流的 ChatGPT 系列、Claude 系列以及众多国产模型搭配使用均具有较好的效果
+- 如果拥有一块至少 8G 显存的 Nvidia 显卡，也可以在个人电脑上运行本地服务来获得免费服务
 
 ## 使用 🛸
 - 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载 KG 并解压缩到本地
@@ -32,12 +33,16 @@
 ## 效果 ⚡
 - 抓取和翻译效果取决于模型本身的水平，使用 💪 ~~更昂贵~~ 更强力  的 模型可以显著提升效果
 - 是的，氪金可以变强
-- 但是即使只使用运行在本地电脑上的小规模开源模型，效果和效率也远超传统工具
-- 如果你拥有一块至少 8G 显存的 Nvidia 显卡，可以通过一键包 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 来使用本地模型
-- 注意：用于 `提取关键字` 与 用于 `翻译` 的服务器端配置不一样
-- 务必严格按照 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 内的说明一步一步搭建环境，请勿直接复制其他应用的配置
+- 但即使只使用运行在个人电脑上的小规模开源模型，也能很好的效果
+- 使用本地模型需要一块至少 8G 显存的 Nvidia 显卡，具体步骤请点击移步 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 安装一键包
+- 注意：受限于性能与开发资源，使用本地模型时，开发者仅能保证与 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 的兼容性
+- 如果您计划使用本地模型，请务必严格按照 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 页面描述的步骤进行
 
 ## 近期更新
+- 20240708
+  - 调整 显著的提升了 `本地模型` 对角色信息的提取、汇总能力
+  - 调整 本地模型调整为 [GLM4-9B-Chat-GGUF](https://github.com/neavo/KeywordGachaServer)，请务必与客户端同步更新
+
 - 20240706
   - 新增 智能总结 功能
   - 新增 重复词根检测 功能
@@ -96,7 +101,8 @@
 ## 语言能力 🗣️
 
 - 较新的模型比如 [GPT4o](https://chatgpt.com/)、[Claude 3.5 Sonnet](https://claude.ai/) 等具有超乎想象多语言能力，但是也十分昂贵
-- [Qwen2](https://github.com/QwenLM/Qwen2) 在处理中文的表现上称得上优秀，处理日文水平也算堪用，7B 版本只需要 8G 显存，推荐使用
+- ~~[Qwen2](https://github.com/QwenLM/Qwen2) 在处理中文的表现上称得上优秀，处理日文水平也算堪用，7B 版本只需要 8G 显存，推荐使用~~
+- 在 KG 的应用情境下，[GLM4-9B-Chat-GGUF](https://huggingface.co/second-state/glm-4-9b-chat-GGUF) 不论是语言水平、还是逻辑能力，在8G以内显存可以使用的模型中都具有压倒性的优势
 
 ## 开发计划 🎢
 

@@ -25,7 +25,7 @@ G = type("GClass", (), {})()
 
 # 原始文本切片阈值
 # 似乎切的越细，能找到的词越多，失败的概率也会降低
-SPLIT_THRESHOLD = 1024
+SPLIT_THRESHOLD = 1 * 1024
 
 # 读取TXT文件并返回
 def read_txt_file(filename):
@@ -88,7 +88,7 @@ def split_by_token_threshold(lines, threshold):
 
         # 如果当前段的大小加上当前行的大小超过阈值，则需要将当前段添加到结果列表中，并重置当前段
         if current_size + line_token > threshold:
-            lines_split_by_token.append("\n".join(current_segment))
+            lines_split_by_token.append("".join(current_segment))
             current_segment = []
             current_size = 0
 
@@ -98,7 +98,7 @@ def split_by_token_threshold(lines, threshold):
 
     # 添加最后一段
     if current_segment:
-        lines_split_by_token.append("\n".join(current_segment))
+        lines_split_by_token.append("".join(current_segment))
 
     return lines_split_by_token
 
@@ -120,31 +120,35 @@ def merge_and_count(words):
     return sorted_words
 
 # 将 Word 列表写入文件
-def write_words_to_file(words, filename, detailmode):
-
+def write_words_to_file(words, filename, detail):
     with open(filename, "w", encoding="utf-8") as file:
-        file.write("{") if not detailmode else None
-        for k, word in enumerate(words):
-            if detailmode:
+        if not detail:
+            data = {}
+
+            for k, word in enumerate(words):
+                data[word.surface] = ""
+
+            file.write(json.dumps(data, indent = 4, ensure_ascii = False))
+        else:
+            for k, word in enumerate(words):
                 file.write(f"词语原文 : {word.surface}\n")
-                file.write(f"词语翻译 : {word.surface_translation}\n")
                 file.write(f"出现次数 : {word.count}\n")
-                file.write(f"智能总结 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                file.write(f"{word.context_summary}\n")
+
+                if G.config.translate_surface_mode == 1:
+                    file.write(f"罗马音 : {word.surface_romaji}\n")
+                    file.write(f"词语翻译 : {', '.join(word.surface_translation)}, {word.surface_translation_description}\n")
+                
+                file.write(f"角色性别 : {word.attribute}\n")
+                file.write(f"角色总结 : {word.context_summary.get("summary", "")}\n")
+
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'\n'.join(word.context)}\n")
-                file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                file.write(f"{'\n'.join(word.context_translation)}\n")
-                file.write("\n")
-            elif k == 0:
-                file.write("\n")
-                file.write(f'    "{word.surface}" : "",\n')
-            elif k != len(words) - 1:
-                file.write(f'    "{word.surface}" : "",\n')
-            else:
-                file.write(f'    "{word.surface}" : ""\n')
-        file.write("}") if not detailmode else None
 
+                if G.config.translate_context_mode == 1:
+                    file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
+                    file.write(f"{'\n'.join(word.context_translation)}\n")
+
+                file.write(f"\n")
 # 读取数据文件
 def read_data_file():
     input_data = []
@@ -189,9 +193,10 @@ def read_data_file():
         # 【\N[123]】 这种形式是代指角色名字的变量
         # 直接抹掉就没办法判断角色了
         # 先把 \N 部分抹掉，保留 ID 部分
-        line = line.strip().replace(r'\\N', '') 
+        line = line.strip().replace(r'\\N', '')
         line = re.sub(r'(\\\{)|(\\\})', '', line) # 放大或者缩小字体的代码
         line = re.sub(r'\\[A-Z]{1,3}\[\d+\]', '', line, flags=re.IGNORECASE) # 干掉其他乱七八糟的部分代码
+        line = line.strip().replace("【】", "") # 由于上面的代码移除，可能会产生空人名框的情况，干掉
         line = line.strip().replace('\n', '') # 干掉行内换行
 
         if len(line) == 0:
@@ -206,6 +211,8 @@ def read_data_file():
 
 # 主函数
 async def main():
+
+
     # 初始化 LLM 对象
     llm = LLM(G.config)
     llm.load_black_list("blacklist.txt")
@@ -232,6 +239,17 @@ async def main():
     LogHelper.info("即将开始执行 [LLM 分词] ...")
     words = await llm.extract_words_batch(input_data_splited, fulltext)
 
+    # 等待查找补充词语任务结果 - 实际不太行，非人名太多
+    # LogHelper.info("即将开始执行 [查找补充词语] ...")
+    # words.extend(TextHelper.find_all_katakana_word(fulltext))
+
+    # NER 相关
+    # from model.NER import NER
+    # ner = NER(G.config)
+    # ner.load_black_list("blacklist.txt")
+    # LogHelper.info("即将开始执行 [NER 分词] ...")
+    # words = ner.extract_words_batch(input_data_splited, fulltext)
+
     # 先合并一次重复词条，便于后续操作
     words_merged = merge_and_count(words)
 
@@ -240,14 +258,17 @@ async def main():
     words_all_filtered = [word for word in words_merged if word not in words_with_threshold]
     words_with_threshold.extend(words_all_filtered[:max(0, 10 - len(words_with_threshold))])
 
-    # 等待重复词根检测任务结果，完成后再对重复词进行一次合并
-    LogHelper.info("即将开始执行 [重复词根检测] ...")
+    # 等待第一类重复词检测任务结果，完成后再对重复词进行一次合并
+    LogHelper.info("即将开始执行 [第一类重复词检测] ...")
     words_no_duplicate = await llm.detect_duplicate_batch(words_with_threshold)
     words_no_duplicate_sorted = merge_and_count(words_no_duplicate)
 
     # 等待翻译词汇任务结果
-    LogHelper.info("即将开始执行 [智能总结] ...")
+    LogHelper.info("即将开始执行 [角色总结] ...")
     words_no_duplicate_sorted = await llm.summarize_context_batch(words_no_duplicate_sorted)
+
+    # 筛选出类型为人名的词语
+    words = [word for word in words if word.type == Word.TYPE_PERSON]
 
     # 等待翻译词汇任务结果
     if G.config.translate_surface_mode == 1:
@@ -307,8 +328,7 @@ if __name__ == "__main__":
     print(f"※※※※  ※※  \033[92mhttps://github.com/neavo/KeywordGacha\033[0m")
     print(f"※※※※")
     print(f"※※※※")
-    print(f"※※※※  ※※  \033[92m!!! 注意 !!!\033[0m")
-    print(f"※※※※  ※※  \033[92m处理流程将消耗巨量 Token\033[0m")
+    print(f"※※※※  ※※  \033[92m处理流程消耗 Token 较多 \033[0m")
     print(f"※※※※  ※※  \033[92m使用在线接口的同学请关注自己的账单\033[0m")
     print(f"※※※※")
     print(f"※※※※")
