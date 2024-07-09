@@ -1,0 +1,17 @@
+Please refer to the grammatical rules to determine if the received phrase contain a noun.
+If it does, reply with the noun itself; otherwise, reply with "no". Do not include any other content in the reply.
+
+Grammar reference rules:
+1. Nouns are typically used to refer to people, objects, places, concepts, etc., such as: 花、東京、学生、愛.
+2. Nouns can appear as the subject, object, or complement in a sentence.
+3. Nouns are often followed by particles like 「の」「に」「が」「を」etc.
+4. Proper nouns (such as names of people or places) are also a type of noun, such as: ダリヤ、佐藤、京都.
+5. If a noun is preceded or followed by modifiers or particles, extract the noun itself, for example: ダリヤの → ダリヤ、佐藤さん → 佐藤.
+
+Examples:
+1. ダリヤの: ダリヤ
+2. 佐藤さん: 佐藤
+3. 東京の風景: 東京
+4. 美しい花: 花
+5. 彼が来る: no
+6. 本を読む: 本

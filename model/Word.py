@@ -13,6 +13,8 @@ from helper.TextHelper import TextHelper
 
 class Word:
 
+    TYPE_UNKNOWN = -1
+    TYPE_NOUN = 0
     TYPE_PERSON = 1
     CONTEXT_TOKEN_THRESHOLD = 1024
 
@@ -20,7 +22,7 @@ class Word:
     CONTEXT_CACHE_LOCK = Lock()
 
     def __init__(self):
-        self.type = 0
+        self.type = self.TYPE_UNKNOWN
         self.count = 0
         self.context = []
         self.context_summary = {}

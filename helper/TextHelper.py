@@ -3,42 +3,26 @@ import re
 class TextHelper:
 
     # 平假名
-    JPN_START = "\u3040"
-    JPN_END = "\u309F"
+    HIRAGANA = ["\u3040", "\u309F"]
 
     # 片假名
-    KATAKANA_START = "\u30A0"
-    KATAKANA_END = "\u30FF"
+    KATAKANA = ["\u30A0", "\u30FF"]
 
-    # 中日韩统一表意文字
-    CJK_START = "\u4E00"
-    CJK_END = "\u9FFF"
-
-    # 全角字符（CJK符号和标点符号）
-    FULLWIDTH_START = "\u3000"
-    FULLWIDTH_END = "\u303F"
-
-    # 日文标点符号
-    SYMBOLS_START = "\uFF01"
-    SYMBOLS_END = "\uFF65"
+    # 片假名语音扩展
+    KATAKANA_PHONETIC_EXTENSIONS = ["\u31F0", "\u31FF"]
 
     # 濁音和半浊音符号
     VOICED_SOUND_MARKS = ["\u309B", "\u309C"]
 
-    # 半角片假名
-    HALFWIDTH_KATAKANA_START = "\uFF66"
-    HALFWIDTH_KATAKANA_END = "\uFF9F"
-
-    # 片假名语音扩展
-    KATAKANA_PHONETIC_EXTENSIONS_START = "\u31F0"
-    KATAKANA_PHONETIC_EXTENSIONS_END = "\u31FF"
+    # 中日韩统一表意文字
+    CJK = ["\u4E00", "\u9FFF"]
 
     # 中日韩通用标点符号
     GENERAL_PUNCTUATION = ["\u2000", "\u206F"]
     CJK_SYMBOLS_AND_PUNCTUATION = ["\u3000", "\u303F"]
     HALFWIDTH_AND_FULLWIDTH_FORMS = ["\uFF00", "\uFFEF"]
     OTHER_CJK_PUNCTUATION = [
-        "\u30FB"    # ・
+        "\u30FB"    # ・ 在片假名 ["\u30A0", "\u30FF"] 范围内
     ]
 
     # 英文标点符号
@@ -80,47 +64,42 @@ class TextHelper:
     @staticmethod
     def is_japanese(ch):
         return (
-            TextHelper.JPN_START <= ch <= TextHelper.JPN_END
-            or TextHelper.KATAKANA_START <= ch <= TextHelper.KATAKANA_END
-            or TextHelper.CJK_START <= ch <= TextHelper.CJK_END
-            or TextHelper.HALFWIDTH_KATAKANA_START <= ch <= TextHelper.HALFWIDTH_KATAKANA_END
-            or TextHelper.KATAKANA_PHONETIC_EXTENSIONS_START <= ch <= TextHelper.KATAKANA_PHONETIC_EXTENSIONS_END
-            or ch in TextHelper.VOICED_SOUND_MARKS
-        )
-
-    # 判断字符是否为日文字符（包含日文标点符号）
-    @staticmethod
-    def is_japanese_with_punctuation(ch):
-        return (
-            TextHelper.JPN_START <= ch <= TextHelper.JPN_END
-            or TextHelper.KATAKANA_START <= ch <= TextHelper.KATAKANA_END
-            or TextHelper.CJK_START <= ch <= TextHelper.CJK_END
-            or TextHelper.HALFWIDTH_KATAKANA_START <= ch <= TextHelper.HALFWIDTH_KATAKANA_END
-            or TextHelper.KATAKANA_PHONETIC_EXTENSIONS_START <= ch <= TextHelper.KATAKANA_PHONETIC_EXTENSIONS_END
-            or TextHelper.FULLWIDTH_START <= ch <= TextHelper.FULLWIDTH_END
-            or TextHelper.SYMBOLS_START <= ch <= TextHelper.SYMBOLS_END
+            TextHelper.CJK[0] <= ch <= TextHelper.CJK[1] 
+            or TextHelper.KATAKANA[0] <= ch <= TextHelper.KATAKANA[1]
+            or TextHelper.HIRAGANA[0] <= ch <= TextHelper.HIRAGANA[1]
+            or TextHelper.KATAKANA_PHONETIC_EXTENSIONS[0] <= ch <= TextHelper.KATAKANA_PHONETIC_EXTENSIONS[1]
             or ch in TextHelper.VOICED_SOUND_MARKS
         )
 
     # 判断字符是否为中日韩汉字
     @staticmethod
     def is_cjk(ch):
-        return TextHelper.CJK_START <= ch <= TextHelper.CJK_END
+        return TextHelper.CJK[0] <= ch <= TextHelper.CJK[1]
 
-    # 判断输入的字符串是否全部由中文或日文汉字组成
+    # 判断输入的字符串是否全部由中日韩汉字组成
     @staticmethod
     def is_all_cjk(text):
         return all(TextHelper.is_cjk(char) for char in text)
 
-    # 检查字符串是否包含至少一个日文字符
+    # 检查字符串是否包含至少一个日文字符（含汉字）
     @staticmethod
     def contains_any_japanese(text):
         return any(TextHelper.is_japanese(char) for char in text)
 
-    # 判断输入的字符串是否全部由日文字符组成
+    # 判断输入的字符串是否全部由日文字符（含汉字）组成
     @staticmethod
     def is_all_japanese(text):
         return all(TextHelper.is_japanese(char) for char in text)
+
+    # 判断字符是否为片假名
+    @staticmethod
+    def is_katakana(ch):
+        return TextHelper.KATAKANA[0] <= ch <= TextHelper.KATAKANA[0]
+
+    # 判断字符串是否为全部片假名
+    @staticmethod
+    def is_all_katakana(ch):
+        return all(TextHelper.is_katakana(ch) for ch in text)
 
     # 移除开头结尾的标点符号
     @staticmethod
@@ -151,30 +130,6 @@ class TextHelper:
 
         return flag
 
-    # 找出文本中所有的片假名词
-    @staticmethod
-    def find_all_katakana_word(fulltext):
-        # 使用时再导入，避免相互导入死循环
-        from model.Word import Word
-
-        words = []
-        for k, v in enumerate(re.findall(r"[\u30A0-\u30FF]+", "\n".join(fulltext))):
-            # 移除首尾标点符号
-            v = TextHelper.strip_punctuation(v)
-
-            # 有效性检查
-            if not TextHelper.is_valid_japanese_word(v, []):
-                continue
-
-            word = Word()
-            word.count = 1
-            word.surface = v
-            word.set_context(v, fulltext)
-
-            words.append(word)
-
-        return words
-
     # 修复不合规的JSON字符串
     @staticmethod
     def fix_broken_json_string(jsonstring):
@@ -187,5 +142,8 @@ class TextHelper:
 
         # 在 GLM4-9B 回复中发现
         jsonstring = jsonstring.replace("```json", "").replace("```", "")
+        
+        # 在 GLM4-9B 回复中发现
+        jsonstring = jsonstring.replace('“', '\\"').replace('”', '\\"')
 
         return jsonstring

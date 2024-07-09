@@ -15,6 +15,7 @@ from tiktoken_ext import openai_public
 from colorama import just_fix_windows_console
 
 from model.LLM import LLM
+from model.NER import NER
 from model.Word import Word
 from helper.LogHelper import LogHelper
 from helper.TextHelper import TextHelper
@@ -140,7 +141,7 @@ def write_words_to_file(words, filename, detail):
                     file.write(f"词语翻译 : {', '.join(word.surface_translation)}, {word.surface_translation_description}\n")
                 
                 file.write(f"角色性别 : {word.attribute}\n")
-                file.write(f"角色总结 : {word.context_summary.get("summary", "")}\n")
+                file.write(f"词义分析 : {word.context_summary.get("summary", "")}\n")
 
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'\n'.join(word.context)}\n")
@@ -213,83 +214,77 @@ def read_data_file():
 
 # 主函数
 async def main():
-
     # 初始化 LLM 对象
     llm = LLM(G.config)
     llm.load_black_list("blacklist.txt")
     llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
+    llm.load_prompt_part_of_speech("prompt\\prompt_part_of_speech.txt")
     llm.load_prompt_detect_duplicate("prompt\\prompt_detect_duplicate.txt")
     llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
     llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
     llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
+
+    # 初始化 NER 对象
+    ner = NER()
+    ner.load_blacklist("blacklist.txt")
 
     # 切分文本
     fulltext = read_data_file()
     LogHelper.info("正在对文件中的文本进行预处理 ...")
     input_data_splited = split_by_token_threshold(fulltext, SPLIT_THRESHOLD)
 
-    # 如果内容较长，适当放宽阈值，以避免出现过多词条
-    if len(input_data_splited) > 300:
-        G.count_threshold = 5
-    elif len(input_data_splited) > 200:
-        G.count_threshold = 4
-    else:
-        G.count_threshold = 3
+    # 设置阈值
+    G.count_threshold = 10
 
-    # 等待分词任务结果
-    LogHelper.info("即将开始执行 [LLM 分词] ...")
-    words = await llm.extract_words_batch(input_data_splited, fulltext)
+    # 开始查找片假名词语
+    LogHelper.info("即将开始执行 [查找第二类词语] ...")
+    words = ner.search_for_second_class_words(input_data_splited, fulltext)
+    words = merge_and_count(words)
 
-    # 等待查找补充词语任务结果
-    if G.config.strict_mode == 0:
-        LogHelper.info("严格模式已关闭 ...")
-        LogHelper.info("即将开始执行 [查找补充词语] ...")
-        words.extend(TextHelper.find_all_katakana_word(fulltext))
+    # 按阈值筛选，但是保证至少有20个条目
+    words_with_threshold = [word for word in words if word.count >= G.count_threshold]
+    words_all_filtered = [word for word in words if word not in words_with_threshold]
+    words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
+    words = words_with_threshold
 
-    # NER 相关
-    # from model.NER import NER
-    # ner = NER(G.config)
-    # ner.load_black_list("blacklist.txt")
-    # LogHelper.info("即将开始执行 [NER 分词] ...")
-    # words = ner.extract_words_batch(input_data_splited, fulltext)
+    # 等待词性判断任务结果
+    LogHelper.info("即将开始执行 [词性判断] ...")
+    words = await llm.part_of_speech_batch(words)
+    words = merge_and_count(words)
 
-    # 先合并一次重复词条，便于后续操作
-    words_merged = merge_and_count(words)
+    # 查找上下文
+    LogHelper.info("即将开始执行 [查找上下文]")
+    for k, word in enumerate(words):
+        word.set_context(word.surface, fulltext)
+        LogHelper.info(f"[查找上下文] 已完成 {k + 1} / {len(words)}")
 
-    # 按阈值筛选，但是保证至少10个
-    words_with_threshold = [word for word in words_merged if word.count >= G.count_threshold]
-    words_all_filtered = [word for word in words_merged if word not in words_with_threshold]
-    words_with_threshold.extend(words_all_filtered[:max(0, 10 - len(words_with_threshold))])
+    # 筛选出类型为名词的词语
+    words = [word for word in words if word.type == Word.TYPE_NOUN]
 
-    # 等待第一类重复词检测任务结果，完成后再对重复词进行一次合并
-    LogHelper.info("即将开始执行 [第一类重复词检测] ...")
-    words_no_duplicate = await llm.detect_duplicate_batch(words_with_threshold)
-    words_no_duplicate_sorted = merge_and_count(words_no_duplicate)
-
-    # 等待翻译词汇任务结果
-    LogHelper.info("即将开始执行 [角色总结] ...")
-    words_no_duplicate_sorted = await llm.summarize_context_batch(words_no_duplicate_sorted)
+    # 等待词义分析任务结果
+    LogHelper.info("即将开始执行 [词义分析] ...")
+    words = await llm.summarize_context_batch(words)
 
     # 筛选出类型为人名的词语
-    words_no_duplicate_sorted = [word for word in words_no_duplicate_sorted if word.type == Word.TYPE_PERSON]
+    words = [word for word in words if word.type == Word.TYPE_PERSON]
 
     # 等待翻译词汇任务结果
     if G.config.translate_surface_mode == 1:
         LogHelper.info("即将开始执行 [词汇翻译] ...")
-        words_no_duplicate_sorted = await llm.translate_surface_batch(words_no_duplicate_sorted)
+        words = await llm.translate_surface_batch(words)
 
     # 等待上下文词表任务结果
     if G.config.translate_context_mode == 1:
         LogHelper.info("即将开始执行 [上下文翻译] ...")
-        words_no_duplicate_sorted = await llm.translate_context_batch(words_no_duplicate_sorted)
+        words = await llm.translate_context_batch(words)
 
     # 定义输出文件名
     names_true_output_file = "角色姓名_日志.txt"
     dictionary_names_true_file = "角色姓名_列表.json"
 
     # 写入文件
-    write_words_to_file(words_no_duplicate_sorted, names_true_output_file, True)
-    write_words_to_file(words_no_duplicate_sorted, dictionary_names_true_file, False)
+    write_words_to_file(words, names_true_output_file, True)
+    write_words_to_file(words, dictionary_names_true_file, False)
 
     # 输出日志
     LogHelper.info("")
