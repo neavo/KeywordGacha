@@ -212,14 +212,57 @@ def read_data_file():
 
     return input_data_filtered
 
+# 处理第一类（汉字）词语
+async def process_first_class_words(llm, ner, input_data_splited, fulltext):
+    LogHelper.info("即将开始执行 [查找第一类词语] ...")
+    words = ner.search_for_first_class_words(input_data_splited, fulltext)
+    words = merge_and_count(words)
+
+    # 按阈值筛选，但是保证至少有20个条目
+    words_with_threshold = [word for word in words if word.count >= G.count_threshold]
+    words_all_filtered = [word for word in words if word not in words_with_threshold]
+    words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
+    words = words_with_threshold
+
+    # 等待词性判断任务结果
+    LogHelper.info("即将开始执行 [第一类词语词性判断] ...")
+    words = await llm.analyze_attribute_batch(words, llm.TASK_TYPE_FIRST_CLASS_ATTRIBUTE)
+    words = merge_and_count(words)
+
+    # 筛选出类型为名词的词语
+    words = [word for word in words if word.type == Word.TYPE_NOUN]
+
+    return words
+
+# 处理第二类（片假名）词语
+async def process_second_class_words(llm, ner, input_data_splited, fulltext):
+    LogHelper.info("即将开始执行 [查找第二类词语] ...")
+    words = ner.search_for_second_class_words(input_data_splited, fulltext)
+    words = merge_and_count(words)
+
+    # 按阈值筛选，但是保证至少有20个条目
+    words_with_threshold = [word for word in words if word.count >= G.count_threshold]
+    words_all_filtered = [word for word in words if word not in words_with_threshold]
+    words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
+    words = words_with_threshold
+
+    # 等待词性判断任务结果
+    LogHelper.info("即将开始执行 [第二类词语词性判断] ...")
+    words = await llm.analyze_attribute_batch(words, llm.TASK_TYPE_SECOND_CLASS_ATTRIBUTE)
+    words = merge_and_count(words)
+
+    # 筛选出类型为名词的词语
+    words = [word for word in words if word.type == Word.TYPE_NOUN]
+
+    return words
+
 # 主函数
 async def main():
     # 初始化 LLM 对象
     llm = LLM(G.config)
-    llm.load_black_list("blacklist.txt")
-    llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
-    llm.load_prompt_part_of_speech("prompt\\prompt_part_of_speech.txt")
-    llm.load_prompt_detect_duplicate("prompt\\prompt_detect_duplicate.txt")
+    llm.load_blacklist("blacklist.txt")
+    llm.load_prompt_first_class_attribute("prompt\\prompt_first_class_attribute.txt")
+    llm.load_prompt_second_class_attribute("prompt\\prompt_second_class_attribute.txt")
     llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
     llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
     llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
@@ -234,32 +277,25 @@ async def main():
     input_data_splited = split_by_token_threshold(fulltext, SPLIT_THRESHOLD)
 
     # 设置阈值
-    G.count_threshold = 10
+    G.count_threshold = 1
 
-    # 开始查找片假名词语
-    LogHelper.info("即将开始执行 [查找第二类词语] ...")
-    words = ner.search_for_second_class_words(input_data_splited, fulltext)
-    words = merge_and_count(words)
+    # 获取第一类词语
+    first_class_words = []
+    if G.work_mode == 2:
+        first_class_words = await process_first_class_words(llm, ner, input_data_splited, fulltext)
 
-    # 按阈值筛选，但是保证至少有20个条目
-    words_with_threshold = [word for word in words if word.count >= G.count_threshold]
-    words_all_filtered = [word for word in words if word not in words_with_threshold]
-    words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
-    words = words_with_threshold
+    # 获取第二类词语
+    second_class_words = []
+    second_class_words = await process_second_class_words(llm, ner, input_data_splited, fulltext)
 
-    # 等待词性判断任务结果
-    LogHelper.info("即将开始执行 [词性判断] ...")
-    words = await llm.part_of_speech_batch(words)
-    words = merge_and_count(words)
+    # 合并各类词语表
+    words = merge_and_count(first_class_words + second_class_words)
 
     # 查找上下文
     LogHelper.info("即将开始执行 [查找上下文]")
     for k, word in enumerate(words):
         word.set_context(word.surface, fulltext)
         LogHelper.info(f"[查找上下文] 已完成 {k + 1} / {len(words)}")
-
-    # 筛选出类型为名词的词语
-    words = [word for word in words if word.type == Word.TYPE_NOUN]
 
     # 等待词义分析任务结果
     LogHelper.info("即将开始执行 [词义分析] ...")
@@ -326,10 +362,6 @@ if __name__ == "__main__":
     print(f"※※※※  ※※  \033[92mhttps://github.com/neavo/KeywordGacha\033[0m")
     print(f"※※※※")
     print(f"※※※※")
-    print(f"※※※※  ※※  \033[92m处理流程消耗 Token 较多 \033[0m")
-    print(f"※※※※  ※※  \033[92m使用在线接口的同学请关注自己的账单\033[0m")
-    print(f"※※※※")
-    print(f"※※※※")
     print(f"※※※※  ※※  \033[92m支持 CSV、JSON、纯文本 三种输入格式\033[0m")
     print(f"※※※※  ※※  \033[92m处理 JSON、纯文本文件时，请输入目标文件的路径\033[0m")
     print(f"※※※※  ※※  \033[92m处理 CSV 文件时，请输入目标文件夹的路径，会读取其中所有的 CSV 文件\033[0m")
@@ -338,6 +370,31 @@ if __name__ == "__main__":
     print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print()
     print()
+
+
+    print(f"选择工作模式：")
+    print(f"　　--> 1.识别假名词语（\033[92m默认，快速\033[0m）")
+    print(f"　　--> 2.识别假名词语和汉字词语（速度较慢，汉字词语目前本地模型的过滤能力较差，杂质词条较多）")
+    print(f"")
+    work_mode = input(f"请输入选项前的数字序号选择运行模式：")
+
+    try:
+        work_mode = int(work_mode)
+    except ValueError:
+        LogHelper.error(f"输入数字无效, 即将退出 ... ")
+        os.system("pause")
+        exit()
+
+    if work_mode == 1:
+        print()
+        LogHelper.info(f"以模式一运行 ...")
+        print()
+    elif work_mode == 2:
+        print()
+        LogHelper.info(f"以模式二运行 ...")
+        print()
+
+    G.work_mode = work_mode
 
     # 加载配置文件
     try:
