@@ -373,25 +373,25 @@ if __name__ == "__main__":
 
 
     print(f"选择工作模式：")
-    print(f"　　--> 1.识别假名词语（\033[92m默认，快速\033[0m）")
-    print(f"　　--> 2.识别假名词语和汉字词语（速度较慢，汉字词语目前本地模型的过滤能力较差，杂质词条较多）")
+    print(f"　　--> 1.快速模式 - 只识别假名词语（\033[92m默认\033[0m）")
+    print(f"　　--> 2.全面模式 - 同时识别假名和汉字词语（速度较慢，汉字词语目前本地模型的过滤能力较差，杂质词条较多）")
     print(f"")
     work_mode = input(f"请输入选项前的数字序号选择运行模式：")
 
     try:
         work_mode = int(work_mode)
     except ValueError:
-        LogHelper.error(f"输入数字无效, 即将退出 ... ")
-        os.system("pause")
-        exit()
+        print()
+        LogHelper.error(f"输入数字无效, 将使用默认模式运行 ... ")
+        work_mode = 1
 
     if work_mode == 1:
         print()
-        LogHelper.info(f"以模式一运行 ...")
+        LogHelper.info(f"以 \033[92m快速模式\033[0m 运行 ...")
         print()
     elif work_mode == 2:
         print()
-        LogHelper.info(f"以模式二运行 ...")
+        LogHelper.info(f"以 全面模式 运行 ...")
         print()
 
     G.work_mode = work_mode
