@@ -138,11 +138,11 @@ class TextHelper:
             r'(?<=: ").+(?=")', # 匹配Json字符中的值不包括双引号的部分
             lambda matches: matches.group(0).replace('\\"', '"').replace('"', '\\"'), 
             jsonstring,
-        )
+        ).strip()
 
         # 在 GLM4-9B 回复中发现
-        jsonstring = jsonstring.replace("```json", "").replace("```", "")
-        jsonstring = jsonstring.replace('“', '\\"').replace('”', '\\"')
+        jsonstring = jsonstring.replace("```json", "").replace("```", "").strip()
+        jsonstring = jsonstring.replace('“', '\\"').replace('”', '\\"').strip()
         jsonstring = jsonstring + "}" if not jsonstring.endswith("}") else jsonstring
 
         return jsonstring
