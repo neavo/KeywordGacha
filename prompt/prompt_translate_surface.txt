@@ -8,8 +8,8 @@
 
 回答请使用JSON格式：
 {
-	"romaji": "<罗马音>",
-	"translation_1": "<音译>",
-	"translation_2": "<其他翻译>",
-	"description": "<翻译说明>"
+"romaji": "<罗马音>",
+"translation_1": "<音译>",
+"translation_2": "<其他翻译>",
+"description": "<翻译说明>"
 }

@@ -224,13 +224,11 @@ async def process_first_class_words(llm, ner, input_data_splited, fulltext):
     words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
     words = words_with_threshold
 
-    # 等待词性判断任务结果
-    LogHelper.info("即将开始执行 [第一类词语词性判断] ...")
-    words = await llm.analyze_attribute_batch(words, llm.TASK_TYPE_FIRST_CLASS_ATTRIBUTE)
-    words = merge_and_count(words)
-
-    # 筛选出类型为名词的词语
-    words = [word for word in words if word.type == Word.TYPE_NOUN]
+    # 查找上下文
+    LogHelper.info("即将开始执行 [第一类词语查找上下文]")
+    for k, word in enumerate(words):
+        word.set_context(word.surface, fulltext)
+        LogHelper.info(f"[第一类词语查找上下文] 已完成 {k + 1} / {len(words)}")
 
     return words
 
@@ -246,13 +244,11 @@ async def process_second_class_words(llm, ner, input_data_splited, fulltext):
     words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
     words = words_with_threshold
 
-    # 等待词性判断任务结果
-    LogHelper.info("即将开始执行 [第二类词语词性判断] ...")
-    words = await llm.analyze_attribute_batch(words, llm.TASK_TYPE_SECOND_CLASS_ATTRIBUTE)
-    words = merge_and_count(words)
-
-    # 筛选出类型为名词的词语
-    words = [word for word in words if word.type == Word.TYPE_NOUN]
+    # 查找上下文
+    LogHelper.info("即将开始执行 [第二类词语查找上下文]")
+    for k, word in enumerate(words):
+        word.set_context(word.surface, fulltext)
+        LogHelper.info(f"[第二类词语查找上下文] 已完成 {k + 1} / {len(words)}")
 
     return words
 
@@ -261,8 +257,7 @@ async def main():
     # 初始化 LLM 对象
     llm = LLM(G.config)
     llm.load_blacklist("blacklist.txt")
-    llm.load_prompt_first_class_attribute("prompt\\prompt_first_class_attribute.txt")
-    llm.load_prompt_second_class_attribute("prompt\\prompt_second_class_attribute.txt")
+    llm.load_prompt_analyze_attribute("prompt\\prompt_analyze_attribute.txt")
     llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
     llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
     llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
@@ -288,11 +283,13 @@ async def main():
     # 合并各类词语表
     words = merge_and_count(first_class_words + second_class_words)
 
-    # 查找上下文
-    LogHelper.info("即将开始执行 [查找上下文]")
-    for k, word in enumerate(words):
-        word.set_context(word.surface, fulltext)
-        LogHelper.info(f"[查找上下文] 已完成 {k + 1} / {len(words)}")
+    # 等待词性判断任务结果
+    LogHelper.info("即将开始执行 [词性判断] ...")
+    words = await llm.analyze_attribute_batch(words)
+    words = merge_and_count(words)
+
+    # 筛选出类型为名词的词语
+    words = [word for word in words if word.type == Word.TYPE_PERSON]
 
     # 等待词义分析任务结果
     LogHelper.info("即将开始执行 [词义分析] ...")
