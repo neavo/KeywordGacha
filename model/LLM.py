@@ -304,9 +304,6 @@ class LLM:
     # 上下文翻译任务
     async def translate_context(self, word, retry):
         async with self.semaphore:
-            # 截取部分上下文翻译，节约时间
-            word.context = word.clip_context(self.MAX_TOKENS_TRANSLATE_CONTEXT)
-
             context_translation = []
             prompt = self.prompt_translate_context
             task_type = self.TASK_TYPE_TRANSLATE_CONTEXT
