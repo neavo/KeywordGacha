@@ -3,6 +3,7 @@ import re
 import csv
 import json
 import asyncio
+import logging
 import traceback
 import concurrent.futures
 from collections import Counter
@@ -14,6 +15,7 @@ from tiktoken_ext import openai_public
 from colorama import just_fix_windows_console
 
 from model.LLM import LLM
+from model.NER import NER
 from model.Word import Word
 from helper.LogHelper import LogHelper
 from helper.TextHelper import TextHelper
@@ -139,7 +141,7 @@ def write_words_to_file(words, filename, detail):
                     file.write(f"词语翻译 : {', '.join(word.surface_translation)}, {word.surface_translation_description}\n")
                 
                 file.write(f"角色性别 : {word.attribute}\n")
-                file.write(f"角色总结 : {word.context_summary.get("summary", "")}\n")
+                file.write(f"词义分析 : {word.context_summary.get("summary", "")}\n")
 
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'\n'.join(word.context)}\n")
@@ -149,6 +151,7 @@ def write_words_to_file(words, filename, detail):
                     file.write(f"{'\n'.join(word.context_translation)}\n")
 
                 file.write(f"\n")
+
 # 读取数据文件
 def read_data_file():
     input_data = []
@@ -209,63 +212,91 @@ def read_data_file():
 
     return input_data_filtered
 
+# 处理第一类（汉字）词语
+async def process_first_class_words(llm, ner, input_data_splited, fulltext):
+    LogHelper.info("即将开始执行 [查找第一类词语] ...")
+    words = ner.search_for_first_class_words(input_data_splited, fulltext)
+    words = merge_and_count(words)
+
+    # 按阈值筛选，但是保证至少有20个条目
+    words_with_threshold = [word for word in words if word.count >= G.config.count_threshold]
+    words_all_filtered = [word for word in words if word not in words_with_threshold]
+    words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
+    words = words_with_threshold
+
+    # 等待词性判断任务结果
+    LogHelper.info("即将开始执行 [第一类词语词性判断] ...")
+    words = await llm.analyze_attribute_batch(words, llm.TASK_TYPE_FIRST_CLASS_ATTRIBUTE)
+    words = merge_and_count(words)
+
+    # 筛选出类型为名词的词语
+    words = [word for word in words if word.type == Word.TYPE_NOUN]
+
+    return words
+
+# 处理第二类（片假名）词语
+async def process_second_class_words(llm, ner, input_data_splited, fulltext):
+    LogHelper.info("即将开始执行 [查找第二类词语] ...")
+    words = ner.search_for_second_class_words(input_data_splited, fulltext)
+    words = merge_and_count(words)
+
+    # 按阈值筛选，但是保证至少有20个条目
+    words_with_threshold = [word for word in words if word.count >= G.config.count_threshold]
+    words_all_filtered = [word for word in words if word not in words_with_threshold]
+    words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
+    words = words_with_threshold
+
+    # 等待词性判断任务结果
+    LogHelper.info("即将开始执行 [第二类词语词性判断] ...")
+    words = await llm.analyze_attribute_batch(words, llm.TASK_TYPE_SECOND_CLASS_ATTRIBUTE)
+    words = merge_and_count(words)
+
+    # 筛选出类型为名词的词语
+    words = [word for word in words if word.type == Word.TYPE_NOUN]
+
+    return words
+
 # 主函数
 async def main():
-
-
     # 初始化 LLM 对象
     llm = LLM(G.config)
-    llm.load_black_list("blacklist.txt")
-    llm.load_prompt_extract_words("prompt\\prompt_extract_words.txt")
-    llm.load_prompt_detect_duplicate("prompt\\prompt_detect_duplicate.txt")
+    llm.load_blacklist("blacklist.txt")
+    llm.load_prompt_first_class_attribute("prompt\\prompt_first_class_attribute.txt")
+    llm.load_prompt_second_class_attribute("prompt\\prompt_second_class_attribute.txt")
     llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
     llm.load_prompt_translate_surface("prompt\\prompt_translate_surface.txt")
     llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
+
+    # 初始化 NER 对象
+    ner = NER()
+    ner.load_blacklist("blacklist.txt")
 
     # 切分文本
     fulltext = read_data_file()
     LogHelper.info("正在对文件中的文本进行预处理 ...")
     input_data_splited = split_by_token_threshold(fulltext, SPLIT_THRESHOLD)
 
-    # 如果内容较长，适当放宽阈值，以避免出现过多词条
-    if len(input_data_splited) > 300:
-        G.count_threshold = 5
-    elif len(input_data_splited) > 200:
-        G.count_threshold = 4
-    else:
-        G.count_threshold = 3
+    # 获取第一类词语
+    first_class_words = []
+    if G.work_mode == 2:
+        first_class_words = await process_first_class_words(llm, ner, input_data_splited, fulltext)
 
-    # 等待分词任务结果
-    LogHelper.info("即将开始执行 [LLM 分词] ...")
-    words = await llm.extract_words_batch(input_data_splited, fulltext)
+    # 获取第二类词语
+    second_class_words = []
+    second_class_words = await process_second_class_words(llm, ner, input_data_splited, fulltext)
 
-    # 等待查找补充词语任务结果 - 实际不太行，非人名太多
-    # LogHelper.info("即将开始执行 [查找补充词语] ...")
-    # words.extend(TextHelper.find_all_katakana_word(fulltext))
+    # 合并各类词语表
+    words = merge_and_count(first_class_words + second_class_words)
 
-    # NER 相关
-    # from model.NER import NER
-    # ner = NER(G.config)
-    # ner.load_black_list("blacklist.txt")
-    # LogHelper.info("即将开始执行 [NER 分词] ...")
-    # words = ner.extract_words_batch(input_data_splited, fulltext)
+    # 查找上下文
+    LogHelper.info("即将开始执行 [查找上下文]")
+    for k, word in enumerate(words):
+        word.set_context(word.surface, fulltext)
+        LogHelper.info(f"[查找上下文] 已完成 {k + 1} / {len(words)}")
 
-    # 先合并一次重复词条，便于后续操作
-    words_merged = merge_and_count(words)
-
-    # 按阈值筛选，但是保证至少10个
-    words_with_threshold = [word for word in words_merged if word.count >= G.count_threshold]
-    words_all_filtered = [word for word in words_merged if word not in words_with_threshold]
-    words_with_threshold.extend(words_all_filtered[:max(0, 10 - len(words_with_threshold))])
-
-    # 等待第一类重复词检测任务结果，完成后再对重复词进行一次合并
-    LogHelper.info("即将开始执行 [第一类重复词检测] ...")
-    words_no_duplicate = await llm.detect_duplicate_batch(words_with_threshold)
-    words_no_duplicate_sorted = merge_and_count(words_no_duplicate)
-
-    # 等待翻译词汇任务结果
-    LogHelper.info("即将开始执行 [角色总结] ...")
-    words_no_duplicate_sorted = await llm.summarize_context_batch(words_no_duplicate_sorted)
+    # 等待词义分析任务结果
+    LogHelper.info("即将开始执行 [词义分析] ...")
+    words = await llm.summarize_context_batch(words)
 
     # 筛选出类型为人名的词语
     words = [word for word in words if word.type == Word.TYPE_PERSON]
@@ -273,20 +304,20 @@ async def main():
     # 等待翻译词汇任务结果
     if G.config.translate_surface_mode == 1:
         LogHelper.info("即将开始执行 [词汇翻译] ...")
-        words_no_duplicate_sorted = await llm.translate_surface_batch(words_no_duplicate_sorted)
+        words = await llm.translate_surface_batch(words)
 
     # 等待上下文词表任务结果
     if G.config.translate_context_mode == 1:
         LogHelper.info("即将开始执行 [上下文翻译] ...")
-        words_no_duplicate_sorted = await llm.translate_context_batch(words_no_duplicate_sorted)
+        words = await llm.translate_context_batch(words)
 
     # 定义输出文件名
     names_true_output_file = "角色姓名_日志.txt"
     dictionary_names_true_file = "角色姓名_列表.json"
 
     # 写入文件
-    write_words_to_file(words_no_duplicate_sorted, names_true_output_file, True)
-    write_words_to_file(words_no_duplicate_sorted, dictionary_names_true_file, False)
+    write_words_to_file(words, names_true_output_file, True)
+    write_words_to_file(words, dictionary_names_true_file, False)
 
     # 输出日志
     LogHelper.info("")
@@ -320,16 +351,25 @@ if __name__ == "__main__":
     # 通过 Colorama 实现在较旧的 Windows 控制台下输出彩色字符
     just_fix_windows_console()
 
+    if os.path.exists("debug.txt"):
+        LogHelper.setLevel(logging.DEBUG)
+        
+        a = {}
+        b = {}
+
+        # 获取字典的键集合
+        keys_a = set(a.keys())
+        keys_b = set(b.keys())
+
+        # 输出重复键的数量
+        print(len(keys_a & keys_b))
+
     print()
     print()
     print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
     print(f"※※※※")
     print(f"※※※※  ※※  \033[92mKeywordGacha\033[0m")
     print(f"※※※※  ※※  \033[92mhttps://github.com/neavo/KeywordGacha\033[0m")
-    print(f"※※※※")
-    print(f"※※※※")
-    print(f"※※※※  ※※  \033[92m处理流程消耗 Token 较多 \033[0m")
-    print(f"※※※※  ※※  \033[92m使用在线接口的同学请关注自己的账单\033[0m")
     print(f"※※※※")
     print(f"※※※※")
     print(f"※※※※  ※※  \033[92m支持 CSV、JSON、纯文本 三种输入格式\033[0m")
@@ -341,10 +381,33 @@ if __name__ == "__main__":
     print()
     print()
 
+
+    print(f"选择工作模式：")
+    print(f"　　--> 1. 快速模式 - 只识别假名词语与混合词语（\033[92m默认\033[0m）")
+    print(f"　　--> 2. 全面模式 - 识别假名、混合词语与纯汉字词语（速度较慢，目前过滤能力有待提升，杂质较多）")
+    print(f"")
+    work_mode = input(f"请输入选项前的数字序号选择运行模式：")
+
+    try:
+        work_mode = int(work_mode)
+        print()
+    except ValueError:
+        LogHelper.error(f"输入数字无效, 将使用\033[92m默认\033[0m模式运行 ... ")
+        work_mode = 1
+
+    if work_mode == 1:
+        LogHelper.info(f"您选择了 1. 快速模式 ...")
+        print()
+    elif work_mode == 2:
+        LogHelper.info(f"您选择了 2. 全面模式 ...")
+        print()
+
+    G.work_mode = work_mode
+
     # 加载配置文件
     try:
         config_file = "config.json"
-        
+
         with open(config_file, "r", encoding="utf-8") as file:
             config = json.load(file)
             G.config = type("GClass", (), {})()
@@ -355,6 +418,10 @@ if __name__ == "__main__":
         LogHelper.error(f"文件 {config_file} 未找到.")
     except json.JSONDecodeError:
         LogHelper.error(f"文件 {config_file} 不是有效的JSON格式.")
+
+    # 检查 DEBUG 模式
+    if os.path.exists("debug.txt"):
+        LogHelper.setLevel(logging.DEBUG)
 
     # 开始业务逻辑
     asyncio.run(run_main())

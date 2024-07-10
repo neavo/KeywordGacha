@@ -39,6 +39,10 @@
 - 如果您计划使用本地模型，请务必严格按照 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 页面描述的步骤进行
 
 ## 近期更新
+- 20240710
+  - 新增 基于新工作流的 快速模式 和 全面模式 显著的提升了抓取速度和抓取能力
+  - 修正 人名筛选不生效的问题
+
 - 20240708
   - 调整 显著的提升了 `本地模型` 对角色信息的提取、汇总能力
   - 调整 本地模型调整为 [GLM4-9B-Chat-GGUF](https://github.com/neavo/KeywordGachaServer)，请务必与客户端同步更新
@@ -91,6 +95,7 @@
         "model_name": "qwen2-7b-instruct", // 你所使用 API 接口的模型名称，从接口平台方获取，默认为本地接口
 
         "max_workers": 4, // 网络请求等任务并发执行的最大数量，如果频繁出现网络错误，可以调小这个值
+        "count_threshold": 10, // 词语出现次数的筛选阈值，调低这个值可以获得更多低频词语
         "request_timeout": 120, // 网络请求的超时时间，如果频繁出现网络错误，可以调大这个值
 
         "translate_surface_mode": "1", // 是否翻译词汇，设为 0 可以跳过此步骤，以节约 Token 与 时间
@@ -102,7 +107,7 @@
 
 - 较新的模型比如 [GPT4o](https://chatgpt.com/)、[Claude 3.5 Sonnet](https://claude.ai/) 等具有超乎想象多语言能力，但是也十分昂贵
 - ~~[Qwen2](https://github.com/QwenLM/Qwen2) 在处理中文的表现上称得上优秀，处理日文水平也算堪用，7B 版本只需要 8G 显存，推荐使用~~
-- 在 KG 的应用情境下，[GLM4-9B-Chat-GGUF](https://huggingface.co/second-state/glm-4-9b-chat-GGUF) 不论是语言水平、还是逻辑能力，在8G以内显存可以使用的模型中都具有压倒性的优势
+- 在 KG 的应用情境下，[GLM4-9B-Chat-GGUF](https://huggingface.co/second-state/glm-4-9b-chat-GGUF) 不论是语言水平还是逻辑能力，在 8G 以内显存可以使用的模型中都具有压倒性的优势
 
 ## 开发计划 🎢
 

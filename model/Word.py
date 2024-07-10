@@ -13,6 +13,8 @@ from helper.TextHelper import TextHelper
 
 class Word:
 
+    TYPE_UNKNOWN = -1
+    TYPE_NOUN = 0
     TYPE_PERSON = 1
     CONTEXT_TOKEN_THRESHOLD = 1024
 
@@ -20,7 +22,7 @@ class Word:
     CONTEXT_CACHE_LOCK = Lock()
 
     def __init__(self):
-        self.type = 0
+        self.type = self.TYPE_UNKNOWN
         self.count = 0
         self.context = []
         self.context_summary = {}
@@ -78,3 +80,18 @@ class Word:
             # 将结果保存到缓存中
             with self.CONTEXT_CACHE_LOCK:
                 Word.CONTEXT_CACHE[surface] = context
+
+    # 按长度截取上下文并返回
+    def clip_context(self, threshold):
+        context = []
+        context_length = 0
+        for k, line in enumerate(self.context):
+            line_lenght = len(self.tiktoken_encoding.encode(line))
+
+            if context_length + line_lenght > threshold:
+                break
+
+            context.append(line)
+            context_length = context_length + line_lenght
+
+        return context

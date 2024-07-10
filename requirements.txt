@@ -1,4 +1,6 @@
 openai
 tiktoken
 colorama
+sudachipy
+sudachidict_full
 pyinstaller
