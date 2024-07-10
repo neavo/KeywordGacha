@@ -219,7 +219,7 @@ async def process_first_class_words(llm, ner, input_data_splited, fulltext):
     words = merge_and_count(words)
 
     # 按阈值筛选，但是保证至少有20个条目
-    words_with_threshold = [word for word in words if word.count >= G.count_threshold]
+    words_with_threshold = [word for word in words if word.count >= G.config.count_threshold]
     words_all_filtered = [word for word in words if word not in words_with_threshold]
     words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
     words = words_with_threshold
@@ -241,7 +241,7 @@ async def process_second_class_words(llm, ner, input_data_splited, fulltext):
     words = merge_and_count(words)
 
     # 按阈值筛选，但是保证至少有20个条目
-    words_with_threshold = [word for word in words if word.count >= G.count_threshold]
+    words_with_threshold = [word for word in words if word.count >= G.config.count_threshold]
     words_all_filtered = [word for word in words if word not in words_with_threshold]
     words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
     words = words_with_threshold
@@ -275,9 +275,6 @@ async def main():
     fulltext = read_data_file()
     LogHelper.info("正在对文件中的文本进行预处理 ...")
     input_data_splited = split_by_token_threshold(fulltext, SPLIT_THRESHOLD)
-
-    # 设置阈值
-    G.count_threshold = 1
 
     # 获取第一类词语
     first_class_words = []
@@ -354,6 +351,19 @@ if __name__ == "__main__":
     # 通过 Colorama 实现在较旧的 Windows 控制台下输出彩色字符
     just_fix_windows_console()
 
+    if os.path.exists("debug.txt"):
+        LogHelper.setLevel(logging.DEBUG)
+        
+        a = {}
+        b = {}
+
+        # 获取字典的键集合
+        keys_a = set(a.keys())
+        keys_b = set(b.keys())
+
+        # 输出重复键的数量
+        print(len(keys_a & keys_b))
+
     print()
     print()
     print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
@@ -373,25 +383,23 @@ if __name__ == "__main__":
 
 
     print(f"选择工作模式：")
-    print(f"　　--> 1.快速模式 - 只识别假名词语（\033[92m默认\033[0m）")
-    print(f"　　--> 2.全面模式 - 同时识别假名和汉字词语（速度较慢，汉字词语目前本地模型的过滤能力较差，杂质词条较多）")
+    print(f"　　--> 1. 快速模式 - 只识别假名词语与混合词语（\033[92m默认\033[0m）")
+    print(f"　　--> 2. 全面模式 - 识别假名、混合词语与纯汉字词语（速度较慢，目前过滤能力有待提升，杂质较多）")
     print(f"")
     work_mode = input(f"请输入选项前的数字序号选择运行模式：")
 
     try:
         work_mode = int(work_mode)
-    except ValueError:
         print()
-        LogHelper.error(f"输入数字无效, 将使用默认模式运行 ... ")
+    except ValueError:
+        LogHelper.error(f"输入数字无效, 将使用\033[92m默认\033[0m模式运行 ... ")
         work_mode = 1
 
     if work_mode == 1:
-        print()
-        LogHelper.info(f"以 \033[92m快速模式\033[0m 运行 ...")
+        LogHelper.info(f"您选择了 1. 快速模式 ...")
         print()
     elif work_mode == 2:
-        print()
-        LogHelper.info(f"以 全面模式 运行 ...")
+        LogHelper.info(f"您选择了 2. 全面模式 ...")
         print()
 
     G.work_mode = work_mode

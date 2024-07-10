@@ -203,12 +203,14 @@ class LLM:
             surface =  message.content.strip()
 
             if task_type == self.TASK_TYPE_FIRST_CLASS_ATTRIBUTE:
-                if any(v in surface for v in ["无", "否", "無", "no", "none"]):
+                if any(v in surface for v in ["否"]):
+                    LogHelper.debug(f"[词性判断] 已剔除 - {word.surface}")
                     return word
 
                 word.type = Word.TYPE_NOUN
             elif task_type == self.TASK_TYPE_SECOND_CLASS_ATTRIBUTE:
-                if any(v in surface for v in ["无", "否", "無", "no", "none"]):
+                if any(v in surface for v in ["否"]):
+                    LogHelper.debug(f"[词性判断] 已剔除 - {word.surface}")
                     return word
 
                 if not TextHelper.is_valid_japanese_word(surface, self.black_list):
@@ -285,6 +287,7 @@ class LLM:
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
             except Exception as error:
+                LogHelper.debug(error)
                 LogHelper.debug(message.content.strip())
                 raise error
 
@@ -346,6 +349,9 @@ class LLM:
     # 上下文翻译任务
     async def translate_context(self, word, retry):
         async with self.semaphore:
+            # 截取部分上下文翻译，节约时间
+            word.context = word.clip_context(self.MAX_TOKENS_TRANSLATE_CONTEXT)
+
             context_translation = []
             prompt = self.prompt_translate_context
             task_type = self.TASK_TYPE_TRANSLATE_CONTEXT
@@ -437,7 +443,7 @@ class LLM:
             if "是" in context_summary["person"] or "は" in context_summary["person"]:
                 word.type = Word.TYPE_PERSON
             else:
-                LogHelper.debug(f"context_summary.person = false - {word.surface}")
+                LogHelper.debug(f"[语义分析] 已剔除 - {word.surface}")
            
             if "女" in context_summary["sex"]:
                 word.attribute = "女"

@@ -142,8 +142,7 @@ class TextHelper:
 
         # 在 GLM4-9B 回复中发现
         jsonstring = jsonstring.replace("```json", "").replace("```", "")
-        
-        # 在 GLM4-9B 回复中发现
         jsonstring = jsonstring.replace('“', '\\"').replace('”', '\\"')
+        jsonstring = jsonstring + "}" if not jsonstring.endswith("}") else jsonstring
 
         return jsonstring

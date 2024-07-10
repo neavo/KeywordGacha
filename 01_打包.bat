@@ -8,7 +8,7 @@
     rd /s /q build
     del /q KeywordGacha.spec
 
-    call python -m pip install numpy --no-binary=:all:
+    call pip install -r requirements.txt
     call pyinstaller --name KeywordGacha --clean --noconfirm --onefile main.py
 
     xcopy "prompt" "dist\prompt" /E /I /H /Y
