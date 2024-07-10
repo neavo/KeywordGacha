@@ -25,7 +25,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build EXE
-        run: pyinstaller --name KeywordGacha --clean --noconfirm --onefile main.py
+        run: pyinstaller --name KeywordGacha --clean --noconfirm main.py
 
       - name: Compress Archive
         id: compress_files
@@ -38,9 +38,9 @@ jobs:
           $timestamp = ([System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::ParseExact($timestamp, "yyyyMMdd_HHmmss", $null), [System.TimeZoneInfo]::Utc.Id, 'China Standard Time')).ToString("yyyyMMdd_HHmmss")
 
           # 复制文件到dist目录
-          Copy-Item -Path "prompt" -Destination "dist" -Recurse -Force
-          Copy-Item -Path "config.json" -Destination "dist" -Force
-          Copy-Item -Path "blacklist.txt" -Destination "dist" -Force
+          Copy-Item -Path "prompt" -Destination "dist\KeywordGacha" -Recurse -Force
+          Copy-Item -Path "config.json" -Destination "dist\KeywordGacha" -Force
+          Copy-Item -Path "blacklist.txt" -Destination "dist\KeywordGacha" -Force
 
           # 压缩dist目录下的所有文件，不包括dist目录本身
           Compress-Archive -Path "dist\*" -DestinationPath "KeywordGacha_DEV_$timestamp.zip" -Force
