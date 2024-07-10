@@ -13,13 +13,14 @@ from helper.TextHelper import TextHelper
 
 class Word:
 
-    TYPE_UNKNOWN = -1
-    TYPE_NOUN = 0
-    TYPE_PERSON = 1
-    CONTEXT_TOKEN_THRESHOLD = 1024
+    TYPE_NOT_PERSON = -20
+    TYPE_NEED_CONFIRM = -10
+    TYPE_UNKNOWN = 0
+    TYPE_PERSON = 10
 
     CONTEXT_CACHE = {}
     CONTEXT_CACHE_LOCK = Lock()
+    CONTEXT_TOKEN_THRESHOLD = 768
 
     def __init__(self):
         self.type = self.TYPE_UNKNOWN
@@ -38,12 +39,15 @@ class Word:
 
     def __str__(self):
         return (
-            f"Word(count={self.count},"
+            f"Word(type={self.type},"
+            f"count={self.count},"
             f"context={self.context},"
             f"context_summary={self.context_summary},"
             f"context_translation={self.context_translation},"
             f"surface={self.surface},"
+            f"surface_romaji={self.surface_romaji},"
             f"surface_translation={self.surface_translation},"
+            f"surface_translation_description={self.surface_translation_description},"
             f"attribute={self.attribute},"
             f"llmresponse={self.llmresponse})"
         )

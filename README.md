@@ -17,9 +17,9 @@
 > <img src="image/02.jpg" style="width: 75%;" alt="image/02.jpg">
   
 ## 要求 🖥️
-- 需要一个兼容 OpenAI 格式的大语言模型接口
+- 需要一个兼容 OpenAI 格式的大语言模型接口，暂时只支持 `日文内容` 的提取
 - 与主流的 ChatGPT 系列、Claude 系列以及众多国产模型搭配使用均具有较好的效果
-- 如果拥有一块至少 8G 显存的 Nvidia 显卡，也可以在个人电脑上运行本地服务来获得免费服务
+- 如果拥有一块至少 8G 显存的 Nvidia 显卡，也可以在个人电脑上运行本地服务来获得免费使用
 
 ## 使用 🛸
 - 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载 KG 并解压缩到本地
@@ -36,9 +36,12 @@
 - 但即使只使用运行在个人电脑上的小规模开源模型，也能很好的效果
 - 使用本地模型需要一块至少 8G 显存的 Nvidia 显卡，具体步骤请点击移步 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 安装一键包
 - 注意：受限于性能与开发资源，使用本地模型时，开发者仅能保证与 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 的兼容性
-- 如果您计划使用本地模型，请务必严格按照 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 页面描述的步骤进行
+- 如果您计划使用本地模型，请务必严格按照 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 页面描述的步骤进行部署
 
 ## 近期更新
+- 20240711
+  - 调整 - 改进词性判断的流程以提升判断的准确性
+
 - 20240710
   - 新增 基于新工作流的 `快速模式` 和 `全面模式` 显著的提升了抓取速度和抓取能力
   - 修正 人名筛选不生效的问题
@@ -58,8 +61,9 @@
 
 ## 文本格式 🆗
 - 目前支持三种不同的输入文本格式，其中 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的 CSV 文件的抓取效果似乎比较好
+- 对文本内容没什么要求，`小说` 、`字幕`、`漫画台词`、`游戏脚本` 等都可以直接读取，不需要预处理
 - 文件中 每一行/每一条 应只包含一个句子，太长的话请先手动处理一下
-- 如当前目录下有 `all.orig.txt` 或 `ManualTransFile.json` 文件，会自动识别
+- 如当前目录下有 `data 文件夹` 、`all.orig.txt` 或 `ManualTransFile.json` 文件，会自动识别
 - 当文件后缀名为 .json 时，会将其内容按以下模式处理，这也是 [MTool](https://afdian.net/a/AdventCirno) 导出翻译原文的格式
 
 ```json
@@ -107,13 +111,15 @@
 
 - 较新的模型比如 [GPT4o](https://chatgpt.com/)、[Claude 3.5 Sonnet](https://claude.ai/) 等具有超乎想象多语言能力，但是也十分昂贵
 - ~~[Qwen2](https://github.com/QwenLM/Qwen2) 在处理中文的表现上称得上优秀，处理日文水平也算堪用，7B 版本只需要 8G 显存，推荐使用~~
-- 在 KG 的应用情境下，[GLM4-9B-Chat-GGUF](https://huggingface.co/second-state/glm-4-9b-chat-GGUF) 不论是语言水平还是逻辑能力，在 8G 以内显存可以使用的模型中都具有压倒性的优势
+- 在 KG 的应用情境下，[GLM4-9B-Chat-GGUF](https://huggingface.co/second-state/glm-4-9b-chat-GGUF) 不论是语言水平还是逻辑能力，在 8G 以内显存可以使用的模型中都具有显著的优势
 
 ## 开发计划 🎢
 
 - [x] 支持 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的 CSV 文本
 - [ ] 添加 对 组织、道具、地域 等其他名词类型的支持
-- [ ] 添加 对英文文本的支持
+- [ ] 添加 对 `英文内容` 的支持
+- [ ] 添加 对 `中文内容` 的支持
+- [ ] 添加 对 `韩文内容` 的支持
 
 ## 问题反馈 😥
   - 运行时的日志保存在程序目录下的 `KeywordGacha.log` `KeywordGacha.log.1` 等文件

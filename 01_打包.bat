@@ -9,12 +9,11 @@
     del /q KeywordGacha.spec
 
     call pip install -r requirements.txt
-    call pyinstaller --name KeywordGacha --clean --noconfirm --onefile main.py
+    call pyinstaller --name KeywordGacha --clean --noconfirm main.py
 
-    xcopy "prompt" "dist\prompt" /E /I /H /Y
-    xcopy "santaza" "dist\santaza" /E /I /H /Y
-    copy /y "config.json" "dist\"
-    copy /y "blacklist.txt" "dist\"
+    xcopy "prompt" "dist\KeywordGacha\prompt" /E /I /H /Y
+    copy /y "config.json" "dist\KeywordGacha\"
+    copy /y "blacklist.txt" "dist\KeywordGacha\"
 
     call conda deactivate
     call conda env remove --name KeywordGacha --yes
