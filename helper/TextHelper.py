@@ -144,5 +144,6 @@ class TextHelper:
         jsonstring = jsonstring.replace("```json", "").replace("```", "").strip()
         jsonstring = jsonstring.replace('“', '\\"').replace('”', '\\"').strip()
         jsonstring = jsonstring + "}" if not jsonstring.endswith("}") else jsonstring
+        jsonstring = jsonstring.replace(",\n}", "\n}") if not jsonstring.endswith(",\n}") else jsonstring
 
         return jsonstring
