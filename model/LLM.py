@@ -160,6 +160,7 @@ class LLM:
 
             result = message.content.strip()
 
+            LogHelper.debug(result)
             try:
                 result = json.loads(
                     TextHelper.fix_broken_json_string(message.content.strip())
@@ -169,9 +170,9 @@ class LLM:
                 LogHelper.debug(message.content.strip())
                 raise error
 
-            if "是" in result["person"]:
+            if "是" in result["name"]:
                 word.type = Word.TYPE_PERSON
-            elif "否" in result["person"]:
+            elif "否" in result["name"]:
                 word.type = Word.TYPE_NOT_PERSON
                 LogHelper.debug(f"[词性判断] 已剔除 - {word.surface} - {result}")
             else:
@@ -383,6 +384,7 @@ class LLM:
             if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
                 raise Exception()
 
+            LogHelper.debug(message.content)
             try:
                 context_summary = json.loads(
                     TextHelper.fix_broken_json_string(message.content.strip())
@@ -391,9 +393,9 @@ class LLM:
                 LogHelper.debug(message.content.strip())
                 raise error
 
-            if "是" in context_summary["person"]:
+            if "是" in context_summary["name"]:
                 word.type = Word.TYPE_PERSON
-            elif "否" in context_summary["person"]:
+            elif "否" in context_summary["name"]:
                 word.type = Word.TYPE_NOT_PERSON
                 LogHelper.debug(f"[语义分析] 已剔除 - {word.surface} - {message.content.strip()}")
             else:
