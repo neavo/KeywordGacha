@@ -1,3 +1,3 @@
 @echo off
 
-python main.py
+envs\python main.py

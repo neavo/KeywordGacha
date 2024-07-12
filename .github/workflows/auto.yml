@@ -1,0 +1,93 @@
+name: Auto Build
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    environment: KeywordGacha
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: 3.12
+
+      - name: Create and Activate
+        run: |
+          conda create --name KeywordGacha python=3.12
+          conda conda activate KeywordGacha
+          
+      - name: Update Pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install Requirements
+        run: |
+          pip install -r requirements.txt
+          python -m spacy download ja_core_news_lg
+
+      - name: Copy Files
+        run: |
+          rd /s /q dist
+          rd /s /q envs
+          xcopy "%USERPROFILE%\miniconda3\envs\KeywordGacha" "envs" /E /I /H /Y
+          
+          xcopy "envs" "dist\KeywordGacha\envs" /E /I /H /Y
+          xcopy "model" "dist\KeywordGacha\model" /E /I /H /Y
+          xcopy "helper" "dist\KeywordGacha\helper" /E /I /H /Y
+          xcopy "prompt" "dist\KeywordGacha\prompt" /E /I /H /Y
+
+          copy /y "00_启动.bat" "dist\KeywordGacha\"
+          copy /y "main.py" "dist\KeywordGacha\"
+          copy /y "config.json" "dist\KeywordGacha\"
+          copy /y "blacklist.txt" "dist\KeywordGacha\"
+
+      - name: Compress Archive
+        id: compress_files
+        shell: pwsh
+        run: |
+          # 获取当前UTC时间
+          $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+
+          # 调整为东八区时间（北京时间）
+          $timestamp = ([System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::ParseExact($timestamp, "yyyyMMdd_HHmmss", $null), [System.TimeZoneInfo]::Utc.Id, 'China Standard Time')).ToString("yyyyMMdd_HHmmss")
+
+          # 压缩dist目录下的所有文件，不包括dist目录本身
+          Compress-Archive -Path "dist\*" -DestinationPath "KeywordGacha_DEV_$timestamp.zip" -Force
+
+          # 输出 timestamp 变量以供后续步骤使用
+          echo "::set-output name=timestamp::$timestamp"
+
+      - name: Delete Previous Release
+        uses: dev-drprasad/delete-tag-and-release@v0.2.1
+        with:
+          tag_name: AUTO_BUILD
+          delete_release: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
+        with:
+          tag_name: AUTO_BUILD
+          release_name: KeywordGacha_DEV_${{ steps.compress_files.outputs.timestamp }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./KeywordGacha_DEV_${{ steps.compress_files.outputs.timestamp }}.zip
+          asset_name: KeywordGacha_DEV_${{ steps.compress_files.outputs.timestamp }}.zip
+          asset_content_type: application/octet-stream

@@ -12,6 +12,7 @@ from concurrent.futures import as_completed
 import tiktoken
 import tiktoken_ext
 from tiktoken_ext import openai_public
+from tqdm import tqdm
 from colorama import just_fix_windows_console
 
 from model.LLM import LLM
@@ -24,10 +25,6 @@ from helper.TextHelper import TextHelper
 # 方便共享全局数据
 # 丑陋，但是有效，不服你咬我啊
 G = type("GClass", (), {})()
-
-# 原始文本切片阈值
-# 似乎切的越细，能找到的词越多，失败的概率也会降低
-SPLIT_THRESHOLD = 1 * 1024
 
 # 读取TXT文件并返回
 def read_txt_file(filename):
@@ -104,22 +101,24 @@ def split_by_token_threshold(lines, threshold):
 
     return lines_split_by_token
 
-# 合并具有相同表面形式（surface）的 Word 对象，计数并逆序排序。
-def merge_and_count(words):
-    surface_to_word = {}
-
+# 合并重复项并计数
+def merge_and_count(words, full_text_string):
+    # 去除重复项
+    words_merged = []
+    words_merged_set = set()
     for word in words:
-        if word.surface not in surface_to_word:
-            surface_to_word[word.surface] = word
-        else:
-            # 累积 count
-            existing_word = surface_to_word[word.surface]
-            existing_word.count += word.count
+        if word.surface not in words_merged_set:
+            words_merged.append(word)
+            words_merged_set.add(word.surface)
+
+    # 在原文中查找出现次数
+    for word in words_merged:
+        word.count = len(re.findall(re.escape(word.surface), full_text_string))
 
     # 将字典转换为列表，并按count逆序排序
-    sorted_words = sorted(surface_to_word.values(), key=lambda x: x.count, reverse=True)
+    words_sorted = sorted(words_merged, key=lambda x: x.count, reverse=True)
 
-    return sorted_words
+    return words_sorted
 
 # 将 Word 列表写入文件
 def write_words_to_file(words, filename, detail):
@@ -212,11 +211,26 @@ def read_data_file():
 
     return input_data_filtered
 
-# 处理第一类（汉字）词语
-async def process_first_class_words(llm, ner, input_data_splited, fulltext):
-    LogHelper.info("即将开始执行 [查找第一类词语] ...")
-    words = ner.search_for_first_class_words(input_data_splited, fulltext)
-    words = merge_and_count(words)
+# 查找 NER 实体
+async def search_for_entity(ner, full_text_lines, task_mode):
+    LogHelper.info("即将开始执行 [查找 NER 实体] ...")
+    words = ner.search_for_entity(full_text_lines, task_mode)
+    words = merge_and_count(words, "\n".join(full_text_lines))
+
+    if os.path.exists("debug.txt"):
+        words_dict = {}
+        for k, word in enumerate(words):
+            if word.ner_type not in words_dict:
+                words_dict[word.ner_type] = []
+
+            t = {}
+            t["count"] = word.count
+            t["surface"] = word.surface
+            t["ner_type"] = word.ner_type
+            words_dict[word.ner_type].append(t)
+
+        with open("words_dict.json", "w", encoding="utf-8") as file:
+            file.write(json.dumps(words_dict, indent = 4, ensure_ascii = False))
 
     # 按阈值筛选，但是保证至少有20个条目
     words_with_threshold = [word for word in words if word.count >= G.config.count_threshold]
@@ -225,30 +239,12 @@ async def process_first_class_words(llm, ner, input_data_splited, fulltext):
     words = words_with_threshold
 
     # 查找上下文
-    LogHelper.info("即将开始执行 [第一类词语查找上下文]")
-    for k, word in enumerate(words):
-        word.set_context(word.surface, fulltext)
-        LogHelper.info(f"[第一类词语查找上下文] 已完成 {k + 1} / {len(words)}")
-
-    return words
-
-# 处理第二类（片假名）词语
-async def process_second_class_words(llm, ner, input_data_splited, fulltext):
-    LogHelper.info("即将开始执行 [查找第二类词语] ...")
-    words = ner.search_for_second_class_words(input_data_splited, fulltext)
-    words = merge_and_count(words)
-
-    # 按阈值筛选，但是保证至少有20个条目
-    words_with_threshold = [word for word in words if word.count >= G.config.count_threshold]
-    words_all_filtered = [word for word in words if word not in words_with_threshold]
-    words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
-    words = words_with_threshold
-
-    # 查找上下文
-    LogHelper.info("即将开始执行 [第二类词语查找上下文]")
-    for k, word in enumerate(words):
-        word.set_context(word.surface, fulltext)
-        LogHelper.info(f"[第二类词语查找上下文] 已完成 {k + 1} / {len(words)}")
+    LogHelper.info("即将开始执行 [查找上下文] ...")
+    print()
+    for k, word in tqdm(enumerate(words), total = len(words)):
+        word.set_context(word.surface, full_text_lines)
+    print()
+    LogHelper.info("[查找上下文] 已完成 ...")
 
     return words
 
@@ -266,27 +262,16 @@ async def main():
     ner = NER()
     ner.load_blacklist("blacklist.txt")
 
-    # 切分文本
-    fulltext = read_data_file()
-    LogHelper.info("正在对文件中的文本进行预处理 ...")
-    input_data_splited = split_by_token_threshold(fulltext, SPLIT_THRESHOLD)
+    # 读取数据文件
+    full_text_lines = read_data_file()
 
-    # 获取第一类词语
-    first_class_words = []
-    if G.work_mode == 2:
-        first_class_words = await process_first_class_words(llm, ner, input_data_splited, fulltext)
-
-    # 获取第二类词语
-    second_class_words = []
-    second_class_words = await process_second_class_words(llm, ner, input_data_splited, fulltext)
-
-    # 合并各类词语表
-    words = merge_and_count(first_class_words + second_class_words)
+    # 查找 NER 实体
+    words = []
+    words = await search_for_entity(ner, full_text_lines, G.work_mode * 10)
 
     # 等待词性判断任务结果
     LogHelper.info("即将开始执行 [词性判断] ...")
     words = await llm.analyze_attribute_batch(words)
-    words = merge_and_count(words)
 
     # 筛选出类型为名词的词语
     words = [word for word in words if word.type == Word.TYPE_PERSON]
@@ -380,8 +365,8 @@ if __name__ == "__main__":
 
 
     print(f"选择工作模式：")
-    print(f"　　--> 1. 快速模式 - 只识别假名词语与混合词语（\033[92m默认\033[0m）")
-    print(f"　　--> 2. 全面模式 - 识别假名、混合词语与纯汉字词语（速度较慢，目前过滤能力有待提升，杂质较多）")
+    print(f"　　--> 1. 快速模式 - \033[92m默认\033[0m")
+    print(f"　　--> 2. 全面模式 - 速度较慢，可能识别出更多的目标词语")
     print(f"")
     work_mode = input(f"请输入选项前的数字序号选择运行模式：")
 
@@ -389,7 +374,7 @@ if __name__ == "__main__":
         work_mode = int(work_mode)
         print()
     except ValueError:
-        LogHelper.error(f"输入数字无效, 将使用\033[92m默认\033[0m模式运行 ... ")
+        LogHelper.warning(f"输入数字无效, 将使用 \033[92m默认模式\033[0m 运行 ... ")
         work_mode = 1
 
     if work_mode == 1:

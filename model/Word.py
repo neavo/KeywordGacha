@@ -30,7 +30,7 @@ class Word:
         self.context_translation = []
         self.surface = ""
         self.surface_romaji = ""
-        self.surface_translation = []
+        self.surface_translation = ["", ""]
         self.surface_translation_description = ""
         self.attribute = ""
         self.llmresponse = ""

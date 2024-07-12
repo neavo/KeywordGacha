@@ -166,7 +166,9 @@ class LLM:
                 )
             except Exception as error:
                 LogHelper.debug(error)
+                LogHelper.debug(word.surface)
                 LogHelper.debug(message.content.strip())
+                LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
                 raise error
 
             if "是" in result["person"]:
@@ -243,7 +245,9 @@ class LLM:
                 )
             except Exception as error:
                 LogHelper.debug(error)
+                LogHelper.debug(word.surface)
                 LogHelper.debug(message.content.strip())
+                LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
                 raise error
 
             word.surface_romaji = data["romaji"]
@@ -388,7 +392,10 @@ class LLM:
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
             except Exception as error:
+                LogHelper.debug(error)
+                LogHelper.debug(word.surface)
                 LogHelper.debug(message.content.strip())
+                LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
                 raise error
 
             if "是" in context_summary["person"]:
