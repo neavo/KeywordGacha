@@ -18,10 +18,10 @@ jobs:
           auto-update-conda: true
           python-version: 3.12
 
-      - name: Create and Activate
+      - name: Create and Activate ENV
         run: |
           conda create --name KeywordGacha python=3.12
-          conda conda activate KeywordGacha
+          conda activate KeywordGacha
           
       - name: Update Pip
         run: python -m pip install --upgrade pip
