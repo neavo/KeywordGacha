@@ -3,6 +3,7 @@ __pycache__
 /*.log*
 /角色姓名*
 
+/envs*
 /dist*
 /build*
 /*.spec
@@ -10,4 +11,5 @@ __pycache__
 /data*
 /debug*
 /all.orig*
+/words_dict*
 /ManualTransFile*
