@@ -18,34 +18,36 @@ jobs:
           auto-update-conda: true
           python-version: 3.12
 
-      - name: Create and Activate ENV
+      - name: Create Env
         run: |
           conda create --name KeywordGacha python=3.12
-          conda activate KeywordGacha
-          
+
       - name: Update Pip
-        run: python -m pip install --upgrade pip
+        run: |
+          # 每一个步骤都要激活环境 
+          conda activate KeywordGacha
+          python -m pip install --upgrade pip
 
       - name: Install Requirements
         run: |
+          # 每一个步骤都要激活环境 
+          conda activate KeywordGacha
           pip install -r requirements.txt
           python -m spacy download ja_core_news_lg
 
       - name: Copy Files
         run: |
-          rd /s /q dist
-          rd /s /q envs
-          xcopy "%USERPROFILE%\miniconda3\envs\KeywordGacha" "envs" /E /I /H /Y
+          xcopy "C:\Miniconda\envs\KeywordGacha" "envs" /E /I /H /Y
           
           xcopy "envs" "dist\KeywordGacha\envs" /E /I /H /Y
           xcopy "model" "dist\KeywordGacha\model" /E /I /H /Y
           xcopy "helper" "dist\KeywordGacha\helper" /E /I /H /Y
           xcopy "prompt" "dist\KeywordGacha\prompt" /E /I /H /Y
 
-          copy /y "00_启动.bat" "dist\KeywordGacha\"
-          copy /y "main.py" "dist\KeywordGacha\"
-          copy /y "config.json" "dist\KeywordGacha\"
-          copy /y "blacklist.txt" "dist\KeywordGacha\"
+          copy "00_启动.bat" "dist\KeywordGacha\"
+          copy "main.py" "dist\KeywordGacha\"
+          copy "config.json" "dist\KeywordGacha\"
+          copy "blacklist.txt" "dist\KeywordGacha\"
 
       - name: Compress Archive
         id: compress_files
