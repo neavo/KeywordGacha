@@ -1,3 +1,5 @@
 @echo off
+@chcp 65001 > nul
 
-envs\python main.py
+cd /d %~dp0
+call env\python.exe main.py

@@ -1,12 +1,10 @@
-__pycache__
-
 /*.log*
 /角色姓名*
 
-/envs*
+/env*
 /dist*
 /build*
-/*.spec
+__pycache__
 
 /data*
 /debug*
