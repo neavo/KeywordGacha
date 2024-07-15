@@ -3,23 +3,17 @@ import re
 import csv
 import json
 import asyncio
-import logging
-import traceback
-import concurrent.futures
-from collections import Counter
-from concurrent.futures import as_completed
 
-import tiktoken
-import tiktoken_ext
-from tiktoken_ext import openai_public
-from tqdm import tqdm
-from colorama import just_fix_windows_console
+import rich
+from rich.prompt import Prompt
 
 from model.LLM import LLM
 from model.NER import NER
 from model.Word import Word
 from helper.LogHelper import LogHelper
+from helper.TestHelper import TestHelper
 from helper.TextHelper import TextHelper
+from helper.ProgressHelper import ProgressHelper
 
 # 定义全局对象
 # 方便共享全局数据
@@ -73,33 +67,6 @@ def read_csv_files(directory):
         LogHelper.error(f"读取文件夹 {directory} 时出错 : {str(error)}")
 
     return input_data
-
-# 按阈值分割文本
-def split_by_token_threshold(lines, threshold):
-    tiktoken_encoding = tiktoken.get_encoding("cl100k_base")
-
-    current_size = 0
-    current_segment = []
-    lines_split_by_token = []
-
-    for line in lines:
-        line_token = len(tiktoken_encoding.encode(line))
-
-        # 如果当前段的大小加上当前行的大小超过阈值，则需要将当前段添加到结果列表中，并重置当前段
-        if current_size + line_token > threshold:
-            lines_split_by_token.append("".join(current_segment))
-            current_segment = []
-            current_size = 0
-
-        # 添加当前字符串到当前段
-        current_segment.append(line)
-        current_size += line_token
-
-    # 添加最后一段
-    if current_segment:
-        lines_split_by_token.append("".join(current_segment))
-
-    return lines_split_by_token
 
 # 合并重复项并计数
 def merge_and_count(words, full_text_string):
@@ -240,16 +207,58 @@ async def search_for_entity(ner, full_text_lines, task_mode):
 
     # 查找上下文
     LogHelper.info("即将开始执行 [查找上下文] ...")
-    print()
-    for k, word in tqdm(enumerate(words), total = len(words)):
-        word.set_context(word.surface, full_text_lines)
-    print()
+    LogHelper.print()
+
+    with ProgressHelper.get_progress() as progress:
+        pid = progress.add_task("查找上下文", total = None)
+        for k, word in enumerate(words):
+            word.set_context(word.surface, full_text_lines)
+            progress.update(pid, advance = 1, total = len(words))
+
+    LogHelper.print()
     LogHelper.info("[查找上下文] 已完成 ...")
 
     return words
 
 # 主函数
-async def main():
+async def begin():
+    # 工作模式选择
+    LogHelper.print()
+    LogHelper.print()
+    LogHelper.print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
+    LogHelper.print(f"※※※※")
+    LogHelper.print(f"※※※※  ※※  [green]KeywordGacha[/]")
+    LogHelper.print(f"※※※※  ※※  [green]https://github.com/neavo/KeywordGacha[/]")
+    LogHelper.print(f"※※※※")
+    LogHelper.print(f"※※※※")
+    LogHelper.print(f"※※※※  ※※  [green]支持 CSV、JSON、纯文本 三种输入格式[/]")
+    LogHelper.print(f"※※※※  ※※  [green]处理 JSON、纯文本文件时，请输入目标文件的路径[/]")
+    LogHelper.print(f"※※※※  ※※  [green]处理 CSV 文件时，请输入目标文件夹的路径，会读取其中所有的 CSV 文件[/]")
+    LogHelper.print(f"※※※※  ※※  [green]目录下如有 [white]data[/] 文件夹、[white]all.orig.txt[/] 文件 或者 [white]ManualTransFile.json[/] 文件，会自动选择[/]")
+    LogHelper.print(f"※※※※")
+    LogHelper.print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
+    LogHelper.print()
+    LogHelper.print()
+
+    LogHelper.print(f"选择工作模式：")
+    LogHelper.print(f"　　--> 1. 快速模式 - [green]默认[/]")
+    LogHelper.print(f"　　--> 2. 全面模式 - 速度较慢，但是可以更加全面的识别目标词语（同时杂质也较多）")
+    LogHelper.print(f"")
+    G.work_mode = int(Prompt.ask(
+        "请输入选项前的 [green]数字序号[/] 选择运行模式", 
+        choices = ["1", "2"],
+        default = "1",
+        show_choices = False,
+        show_default = False
+    ))
+    
+    if G.work_mode == 1:
+        LogHelper.info(f"您选择了 1. 快速模式 ...")
+        LogHelper.print()
+    elif G.work_mode == 2:
+        LogHelper.info(f"您选择了 2. 全面模式 ...")
+        LogHelper.print()
+
     # 初始化 LLM 对象
     llm = LLM(G.config)
     llm.load_blacklist("blacklist.txt")
@@ -273,7 +282,7 @@ async def main():
     LogHelper.info("即将开始执行 [词性判断] ...")
     words = await llm.analyze_attribute_batch(words)
 
-    # 筛选出类型为名词的词语
+    # 筛选出类型为人名的词语
     words = [word for word in words if word.type == Word.TYPE_PERSON]
 
     # 等待词义分析任务结果
@@ -311,80 +320,14 @@ async def main():
     # 等待用户推出
     os.system("pause")
 
-# 确保程序出错时可以捕捉到错误日志
-async def run_main():
-    try:
-        await main()
-    except Exception as error:
-        LogHelper.error(traceback.format_exc())
-        print()
-        print()
-        print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
-        print(f"※※※※")
-        print(f"※※※※  ※※  \033[91m出现严重错误，程序即将退出，错误信息已保存至日志文件 KeywordGacha.log ...\033[0m")
-        print(f"※※※※")
-        print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
-        print()
-        print()
-        os.system("pause")
+# 一些初始化步骤
+def init():
+   # 测试
+    if LogHelper.is_debug():
+        TestHelper.check_duplicates()
 
-# 开始运行程序
-if __name__ == "__main__":
-    # 通过 Colorama 实现在较旧的 Windows 控制台下输出彩色字符
-    just_fix_windows_console()
-
-    if os.path.exists("debug.txt"):
-        LogHelper.setLevel(logging.DEBUG)
-        
-        a = {}
-        b = {}
-
-        # 获取字典的键集合
-        keys_a = set(a.keys())
-        keys_b = set(b.keys())
-
-        # 输出重复键的数量
-        print(len(keys_a & keys_b))
-
-    print()
-    print()
-    print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
-    print(f"※※※※")
-    print(f"※※※※  ※※  \033[92mKeywordGacha\033[0m")
-    print(f"※※※※  ※※  \033[92mhttps://github.com/neavo/KeywordGacha\033[0m")
-    print(f"※※※※")
-    print(f"※※※※")
-    print(f"※※※※  ※※  \033[92m支持 CSV、JSON、纯文本 三种输入格式\033[0m")
-    print(f"※※※※  ※※  \033[92m处理 JSON、纯文本文件时，请输入目标文件的路径\033[0m")
-    print(f"※※※※  ※※  \033[92m处理 CSV 文件时，请输入目标文件夹的路径，会读取其中所有的 CSV 文件\033[0m")
-    print(f"※※※※  ※※  \033[92m目录下如有 data 文件夹、all.orig.txt 文件 或者 ManualTransFile.json 文件，会自动选择\033[0m")
-    print(f"※※※※")
-    print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
-    print()
-    print()
-
-
-    print(f"选择工作模式：")
-    print(f"　　--> 1. 快速模式 - \033[92m默认\033[0m")
-    print(f"　　--> 2. 全面模式 - 速度较慢，可能识别出更多的目标词语")
-    print(f"")
-    work_mode = input(f"请输入选项前的数字序号选择运行模式：")
-
-    try:
-        work_mode = int(work_mode)
-        print()
-    except ValueError:
-        LogHelper.warning(f"输入数字无效, 将使用 \033[92m默认模式\033[0m 运行 ... ")
-        work_mode = 1
-
-    if work_mode == 1:
-        LogHelper.info(f"您选择了 1. 快速模式 ...")
-        print()
-    elif work_mode == 2:
-        LogHelper.info(f"您选择了 2. 全面模式 ...")
-        print()
-
-    G.work_mode = work_mode
+    # 注册全局异常追踪器
+    rich.traceback.install()
 
     # 加载配置文件
     try:
@@ -401,9 +344,23 @@ if __name__ == "__main__":
     except json.JSONDecodeError:
         LogHelper.error(f"文件 {config_file} 不是有效的JSON格式.")
 
-    # 检查 DEBUG 模式
-    if os.path.exists("debug.txt"):
-        LogHelper.setLevel(logging.DEBUG)
+# 确保程序出错时可以捕捉到错误日志
+async def main():
+    try:
+        init()
+        await begin()
+    except EOFError:
+        LogHelper.error(f"EOFError - 程序即将退出 ...")
+    except KeyboardInterrupt:
+        LogHelper.error(f"KeyboardInterrupt - 程序即将退出 ...")
+    except Exception as e:
+        LogHelper.error(f"{LogHelper.get_trackback(e)}")
+        LogHelper.print()
+        LogHelper.print()
+        LogHelper.error(f"出现严重错误，程序即将退出，错误信息已保存至日志文件 [green]KeywordGacha.log[/] ...")
+        LogHelper.print()
+        LogHelper.print()
+        os.system("pause")
 
-    # 开始业务逻辑
-    asyncio.run(run_main())
+if __name__ == "__main__":
+    asyncio.run(main())

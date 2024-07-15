@@ -1,71 +1,59 @@
+import os
 import re
 import logging
+import traceback
+
 from logging.handlers import RotatingFileHandler
 
-class ColorStreamHandler(logging.StreamHandler):
-
-    LEVEL_NAME = [
-        " [DEBUG] ",
-        " [INFO] ",
-        " [WARNING] ",
-        " [ERROR] ",
-        " [CRITICAL] ",      
-    ]
-
-    COLOR_LEVEL_NAME = [
-        " [\033[94mDEBUG\033[0m] ",         # 蓝色
-        " [\033[92mINFO\033[0m] ",          # 绿色
-        " [\033[93mWARNING\033[0m] ",       # 黄色
-        " [\033[91mERROR\033[0m] ",         # 红色
-        " [\033[1;95mCRITICAL\033[0m] ",    # 亮品红色     
-    ]
-
-    def emit(self, record):
-        message = self.format(record)
-
-        for k, v in enumerate(self.LEVEL_NAME):
-            if v in message:
-                # message = message.replace(v, self.COLOR_LEVEL_NAME[k])
-                message = re.sub(re.escape(v), self.COLOR_LEVEL_NAME[k], message, count = 1)
-                break
-
-        print(message)
+from rich.console import Console
+from rich.logging import RichHandler
 
 class LogHelper:
     # 创建一个logger
     logger = logging.getLogger("KeywordGacha")
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG if os.path.exists("debug.txt") else logging.INFO)
 
     # 创建一个handler
     file_handler = RotatingFileHandler(
-                        filename = "KeywordGacha.log",
-                        encoding = "utf-8",
-                        maxBytes = 1 * 1024 * 1024, 
-                        backupCount = 1
-                    )
-    console_handler = ColorStreamHandler()
+        filename = "KeywordGacha.log",
+        encoding = "utf-8",
+        maxBytes = 2 * 1024 * 1024, 
+        backupCount = 1
+    )
 
     # 定义输出格式
     file_handler_formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    console_handler_formatter = logging.Formatter(
-        "[%(asctime)s] [%(levelname)s] %(message)s",
-        datefmt="%H:%M:%S",
+        datefmt = "%Y-%m-%d %H:%M:%S",
     )
 
     # 设置输出格式
     file_handler.setFormatter(file_handler_formatter)
-    console_handler.setFormatter(console_handler_formatter)
 
     # 给logger添加handler
     logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    logger.addHandler(RichHandler(
+        markup = True,
+        show_path = False,
+        rich_tracebacks = True,
+        log_time_format = "[%X]",
+        omit_repeated_times = False
+    ))
+
+    # 注册全局控制台实例
+    console = Console(highlight = False)
 
     @staticmethod
-    def setLevel(level):
-        return LogHelper.logger.setLevel(level)
+    def print(*args):
+        return LogHelper.console.print(*args)
+
+    @staticmethod
+    def is_debug():
+        return os.path.exists("debug.txt")
+
+    @staticmethod
+    def get_trackback(e):
+        return f"\n{("".join(traceback.format_exception(None, e, e.__traceback__))).strip()}"
 
     @staticmethod
     def debug(message):

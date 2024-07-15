@@ -2,11 +2,11 @@ import re
 import json
 
 import spacy
-from tqdm import tqdm
 
 from model.Word import Word
 from helper.LogHelper import LogHelper
 from helper.TextHelper import TextHelper
+from helper.ProgressHelper import ProgressHelper
 
 class NER:
 
@@ -74,7 +74,8 @@ class NER:
     def __init__(self):
         self.blacklist = ""
         self.tokenizer = spacy.load(
-            "ja_core_news_lg",
+            # "ja_core_news_lg",
+            "resource\\kg_ner_ja",
             exclude = [
                 "parser",
                 "tok2vec",
@@ -92,38 +93,42 @@ class NER:
                 self.blacklist = ""
                 for k, v in enumerate(data):
                     self.blacklist = self.blacklist + v + "\n"
-        except Exception as error:
-            LogHelper.error(f"加载配置文件时发生错误 - {error}")
+        except Exception as e:
+            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 查找 NER 实体 
     def search_for_entity(self, full_text_lines, task_mode):
         words = []
 
-        print()
-        for doc in tqdm(self.tokenizer.pipe(full_text_lines, n_process = self.SPACY_N_PROCESS, batch_size = self.SPACY_BACTH_SIZE), total = len(full_text_lines)):
-            for token in doc:
-                word = Word()
-                word.count = 1
-                word.surface = token.lemma_
-                word.ner_type = token.ent_type_
+        LogHelper.print()
+        with ProgressHelper.get_progress() as progress:
+            pid = progress.add_task("查找 NER 实体", total = None)
+            for doc in self.tokenizer.pipe(full_text_lines, n_process = self.SPACY_N_PROCESS, batch_size = self.SPACY_BACTH_SIZE):
+                for token in doc:
+                    word = Word()
+                    word.count = 1
+                    word.surface = token.lemma_
+                    word.ner_type = token.ent_type_
 
-                # 判断词性
-                if not word.ner_type in self.NER_TYPES[task_mode]:
-                    continue
+                    # 判断词性
+                    if not word.ner_type in self.NER_TYPES[task_mode]:
+                        continue
 
-                # 移除纯汉字词
-                # if TextHelper.is_all_cjk(word.surface):
-                #     continue
+                    # 移除纯汉字词
+                    # if TextHelper.is_all_cjk(word.surface):
+                    #     continue
 
-                # 移除首尾标点符号
-                word.surface = TextHelper.strip_punctuation(word.surface)
+                    # 移除首尾标点符号
+                    word.surface = TextHelper.strip_punctuation(word.surface)
 
-                # 有效性检查
-                if not TextHelper.is_valid_japanese_word(word.surface, self.blacklist):
-                    continue
+                    # 有效性检查
+                    if not TextHelper.is_valid_japanese_word(word.surface, self.blacklist):
+                        continue
 
-                words.append(word)
-        print()
+                    words.append(word)
+
+                progress.update(pid, advance = 1, total = len(full_text_lines))
+        LogHelper.print()
         LogHelper.info(f"[查找 NER 实体] 已完成 ...")
 
         return words

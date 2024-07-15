@@ -2,9 +2,9 @@
     "api_key": "sk-no-key-required",
     "base_url": "http://localhost:8080/v1",
     "model_name": "glm-4-9b-chat",
-    "max_workers": 4,
-    "count_threshold": 10,
+    "count_threshold": 3,
     "request_timeout": 120,
+    "request_frequency_threshold": 1,
     "translate_surface_mode": 1,
     "translate_context_mode": 1
 }

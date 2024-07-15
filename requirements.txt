@@ -1,8 +1,8 @@
-tqdm
+rich
 openai
 tiktoken
-colorama
+AsyncLimiter
 
 wheel
 setuptools
-spacy
+spacy[ja]
