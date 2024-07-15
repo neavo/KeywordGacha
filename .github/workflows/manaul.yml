@@ -11,28 +11,20 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          
+                 
       - name: Create Env
         run: |
-          python -m venv env
-
-      - name: Update Pip
-        run: |
-          # 每一个步骤都要激活环境 
-          env\Scripts\activate
-          python -m pip install --upgrade pip
+          powershell -Command "Expand-Archive -Path 'resource\WinPython64.zip' -DestinationPath 'env'"
 
       - name: Install Requirements
         run: |
-          # 每一个步骤都要激活环境 
-          env\Scripts\activate
-          pip install -r requirements.txt
-          python -m spacy download ja_core_news_lg
+          # 激活虚拟环境（每一步都要激活） 
+          call env\scripts\activate
+
+          @REM 安装依赖
+          call pip install --upgrade pip
+          call pip install -r requirements.txt
+          call python -m spacy download ja_core_news_lg
 
       - name: Copy Files
         run: |          

@@ -1,21 +1,28 @@
 @echo off
 @chcp 65001 > nul
 
-    call python -m venv env
-    call env\Scripts\activate
+    @REM 重置虚拟环境
+    rd /S /Q "env"
+    rd /S /Q "dist"
+    powershell -Command "Expand-Archive -Path 'resource\WinPython64.zip' -DestinationPath 'env'"
 
-    call python -m pip install --upgrade pip
+    @REM 激活虚拟环境
+    call env\scripts\activate
+
+    @REM 安装依赖
+    call pip install --upgrade pip
     call pip install -r requirements.txt
     call python -m spacy download ja_core_news_lg
 
-    @REM xcopy "env" "dist\KeywordGacha\env" /E /I /H /Y
-    @REM xcopy "model" "dist\KeywordGacha\model" /E /I /H /Y
-    @REM xcopy "helper" "dist\KeywordGacha\helper" /E /I /H /Y
-    @REM xcopy "prompt" "dist\KeywordGacha\prompt" /E /I /H /Y
+    @REM 打包步骤
+    xcopy "env" "dist\KeywordGacha\env" /E /I /H /Y
+    xcopy "model" "dist\KeywordGacha\model" /E /I /H /Y
+    xcopy "helper" "dist\KeywordGacha\helper" /E /I /H /Y
+    xcopy "prompt" "dist\KeywordGacha\prompt" /E /I /H /Y
 
-    @REM copy "00_启动.bat" "dist\KeywordGacha\"
-    @REM copy "main.py" "dist\KeywordGacha\"
-    @REM copy "config.json" "dist\KeywordGacha\"
-    @REM copy "blacklist.txt" "dist\KeywordGacha\"
+    copy "00_启动.bat" "dist\KeywordGacha\"
+    copy "main.py" "dist\KeywordGacha\"
+    copy "config.json" "dist\KeywordGacha\"
+    copy "blacklist.txt" "dist\KeywordGacha\"
 
-    call deactivate
+pause

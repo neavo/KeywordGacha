@@ -1,5 +1,5 @@
 @echo off
+@chcp 65001 > nul
 
-call env\Scripts\activate
-call python main.py
-call deactivate
+    call env\scripts\activate
+    call python main.py

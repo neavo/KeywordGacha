@@ -1,4 +1,4 @@
 @echo off
 @chcp 65001 > nul
 
-    call env\Scripts\activate
+    call env\scripts\activate
