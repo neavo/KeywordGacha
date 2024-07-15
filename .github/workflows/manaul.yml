@@ -10,14 +10,13 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
-
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          auto-update-conda: true
-          python-version: 3.12
-
+          python-version: "3.12"
+          
       - name: Create Env
         run: |
           python -m venv env
