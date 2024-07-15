@@ -20,26 +20,24 @@ jobs:
 
       - name: Create Env
         run: |
-          conda create --name KeywordGacha python=3.12
+          python -m venv env
 
       - name: Update Pip
         run: |
           # 每一个步骤都要激活环境 
-          conda activate KeywordGacha
+          env\Scripts\activate
           python -m pip install --upgrade pip
 
       - name: Install Requirements
         run: |
           # 每一个步骤都要激活环境 
-          conda activate KeywordGacha
+          env\Scripts\activate
           pip install -r requirements.txt
           python -m spacy download ja_core_news_lg
 
       - name: Copy Files
-        run: |
-          xcopy "C:\Miniconda\envs\KeywordGacha" "envs" /E /I /H /Y
-          
-          xcopy "envs" "dist\KeywordGacha\envs" /E /I /H /Y
+        run: |          
+          xcopy "env" "dist\KeywordGacha\env" /E /I /H /Y
           xcopy "model" "dist\KeywordGacha\model" /E /I /H /Y
           xcopy "helper" "dist\KeywordGacha\helper" /E /I /H /Y
           xcopy "prompt" "dist\KeywordGacha\prompt" /E /I /H /Y
