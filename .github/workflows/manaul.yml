@@ -21,7 +21,7 @@ jobs:
           # 激活虚拟环境（每一步都要激活） 
           call env\scripts\activate
 
-          @REM 安装依赖
+          # 安装依赖
           call pip install --upgrade pip
           call pip install -r requirements.txt
           call python -m spacy download ja_core_news_lg
