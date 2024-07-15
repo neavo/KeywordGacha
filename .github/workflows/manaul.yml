@@ -16,15 +16,17 @@ jobs:
         run: |
           powershell -Command "Expand-Archive -Path 'resource\WinPython64.zip' -DestinationPath 'env'"
 
-      - name: Install Requirements
+      - name: Install Requirements Step.01
         run: |
-          # 激活虚拟环境（每一步都要激活） 
-          env\scripts\activate
+          env\scripts\python.bat -m pip install --upgrade pip
 
-          # 安装依赖
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          python -m spacy download ja_core_news_lg
+      - name: Install Requirements Step.02
+        run: |
+          env\scripts\python.bat -m pip install -r requirements.txt
+
+      - name: Install Requirements Step.03
+        run: |
+          env\scripts\python.bat -m spacy download ja_core_news_lg
 
       - name: Copy Files
         run: |          

@@ -1,5 +1,4 @@
 @echo off
 @chcp 65001 > nul
 
-    call env\scripts\activate
-    call python main.py
+    call env\scripts\python.bat main.py
