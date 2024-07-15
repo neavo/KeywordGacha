@@ -1,3 +1,5 @@
 @echo off
 
-envs\python main.py
+call env\Scripts\activate
+call python main.py
+call deactivate
