@@ -6,13 +6,11 @@
     rd /S /Q "dist"
     powershell -Command "Expand-Archive -Path 'resource\WinPython64.zip' -DestinationPath 'env'"
 
-    @REM 激活虚拟环境
-    call env\scripts\activate
-
     @REM 安装依赖
-    call pip install --upgrade pip
-    call pip install -r requirements.txt
-    call python -m spacy download ja_core_news_lg
+    @REM 不加 call 的话，一次只能执行一步
+    call env\scripts\python.bat -m pip install --upgrade pip
+    call env\scripts\python.bat -m pip install -r requirements.txt
+    call env\scripts\python.bat -m spacy download ja_core_news_lg
 
     @REM 打包步骤
     xcopy "env" "dist\KeywordGacha\env" /E /I /H /Y
