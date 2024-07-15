@@ -1,7 +1,7 @@
 rich
 openai
 tiktoken
-AsyncLimiter
+aiolimiter
 
 wheel
 setuptools
