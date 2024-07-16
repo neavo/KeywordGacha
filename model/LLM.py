@@ -65,10 +65,13 @@ class LLM:
 
         # 请求限制器
         if config.request_frequency_threshold > 1:
+            self.semaphore = asyncio.Semaphore(config.request_frequency_threshold)
             self.async_limiter = AsyncLimiter(max_rate = config.request_frequency_threshold, time_period = 1)
         elif config.request_frequency_threshold > 0:
+            self.semaphore = asyncio.Semaphore(1)
             self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1 / config.request_frequency_threshold)
         else:
+            self.semaphore = asyncio.Semaphore(1)
             self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
 
         # 初始化OpenAI客户端
@@ -151,7 +154,7 @@ class LLM:
 
     # 词性判断任务
     async def analyze_attribute(self, word, retry):
-        async with self.async_limiter:
+        async with self.semaphore, self.async_limiter:
             prompt = self.prompt_analyze_attribute.replace("{surface}", word.surface)
             task_type = self.TASK_TYPE_ANALYZE_ATTRIBUTE
             usage, message, llmresponse = await self.request(prompt, "\n".join(word.context), task_type, retry)
@@ -234,7 +237,7 @@ class LLM:
 
     # 词语翻译任务
     async def translate_surface(self, word, retry):
-        async with self.async_limiter:
+        async with self.semaphore, self.async_limiter:
             prompt = self.prompt_translate_surface.replace("{attribute}", word.attribute)
             task_type = self.TASK_TYPE_TRANSLATE_SURFACE
             usage, message, llmresponse = await self.request(prompt, word.surface, task_type, retry)
@@ -310,7 +313,7 @@ class LLM:
 
     # 上下文翻译任务
     async def translate_context(self, word, retry):
-        async with self.async_limiter:
+        async with self.semaphore, self.async_limiter:
             context_translation = []
             prompt = self.prompt_translate_context
             task_type = self.TASK_TYPE_TRANSLATE_CONTEXT
@@ -382,7 +385,7 @@ class LLM:
 
     # 语义分析任务 
     async def summarize_context(self, word, retry):
-        async with self.async_limiter:
+        async with self.semaphore, self.async_limiter:
             prompt = self.prompt_summarize_context.replace("{surface}", word.surface)
             task_type = self.TASK_TYPE_SUMMAIRZE_CONTEXT
             usage, message, llmresponse = await self.request(prompt, "\n".join(word.context), task_type, retry)
