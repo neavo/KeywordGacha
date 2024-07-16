@@ -5,6 +5,8 @@ import json
 import asyncio
 
 import rich
+from rich import box
+from rich.table import Table
 from rich.prompt import Prompt
 
 from model.LLM import LLM
@@ -220,32 +222,42 @@ async def search_for_entity(ner, full_text_lines, task_mode):
 
     return words
 
+# 打印应用信息
+def print_app_info():
+    LogHelper.print()
+    LogHelper.print()
+    LogHelper.rule(f"KeywordGacha", style = "light_goldenrod2")
+    LogHelper.rule(f"[blue]https://github.com/neavo/KeywordGacha", style = "light_goldenrod2")
+    LogHelper.rule(f"使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等任意文本中的词汇表的翻译辅助工具", style = "light_goldenrod2")
+    LogHelper.print()
+
+    table = Table(box = box.ASCII2, expand = True, highlight = True, show_lines = True, border_style = "light_goldenrod2")
+    table.add_column("设置", justify = "left", style = "white", width = 24,overflow = "fold")
+    table.add_column("当前值", justify = "left", style = "white", width = 24, overflow = "fold")
+    table.add_column("说明信息 - 修改设置请打开 [blue]Config.json[/] 文件", justify = "left", style = "white", overflow = "fold")
+
+    table.add_row("api_key", str(G.config.api_key), "授权密钥，从接口平台方获取，使用在线接口时一定要设置正确")
+    table.add_row("base_url", str(G.config.base_url), "请求地址，从接口平台方获取，使用在线接口时一定要设置正确")
+    table.add_row("model_name", str(G.config.model_name), "模型名称，从接口平台方获取，使用在线接口时一定要设置正确")
+    table.add_row("count_threshold", str(G.config.count_threshold), "出现次数低于此值的词语会被过滤掉，调低它可以抓取更多低频词语")
+    table.add_row("translate_surface_mode", str(G.config.translate_surface_mode), "是否启用词语翻译功能，0 - 禁用，1 - 启用")
+    table.add_row("translate_context_mode", str(G.config.translate_context_mode), "是否启用上下文翻译功能，0 - 禁用，1 - 启用")
+    table.add_row("request_timeout", str(G.config.request_timeout), "网络请求超时时间（秒）如果频繁出现网络错误，可以调大这个值")
+    table.add_row("request_frequency_threshold", str(G.config.request_frequency_threshold), "网络请求频率阈值（次/秒，可以小于 1）\n如果频繁出现网络错误，特别是使用中转平台时，可以调小这个值")
+
+    LogHelper.print(table)
+    LogHelper.print()
+
 # 主函数
 async def begin():
-    # 工作模式选择
-    LogHelper.print()
-    LogHelper.print()
-    LogHelper.print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
-    LogHelper.print(f"※※※※")
-    LogHelper.print(f"※※※※  ※※  [green]KeywordGacha[/]")
-    LogHelper.print(f"※※※※  ※※  [green]https://github.com/neavo/KeywordGacha[/]")
-    LogHelper.print(f"※※※※")
-    LogHelper.print(f"※※※※")
-    LogHelper.print(f"※※※※  ※※  [green]支持 CSV、JSON、纯文本 三种输入格式[/]")
-    LogHelper.print(f"※※※※  ※※  [green]处理 JSON、纯文本文件时，请输入目标文件的路径[/]")
-    LogHelper.print(f"※※※※  ※※  [green]处理 CSV 文件时，请输入目标文件夹的路径，会读取其中所有的 CSV 文件[/]")
-    LogHelper.print(f"※※※※  ※※  [green]目录下如有 [white]data[/] 文件夹、[white]all.orig.txt[/] 文件 或者 [white]ManualTransFile.json[/] 文件，会自动选择[/]")
-    LogHelper.print(f"※※※※")
-    LogHelper.print(f"※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※")
-    LogHelper.print()
-    LogHelper.print()
+    # 打印应用信息
+    print_app_info()
 
     LogHelper.print(f"选择工作模式：")
     LogHelper.print(f"　　--> 1. 快速模式 - [green]默认[/]")
-    LogHelper.print(f"　　--> 2. 全面模式 - 速度较慢，但是可以更加全面的识别目标词语（同时杂质也较多）")
+    LogHelper.print(f"　　--> 2. 全面模式 - 速度较慢，但是可以更加强力的识别目标词语（同时杂质也较多）")
     LogHelper.print(f"")
-    G.work_mode = int(Prompt.ask(
-        "请输入选项前的 [green]数字序号[/] 选择运行模式", 
+    G.work_mode = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 选择运行模式", 
         choices = ["1", "2"],
         default = "1",
         show_choices = False,
@@ -292,9 +304,9 @@ async def begin():
     # 筛选出类型为人名的词语
     words = [word for word in words if word.type == Word.TYPE_PERSON]
 
-    # 等待翻译词汇任务结果
+    # 等待翻译词语任务结果
     if G.config.translate_surface_mode == 1:
-        LogHelper.info("即将开始执行 [词汇翻译] ...")
+        LogHelper.info("即将开始执行 [词语翻译] ...")
         words = await llm.translate_surface_batch(words)
 
     # 等待上下文词表任务结果
