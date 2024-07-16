@@ -77,7 +77,7 @@ class LLM:
         # 初始化OpenAI客户端
         self.openai_handler = AsyncOpenAI(
             api_key = self.api_key,
-            base_url = self.base_url,
+            base_url = self.base_url if self.base_url.endswith("/v1") else self.base_url + "/v1",
             timeout = config.request_timeout,
             max_retries = 0
         )
@@ -162,29 +162,25 @@ class LLM:
             if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
                 raise Exception("usage.completion_tokens >= MAX_TOKENS")
 
-            result = message.content.strip()
-
             try:
                 result = json.loads(
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
-            except Exception as error:
-                LogHelper.debug(error)
-                LogHelper.debug(word.surface)
+            except Exception as e:
+                LogHelper.debug(f"{e} + {LogHelper.get_trackback(e)}")
                 LogHelper.debug(message.content.strip())
                 LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
-                raise error
+                raise e
 
             if any(v in ["是", "は"] for v in result["character_name"]):
                 word.type = Word.TYPE_PERSON
-                LogHelper.debug(f"{word.surface} - {message.content.strip()}")
+                LogHelper.debug(f"{word.surface} - {result}")
             elif "否" in result["character_name"]:
                 word.type = Word.TYPE_NOT_PERSON
                 LogHelper.info(f"[词性判断] 已剔除 - {word.surface} - {result}")
             else:
-                raise Exception(result["character_name"])
+                raise Exception(f"不正确的返回值 - {word.surface} - {result["character_name"]}")
             
-
             return word
 
     # 词性判断任务完成时的回调
@@ -193,8 +189,8 @@ class LLM:
             word = future.result()
             words_successed.append(word)
             LogHelper.info(f"[词性判断] 已完成 {len(words_successed)} / {len(words)} ...")       
-        except Exception as error:
-            LogHelper.warning(f"[词性判断] 子任务执行失败，稍后将重试 ... {error}")
+        except Exception as e:
+            LogHelper.warning(f"[词性判断] 子任务执行失败，稍后将重试 ... {e}")
 
     # 批量执行词性判断任务的具体实现
     async def do_analyze_attribute_batch(self, words, words_failed, words_successed):
@@ -386,29 +382,28 @@ class LLM:
 
             if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
                 raise Exception("usage.completion_tokens >= MAX_TOKENS")
-
+    
             try:
-                context_summary = json.loads(
+                result = json.loads(
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
-            except Exception as error:
-                LogHelper.debug(error)
-                LogHelper.debug(word.surface)
+            except Exception as e:
+                LogHelper.debug(f"{e} + {LogHelper.get_trackback(e)}")
                 LogHelper.debug(message.content.strip())
                 LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
-                raise error
+                raise e
 
-            if any(v in ["是", "は"] for v in context_summary["character_name"]):
+            if any(v in ["是", "は"] for v in result["character_name"]):
                 word.type = Word.TYPE_PERSON
-                LogHelper.debug(f"{word.surface} - {message.content.strip()}")
-            elif "否" in context_summary["character_name"]:
+                LogHelper.debug(f"{word.surface} - {result}")
+            elif "否" in result["character_name"]:
                 word.type = Word.TYPE_NOT_PERSON
-                LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {message.content.strip()}")
+                LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
             else:
-                raise Exception(context_summary["character_name"])
+                raise Exception(f"不正确的返回值 - {word.surface} - {result["character_name"]}")
 
-            word.attribute = context_summary["sex"]
-            word.context_summary = context_summary
+            word.attribute = result["sex"]
+            word.context_summary = result
 
             return word
 
