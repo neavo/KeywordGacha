@@ -13,9 +13,9 @@
 - 极大的提升 小说、漫画、字幕、游戏脚本 等内容译前准备时制作统一词汇表的工作效率
 - 随机选取 [绿站榜单作品](https://books.fishhawk.top) 作为测试样本，与人工校对制作的词表对比，命中率约为 `80%-90%`
 
-> <img src="image/01.jpg" style="width: 75%;" alt="image/01.jpg">
+> <img src="image/01.jpg" style="width: 80%;" alt="image/01.jpg">
 
-> <img src="image/02.jpg" style="width: 75%;" alt="image/02.jpg">
+> <img src="image/02.jpg" style="width: 80%;" alt="image/02.jpg">
   
 ## 要求 🖥️
 - 需要一个兼容 OpenAI 格式的大语言模型接口
@@ -39,7 +39,12 @@
 - 注意：受限于性能与开发资源，使用本地模型时，开发者仅能保证与 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 的兼容性
 - 如果您计划使用本地模型，请务必严格按照 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 页面描述的步骤进行部署
 
-## 近期更新
+## 近期更新 📅
+- 20240716
+  - 调整 - 继续优化抓取能力
+  - 调整 - 一些样式和兼容性调整
+  - 新增 - 网络请求频率阈值 设置选项
+
 - 20240712
   - 调整 - 使用了新的 NER 分词前端，处理速度和命中率有了显著的提升
     - 随机选取 [绿站榜单作品](https://books.fishhawk.top) 作为测试样本，与人工校对制作的词表对比
@@ -56,10 +61,6 @@
 - 20240708
   - 调整 显著的提升了 `本地模型` 对角色信息的提取、汇总能力
   - 调整 本地模型调整为 [GLM4-9B-Chat-GGUF](https://github.com/neavo/KeywordGachaServer)，请务必与客户端同步更新
-
-- 20240706
-  - 新增 智能总结 功能
-  - 新增 重复词根检测 功能
 
 ## 文本格式 🆗
 - 
@@ -96,28 +97,24 @@
 
 ## 设置说明 🎚️
 
-  ```json
-    {
-        "api_key": "sk-no-key-required", // 你所使用 API 接口的密钥，从接口平台方获取，默认为本地接口
-        "base_url": "译文http://localhost:8080/v1", // 你所使用 API 接口的地址，从接口平台方获取，默认为本地接口
-        "model_name": "qwen2-7b-instruct", // 你所使用 API 接口的模型名称，从接口平台方获取，默认为本地接口
+```json
+"api_key" : "授权密钥，从接口平台方获取，使用在线接口时一定要设置正确"
+"base_url" : "请求地址，从接口平台方获取，使用在线接口时一定要设置正确"
+"model_name" : "模型名称，从接口平台方获取，使用在线接口时一定要设置正确"
+"count_threshold" : "出现次数低于此值的词语会被过滤掉，调低它可以抓取更多低频词语"
+"translate_surface_mode" : "是否启用词语翻译功能，0 - 禁用，1 - 启用"
+"translate_context_mode" : "是否启用上下文翻译功能，0 - 禁用，1 - 启用"
+"request_timeout" : "网络请求超时时间（秒）如果频繁出现网络错误，可以调大这个值"
+"request_frequency_threshold" : "网络请求频率阈值（次/秒，可以小于 1）。如果频繁出现网络错误，特别是使用中转平台时，可以调小这个值"
+```
 
-        "max_workers": 4, // 网络请求等任务并发执行的最大数量，如果频繁出现网络错误，可以调小这个值
-        "count_threshold": 10, // 词语出现次数的筛选阈值，调低这个值可以获得更多低频词语
-        "request_timeout": 120, // 网络请求的超时时间，如果频繁出现网络错误，可以调大这个值
-
-        "translate_surface_mode": "1", // 是否翻译词汇，设为 0 可以跳过此步骤，以节约 Token 与 时间
-        "translate_context_mode": "1", // 是否翻译上下文，设为 0 可以跳过此步骤，以极大的节约 Token 与 时间
-    }
-  ```
-
-## 语言能力 🗣️
+## 语言能力 🔎
 
 - 较新的模型比如 [GPT4o](https://chatgpt.com/)、[Claude 3.5 Sonnet](https://claude.ai/) 等具有超乎想象多语言能力，但是也十分昂贵
 - ~~[Qwen2](https://github.com/QwenLM/Qwen2) 在处理中文的表现上称得上优秀，处理日文水平也算堪用，7B 版本只需要 8G 显存，推荐使用~~
 - 在 KG 的应用情境下，[GLM4-9B-Chat-GGUF](https://huggingface.co/second-state/glm-4-9b-chat-GGUF) 不论是语言水平还是逻辑能力，在 8G 以内显存可以使用的模型中都具有显著的优势
 
-## 开发计划 🎢
+## 开发计划 📈
 
 - [x] 支持 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的 CSV 文本
 - [ ] 添加 对 组织、道具、地域 等其他名词类型的支持
@@ -127,9 +124,5 @@
 - [ ] 添加 全自动生成模式
 
 ## 问题反馈 😥
-  - 运行时的日志保存在程序目录下的 `KeywordGacha.log` `KeywordGacha.log.1` 等文件
+  - 运行时的日志保存在程序目录下的 `KeywordGacha.log` 等日志文件内
   - 反馈问题的时候请附上这些日志文件
-
-## 友情提醒 💰
-  - KG 会将 `全部的文本` 发送至 AI 进行处理，这个过程会消耗大量的 Token
-  - 如使用在线接口，请关注你的账单！
