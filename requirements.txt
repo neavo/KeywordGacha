@@ -1,4 +1,5 @@
 rich
+loguru
 openai
 tiktoken
 aiolimiter

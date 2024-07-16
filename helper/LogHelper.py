@@ -1,37 +1,15 @@
 import os
-import re
 import logging
 import traceback
 
-from logging.handlers import RotatingFileHandler
-
+from loguru import logger as LoguruLogger
 from rich.console import Console
 from rich.logging import RichHandler
 
 class LogHelper:
-    # 创建一个logger
+    # 控制台日志实例
     logger = logging.getLogger("KeywordGacha")
     logger.setLevel(logging.DEBUG if os.path.exists("debug.txt") else logging.INFO)
-
-    # 创建一个handler
-    file_handler = RotatingFileHandler(
-        filename = "KeywordGacha.log",
-        encoding = "utf-8",
-        maxBytes = 2 * 1024 * 1024, 
-        backupCount = 1
-    )
-
-    # 定义输出格式
-    file_handler_formatter = logging.Formatter(
-        "[%(asctime)s] [%(levelname)s] %(message)s",
-        datefmt = "%Y-%m-%d %H:%M:%S",
-    )
-
-    # 设置输出格式
-    file_handler.setFormatter(file_handler_formatter)
-
-    # 给logger添加handler
-    logger.addHandler(file_handler)
     logger.addHandler(RichHandler(
         markup = True,
         show_path = False,
@@ -40,12 +18,25 @@ class LogHelper:
         omit_repeated_times = False
     ))
 
-    # 注册全局控制台实例
+    # 全局文件日志实例
+    LoguruLogger.remove(0)
+    LoguruLogger.add(
+        "KeywordGacha.log",
+        delay = True,
+        level = "DEBUG" if os.path.exists("debug.txt") else "INFO",
+        format = "[{time:YYYY-MM-DD HH:mm:ss}] [{level}] {message}",
+        enqueue = True,
+        encoding = "utf-8",
+        rotation = "1 MB",
+        retention = 3
+    )
+
+    # 全局控制台实例
     console = Console(highlight = False)
 
     @staticmethod
     def print(*args):
-        return LogHelper.console.print(*args)
+        LogHelper.console.print(*args)
 
     @staticmethod
     def is_debug():
@@ -53,24 +44,29 @@ class LogHelper:
 
     @staticmethod
     def get_trackback(e):
-        return f"\n{("".join(traceback.format_exception(None, e, e.__traceback__))).strip()}"
+        f"\n{("".join(traceback.format_exception(None, e, e.__traceback__))).strip()}"
 
     @staticmethod
     def debug(message):
-        return LogHelper.logger.debug(message)
+        LoguruLogger.debug(message)
+        LogHelper.logger.debug(message)
 
     @staticmethod
     def info(message):
-        return LogHelper.logger.info(message)
+        LoguruLogger.info(message)
+        LogHelper.logger.info(message)
 
     @staticmethod
     def warning(message):
-        return LogHelper.logger.warning(message)
+        LoguruLogger.warning(message)
+        LogHelper.logger.warning(message)
 
     @staticmethod
     def error(message):
-        return LogHelper.logger.error(message)
+        LoguruLogger.error(message)
+        LogHelper.logger.error(message)
 
     @staticmethod
     def critical(message):
-        return LogHelper.logger.critical(message)
+        LoguruLogger.critical(message)
+        LogHelper.logger.critical(message)
