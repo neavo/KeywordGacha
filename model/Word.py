@@ -58,8 +58,8 @@ class Word:
             with self.CONTEXT_CACHE_LOCK:
                 self.context = Word.CONTEXT_CACHE.get(surface)
         else:
-            # 匹配原文
-            matches = [line.strip() for line in original if surface in line]
+            # 匹配原文，并且移除行内换行
+            matches = [re.sub(r'[\r\n]+', '', line.strip()) for line in original if surface in line]
             
             # 使用OrderedDict去除重复并保持顺序
             unique_matches = list(OrderedDict.fromkeys(matches))

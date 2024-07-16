@@ -323,12 +323,6 @@ class LLM:
                 raise Exception("usage.completion_tokens >= MAX_TOKENS")
             
             for k, line in enumerate(message.content.split("\n")):
-                # 比之前稍微好了一点，但是还是很丑陋
-                line = line.replace("\n", "")
-                line = re.sub(r"(第.行)?翻译文本：?", "", line)
-                line = re.sub(r"第.行：?", "", line)
-                line = line.strip()                
-
                 if len(line) > 0:
                     context_translation.append(line)
 
