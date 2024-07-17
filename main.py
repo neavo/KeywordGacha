@@ -181,9 +181,13 @@ def read_data_file():
     return input_data_filtered
 
 # 查找 NER 实体
-async def search_for_entity(ner, full_text_lines, task_mode):
+def search_for_entity(ner, full_text_lines, task_mode):
     LogHelper.info("即将开始执行 [查找 NER 实体] ...")
-    words = ner.search_for_entity(full_text_lines, task_mode)
+
+    if task_mode == NER.TASK_MODES.QUICK:
+        words = ner.search_for_entity_qucik(full_text_lines)
+    elif task_mode == NER.TASK_MODES.ACCURACY:
+        words = ner.search_for_entity_accuracy(full_text_lines)
     words = merge_and_count(words, "\n".join(full_text_lines))
 
     if os.path.exists("debug.txt"):
@@ -193,6 +197,7 @@ async def search_for_entity(ner, full_text_lines, task_mode):
                 words_dict[word.ner_type] = []
 
             t = {}
+            t["score"] = float(word.score)
             t["count"] = word.count
             t["surface"] = word.surface
             t["ner_type"] = word.ner_type
@@ -219,6 +224,11 @@ async def search_for_entity(ner, full_text_lines, task_mode):
 
     LogHelper.print()
     LogHelper.info("[查找上下文] 已完成 ...")
+
+    # 通过分词器、上下文、出现次数还原词根
+    # 此时才有上下文
+    words = ner.lemmatize_words(words)
+    words = merge_and_count(words, "\n".join(full_text_lines))
 
     return words
 
@@ -254,21 +264,21 @@ async def begin():
     print_app_info()
 
     LogHelper.print(f"选择工作模式：")
-    LogHelper.print(f"　　--> 1. 快速模式 - [green]默认[/]")
-    LogHelper.print(f"　　--> 2. 全面模式 - 速度较慢，但是可以更加强力的识别目标词语（同时杂质也较多）")
+    LogHelper.print(f"　　--> 1. 快速模式 - 速度快，精度尚可，只能识别角色姓名")
+    LogHelper.print(f"　　--> 2. 精确模式 - [green]默认模式[/]，速度较慢，识别能力强，可以识别所有类型的专有名词")
     LogHelper.print(f"")
     G.work_mode = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 选择运行模式", 
         choices = ["1", "2"],
-        default = "1",
+        default = "2",
         show_choices = False,
         show_default = False
     ))
     
     if G.work_mode == 1:
-        LogHelper.info(f"您选择了 1. 快速模式 ...")
+        LogHelper.info(f"您选择了 [green]快速模式[/] ...")
         LogHelper.print()
     elif G.work_mode == 2:
-        LogHelper.info(f"您选择了 2. 全面模式 ...")
+        LogHelper.info(f"您选择了 [green]精确模式[/] ...")
         LogHelper.print()
 
     # 初始化 LLM 对象
@@ -280,15 +290,16 @@ async def begin():
     llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
 
     # 初始化 NER 对象
-    ner = NER()
-    ner.load_blacklist("blacklist.txt")
+    with LogHelper.status(f"正在初始化 NER 引擎 ..."):
+        ner = NER()
+        ner.load_blacklist("blacklist.txt")
 
     # 读取数据文件
     full_text_lines = read_data_file()
 
     # 查找 NER 实体
     words = []
-    words = await search_for_entity(ner, full_text_lines, G.work_mode * 10)
+    words = search_for_entity(ner, full_text_lines, G.work_mode * 10)
 
     # 等待词性判断任务结果
     LogHelper.info("即将开始执行 [词性判断] ...")
@@ -334,7 +345,7 @@ async def begin():
 
 # 一些初始化步骤
 def init():
-   # 测试
+    # 测试
     if LogHelper.is_debug():
         TestHelper.check_duplicates()
 

@@ -24,6 +24,7 @@ class Word:
 
     def __init__(self):
         self.type = self.TYPE_UNKNOWN
+        self.score = 0
         self.count = 0
         self.context = []
         self.context_summary = {}
@@ -40,6 +41,7 @@ class Word:
     def __str__(self):
         return (
             f"Word(type={self.type},"
+            f"score={self.score},"
             f"count={self.count},"
             f"context={self.context},"
             f"context_summary={self.context_summary},"
