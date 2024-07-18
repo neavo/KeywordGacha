@@ -37,10 +37,18 @@ class LogHelper:
     @staticmethod
     def rule(*args, **kwargs):
         LogHelper.console.rule(*args, **kwargs)
+        
+    @staticmethod
+    def json(json, *args, **kwargs):
+        LogHelper.console.print_json(str(json), *args, **kwargs)
 
     @staticmethod
     def print(*args, **kwargs):
         LogHelper.console.print(*args, **kwargs)
+
+    @staticmethod
+    def status(status, *args, **kwargs):
+        return LogHelper.console.status(status, *args, **kwargs)
 
     @staticmethod
     def is_debug():
@@ -48,29 +56,29 @@ class LogHelper:
 
     @staticmethod
     def get_trackback(e):
-        f"\n{("".join(traceback.format_exception(None, e, e.__traceback__))).strip()}"
+        return f"{e}\n{("".join(traceback.format_exception(None, e, e.__traceback__))).strip()}"
 
     @staticmethod
     def debug(message, *args, **kwargs):
-        LoguruLogger.debug(message, *args, **kwargs)
-        LogHelper.logger.debug(message, *args, **kwargs)
+        LoguruLogger.debug(str(message), *args, **kwargs)
+        LogHelper.logger.debug(str(message), *args, **kwargs)
 
     @staticmethod
     def info(message, *args, **kwargs):
-        LoguruLogger.info(message, *args, **kwargs)
-        LogHelper.logger.info(message, *args, **kwargs)
+        LoguruLogger.info(str(message), *args, **kwargs)
+        LogHelper.logger.info(str(message), *args, **kwargs)
 
     @staticmethod
     def warning(message, *args, **kwargs):
-        LoguruLogger.warning(message, *args, **kwargs)
-        LogHelper.logger.warning(message, *args, **kwargs)
+        LoguruLogger.warning(str(message), *args, **kwargs)
+        LogHelper.logger.warning(str(message), *args, **kwargs)
 
     @staticmethod
     def error(message, *args, **kwargs):
-        LoguruLogger.error(message, *args, **kwargs)
-        LogHelper.logger.error(message, *args, **kwargs)
+        LoguruLogger.error(str(message), *args, **kwargs)
+        LogHelper.logger.error(str(message), *args, **kwargs)
 
     @staticmethod
     def critical(message, *args, **kwargs):
-        LoguruLogger.critical(message, *args, **kwargs)
-        LogHelper.logger.critical(message, *args, **kwargs)
+        LoguruLogger.critical(str(message), *args, **kwargs)
+        LogHelper.logger.critical(str(message), *args, **kwargs)

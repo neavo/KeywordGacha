@@ -4,6 +4,10 @@ openai
 tiktoken
 aiolimiter
 
+onnx
+optimum
+onnxruntime
+
 wheel
 setuptools
 spacy[ja]

@@ -1,7 +1,8 @@
 from helper.LogHelper import LogHelper
+from helper.TextHelper import TextHelper
+
 
 class TestHelper:
- 
     @staticmethod
     def check_duplicates(*args):
         a = {}

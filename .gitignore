@@ -1,5 +1,6 @@
 /*.log*
-/角色姓名*
+/*_列表*
+/*_日志*
 
 /env*
 /dist*
@@ -11,3 +12,4 @@ __pycache__
 /all.orig*
 /words_dict*
 /ManualTransFile*
+/resource/kg_ner_ja_onnx*

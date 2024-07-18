@@ -1,6 +1,6 @@
 <h1><p align='center' >KeywordGacha</p></h1>
 <div align=center><img src="https://img.shields.io/github/v/release/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/license/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/stars/neavo/KeywordGacha"/></div>
-<p align='center' >使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等任意文本中的词汇表的翻译辅助工具</p>
+<p align='center' >使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等任意文本中的词语表的翻译辅助工具</p>
 
 &ensp;
 &ensp;
@@ -23,13 +23,13 @@
 - 如果拥有一块至少 8G 显存的 Nvidia 显卡，也可以在个人电脑上运行本地服务来获得免费使用
 
 ## 使用 🛸
-- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载 KG 并解压缩到本地
+- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载 `KeywordGacha_DEV_*.zip` 并本地并解压缩
 - 打开配置文件 `config.json` ，填入 API 信息，如使用本地接口则不需要修改
-- 双击 `00_启动.bat`，按提示操作即可
-- 流程执行完毕后，会生成结果文件 `角色姓名_日志.txt` 与 `角色姓名_列表.json`
-- `角色姓名_日志.txt` 中包含抓取到的词汇的原文、上下文、翻译建议、角色信息总结等信息
-- 参考日志中的信息完成 `角色姓名_列表.json` 后，可以直接导入到 [AiNiee](https://github.com/NEKOparapa/AiNiee) 等翻译器中使用
-- 注意，为保证翻译质量，目前 `KG 并不会直接为你填充词汇表内的翻译`，请认真审阅日志后手动完成词汇表
+- 双击 `01_启动.bat`，按提示操作即可
+- 流程执行完毕后，会生成类似于 `角色实体_日志.txt` 与 `角色实体_列表.json` 的结果文件
+- `*_日志.txt` 中包含抓取到的词语的原文、上下文、翻译建议、角色信息总结等信息
+- 参考日志中的信息完成 `*_列表.json` 后，可以直接导入到 [AiNiee](https://github.com/NEKOparapa/AiNiee) 等翻译器中使用
+- 注意，为保证翻译质量，目前 `KG 并不会直接为你填充词语表内的翻译`，请认真审阅日志后手动完成词语表
 
 ## 效果 ⚡
 - 抓取和翻译效果取决于模型本身的水平，使用 💪 ~~更昂贵~~ 更强力  的 模型可以显著提升效果
@@ -41,6 +41,9 @@
 
 ## 近期更新 📅
 - 20240716
+  - 新增 - 对组织、物品等其他实体种类的识别
+
+- 20240716
   - 调整 - 继续优化抓取能力
   - 调整 - 一些样式和兼容性调整
   - 新增 - 网络请求频率阈值 设置选项
@@ -51,9 +54,6 @@
     - 命中率约为 `80%-90%`
     - 现在 `快速模式` 也可以处理纯汉字词语了
 
-- 20240711
-  - 调整 - 改进词性判断的流程以提升判断的准确性
-
 - 20240710
   - 新增 基于新工作流的 `快速模式` 和 `全面模式` 显著的提升了抓取速度和抓取能力
   - 修正 人名筛选不生效的问题
@@ -63,10 +63,9 @@
   - 调整 本地模型调整为 [GLM4-9B-Chat-GGUF](https://github.com/neavo/KeywordGachaServer)，请务必与客户端同步更新
 
 ## 文本格式 🆗
-- 
-- 目前支持三种不同的输入文本格式，其中 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的 CSV 文件的抓取效果似乎比较好
+- 目前支持三种不同的输入文本格式，暂时只支持 `日文`
 - 对文本内容没什么要求，`小说` 、`字幕`、`漫画台词`、`游戏脚本` 等都可以直接读取，不需要预处理
-- 暂时只支持 `日文内容` 的提取
+- 处理 `游戏文本` 时，建议使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的文本，[MTool](https://afdian.net/a/AdventCirno) 导出的文本有时效果较差
 - 文件中 每一行/每一条 应只包含一个句子，太长的话请先手动处理一下
 - 如当前目录下有 `data 文件夹` 、`all.orig.txt` 或 `ManualTransFile.json` 文件，会自动识别
 - 当文件后缀名为 .json 时，会将其内容按以下模式处理，这也是 [MTool](https://afdian.net/a/AdventCirno) 导出翻译原文的格式
@@ -103,7 +102,7 @@
 "model_name" : "模型名称，从接口平台方获取，使用在线接口时一定要设置正确"
 "count_threshold" : "出现次数低于此值的词语会被过滤掉，调低它可以抓取更多低频词语"
 "translate_surface_mode" : "是否启用词语翻译功能，0 - 禁用，1 - 启用"
-"translate_context_mode" : "是否启用上下文翻译功能，0 - 禁用，1 - 启用"
+"translate_context_mode" : "是否启用上下文翻译功能，只对角色实体生效，0 - 禁用，1 - 启用"
 "request_timeout" : "网络请求超时时间（秒）如果频繁出现网络错误，可以调大这个值"
 "request_frequency_threshold" : "网络请求频率阈值（次/秒，可以小于 1）。如果频繁出现网络错误，特别是使用中转平台时，可以调小这个值"
 ```
@@ -117,10 +116,11 @@
 ## 开发计划 📈
 
 - [x] 支持 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的 CSV 文本
-- [ ] 添加 对 组织、道具、地域 等其他名词类型的支持
+- [X] 添加 对 组织、道具、地域 等其他名词类型的支持
 - [ ] 添加 对 `英文内容` 的支持
 - [ ] 添加 对 `中文内容` 的支持
 - [ ] 添加 对 `韩文内容` 的支持
+- [ ] 添加 对 GPU 加速的支持
 - [ ] 添加 全自动生成模式
 
 ## 问题反馈 😥
