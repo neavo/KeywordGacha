@@ -56,7 +56,7 @@ class LogHelper:
 
     @staticmethod
     def get_trackback(e):
-        return f"\n{("".join(traceback.format_exception(None, e, e.__traceback__))).strip()}"
+        return f"{e}\n{("".join(traceback.format_exception(None, e, e.__traceback__))).strip()}"
 
     @staticmethod
     def debug(message, *args, **kwargs):

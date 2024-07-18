@@ -13,17 +13,11 @@ from helper.TextHelper import TextHelper
 
 class Word:
 
-    TYPE_NOT_PERSON = -20
-    TYPE_NEED_CONFIRM = -10
-    TYPE_UNKNOWN = 0
-    TYPE_PERSON = 10
-
     CONTEXT_CACHE = {}
     CONTEXT_CACHE_LOCK = Lock()
     CONTEXT_TOKEN_THRESHOLD = 768
 
     def __init__(self):
-        self.type = self.TYPE_UNKNOWN
         self.score = 0
         self.count = 0
         self.context = []
@@ -33,15 +27,18 @@ class Word:
         self.surface_romaji = ""
         self.surface_translation = ["", ""]
         self.surface_translation_description = ""
+        self.ner_type = ""
         self.attribute = ""
-        self.llmresponse = ""
+        self.llmresponse_analyze_attribute = ""
+        self.llmresponse_summarize_context = ""
+        self.llmresponse_translate_context = ""
+        self.llmresponse_translate_surface = ""
 
         self.tiktoken_encoding = tiktoken.get_encoding("cl100k_base")
 
     def __str__(self):
         return (
-            f"Word(type={self.type},"
-            f"score={self.score},"
+            f"Word(score={self.score},"
             f"count={self.count},"
             f"context={self.context},"
             f"context_summary={self.context_summary},"
@@ -50,8 +47,12 @@ class Word:
             f"surface_romaji={self.surface_romaji},"
             f"surface_translation={self.surface_translation},"
             f"surface_translation_description={self.surface_translation_description},"
+            f"ner_type={self.ner_type},"
             f"attribute={self.attribute},"
-            f"llmresponse={self.llmresponse})"
+            f"llmresponse_analyze_attribute={self.llmresponse_analyze_attribute},"
+            f"llmresponse_summarize_context={self.llmresponse_summarize_context},"
+            f"llmresponse_translate_context={self.llmresponse_translate_context},"
+            f"llmresponse_translate_surface={self.llmresponse_translate_surface})"
         )
 
     # 从原文中提取上下文

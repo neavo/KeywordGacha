@@ -6,6 +6,7 @@ import asyncio
 from openai import AsyncOpenAI
 from aiolimiter import AsyncLimiter
 
+from model.NER import NER
 from model.Word import Word
 from helper.LogHelper import LogHelper
 from helper.TextHelper import TextHelper
@@ -111,20 +112,29 @@ class LLM:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 根据类型加载不同的prompt模板文件
-    def load_prompt_translate_surface(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_translate_surface = file.read()
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
-
-    # 根据类型加载不同的prompt模板文件
     def load_prompt_translate_context(self, filepath):
         try:
             with open(filepath, "r", encoding="utf-8") as file:
                 self.prompt_translate_context = file.read()
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
+
+    # 根据类型加载不同的prompt模板文件
+    def load_prompt_translate_surface_common(self, filepath):
+        try:
+            with open(filepath, "r", encoding="utf-8") as file:
+                self.prompt_translate_surface_common = file.read()
+        except Exception as e:
+            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
+
+    # 根据类型加载不同的prompt模板文件
+    def load_prompt_translate_surface_person(self, filepath):
+        try:
+            with open(filepath, "r", encoding="utf-8") as file:
+                self.prompt_translate_surface_person = file.read()
+        except Exception as e:
+            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
+
 
     # 异步发送请求到OpenAI获取模型回复
     async def request(self, prompt, content, task_type, retry = False):
@@ -157,7 +167,7 @@ class LLM:
         async with self.semaphore, self.async_limiter:
             prompt = self.prompt_analyze_attribute.replace("{surface}", word.surface)
             task_type = self.TASK_TYPE_ANALYZE_ATTRIBUTE
-            usage, message, llmresponse = await self.request(prompt, "\n".join(word.context), task_type, retry)
+            usage, message, word.llmresponse_analyze_attribute = await self.request(prompt, "\n".join(word.context), task_type, retry)
 
             if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
                 raise Exception("usage.completion_tokens >= MAX_TOKENS")
@@ -167,16 +177,16 @@ class LLM:
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
             except Exception as e:
-                LogHelper.debug(f"{e} + {LogHelper.get_trackback(e)}")
+                LogHelper.debug(f"{LogHelper.get_trackback(e)}")
                 LogHelper.debug(message.content.strip())
                 LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
                 raise e
 
             if any(v in ["是", "は"] for v in result["character_name"]):
-                word.type = Word.TYPE_PERSON
+                word.ner_type = NER.NER_TYPES.get("PERSON")
                 LogHelper.debug(f"{word.surface} - {result}")
             elif "否" in result["character_name"]:
-                word.type = Word.TYPE_NOT_PERSON
+                word.ner_type = ""
                 LogHelper.info(f"[词性判断] 已剔除 - {word.surface} - {result}")
             else:
                 raise Exception(f"不正确的返回值 - {word.surface} - {result["character_name"]}")
@@ -190,7 +200,7 @@ class LLM:
             words_successed.append(word)
             LogHelper.info(f"[词性判断] 已完成 {len(words_successed)} / {len(words)} ...")       
         except Exception as e:
-            LogHelper.warning(f"[词性判断] 子任务执行失败，稍后将重试 ... {e}")
+            LogHelper.warning(f"[词性判断] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
 
     # 批量执行词性判断任务的具体实现
     async def do_analyze_attribute_batch(self, words, words_failed, words_successed):
@@ -234,9 +244,13 @@ class LLM:
     # 词语翻译任务
     async def translate_surface(self, word, retry):
         async with self.semaphore, self.async_limiter:
-            prompt = self.prompt_translate_surface.replace("{attribute}", word.attribute)
+            if word.ner_type != NER.NER_TYPES.get("PERSON"):
+                prompt = self.prompt_translate_surface_common
+            else:
+                prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
+
             task_type = self.TASK_TYPE_TRANSLATE_SURFACE
-            usage, message, llmresponse = await self.request(prompt, word.surface, task_type, retry)
+            usage, message, word.llmresponse_translate_surface = await self.request(prompt, word.surface, task_type, retry)
 
             if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
                 raise Exception("usage.completion_tokens >= MAX_TOKENS")
@@ -264,8 +278,8 @@ class LLM:
             word = future.result()
             words_successed.append(word)
             LogHelper.info(f"[词语翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
-        except Exception as error:
-            LogHelper.warning(f"[词语翻译] 子任务执行失败，稍后将重试 ... {error}")
+        except Exception as e:
+            LogHelper.warning(f"[词语翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
 
         # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
         words_failed.clear()
@@ -313,7 +327,7 @@ class LLM:
             context_translation = []
             prompt = self.prompt_translate_context
             task_type = self.TASK_TYPE_TRANSLATE_CONTEXT
-            usage, message, llmresponse = await self.request(prompt, "\n".join(word.context), task_type, retry)
+            usage, message, word.llmresponse_translate_context = await self.request(prompt, "\n".join(word.context), task_type, retry)
 
             if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
                 raise Exception("usage.completion_tokens >= MAX_TOKENS")
@@ -332,8 +346,8 @@ class LLM:
             word = future.result()
             words_successed.append(word)
             LogHelper.info(f"[上下文翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
-        except Exception as error:
-            LogHelper.warning(f"[上下文翻译] 子任务执行失败，稍后将重试 ... {error}")
+        except Exception as e:
+            LogHelper.warning(f"[上下文翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
 
         # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
         words_failed.clear()
@@ -378,7 +392,7 @@ class LLM:
         async with self.semaphore, self.async_limiter:
             prompt = self.prompt_summarize_context.replace("{surface}", word.surface)
             task_type = self.TASK_TYPE_SUMMAIRZE_CONTEXT
-            usage, message, llmresponse = await self.request(prompt, "\n".join(word.context), task_type, retry)
+            usage, message, word.llmresponse_summarize_context = await self.request(prompt, "\n".join(word.context), task_type, retry)
 
             if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
                 raise Exception("usage.completion_tokens >= MAX_TOKENS")
@@ -388,17 +402,17 @@ class LLM:
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
             except Exception as e:
-                LogHelper.debug(f"{e} + {LogHelper.get_trackback(e)}")
+                LogHelper.debug(f"{LogHelper.get_trackback(e)}")
                 LogHelper.debug(message.content.strip())
                 LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
                 raise e
 
             if any(v in ["是", "は"] for v in result["character_name"]):
-                word.type = Word.TYPE_PERSON
+                word.ner_type = NER.NER_TYPES.get("PERSON")
                 LogHelper.debug(f"{word.surface} - {result}")
             elif "否" in result["character_name"]:
-                word.type = Word.TYPE_NOT_PERSON
-                LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
+                word.ner_type = ""
+                LogHelper.info(f"[词性判断] 已剔除 - {word.surface} - {result}")
             else:
                 raise Exception(f"不正确的返回值 - {word.surface} - {result["character_name"]}")
 

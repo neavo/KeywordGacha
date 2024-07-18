@@ -81,25 +81,50 @@ class TextHelper:
     def is_all_cjk(text):
         return all(TextHelper.is_cjk(char) for char in text)
 
-    # 检查字符串是否包含至少一个日文字符（含汉字）
+    # 检查字符串是否包含至少一个中日韩汉字组成
     @staticmethod
-    def contains_any_japanese(text):
-        return any(TextHelper.is_japanese(char) for char in text)
+    def has_any_cjk(text):
+        return any(TextHelper.is_cjk(char) for char in text)
+
+    # 判断字符是否为片假名
+    @staticmethod
+    def is_katakana(ch):
+        return TextHelper.KATAKANA[0] <= ch <= TextHelper.KATAKANA[1]
+
+    # 判断字符串是否全部为片假名
+    @staticmethod
+    def is_all_katakana(ch):
+        return all(TextHelper.is_katakana(ch) for ch in text)
+
+    # 检查字符串是否包含至少一个片假名
+    @staticmethod
+    def has_any_katakanae(text):
+        return any(TextHelper.is_katakana(char) for char in text)
+
+    # 判断字符是否为平假名
+    @staticmethod
+    def is_hiragana(ch):
+        return TextHelper.HIRAGANA[0] <= ch <= TextHelper.HIRAGANA[1]
+
+    # 判断字符串是否全部为平假名
+    @staticmethod
+    def is_all_hiragana(ch):
+        return all(TextHelper.is_hiragana(ch) for ch in text)
+
+    # 检查字符串是否包含至少一个平假名
+    @staticmethod
+    def has_any_hiragana(text):
+        return any(TextHelper.is_hiragana(char) for char in text)
 
     # 判断输入的字符串是否全部由日文字符（含汉字）组成
     @staticmethod
     def is_all_japanese(text):
         return all(TextHelper.is_japanese(char) for char in text)
 
-    # 判断字符是否为片假名
+    # 检查字符串是否包含至少一个日文字符（含汉字）
     @staticmethod
-    def is_katakana(ch):
-        return TextHelper.KATAKANA[0] <= ch <= TextHelper.KATAKANA[0]
-
-    # 判断字符串是否为全部片假名
-    @staticmethod
-    def is_all_katakana(ch):
-        return all(TextHelper.is_katakana(ch) for ch in text)
+    def has_any_japanese(text):
+        return any(TextHelper.is_japanese(char) for char in text)
 
     # 移除开头结尾的标点符号
     @staticmethod
@@ -114,6 +139,32 @@ class TextHelper:
 
         return text.strip()
 
+    # 移除开头结尾的阿拉伯数字
+    @staticmethod
+    def strip_arabic_numerals(text):
+        return re.sub(r'^\d+|\d+$', '', text)
+
+    # 移除开头结尾的非日文字符
+    @staticmethod
+    def strip_not_japanese(text):
+        text = text.strip()
+
+        while text and not TextHelper.is_japanese(text[0]):
+            text = text[1:]
+
+        while text and not TextHelper.is_japanese(text[-1]):
+            text = text[:-1]
+
+        return text.strip()
+
+    # 移除结尾的汉字字符
+    @staticmethod
+    def remove_suffix_cjk(text):
+        while text and TextHelper.is_cjk(text[-1]):
+            text = text[:-1]
+
+        return text
+
     # 判断是否是一个有意义的日文词语
     @staticmethod
     def is_valid_japanese_word(surface, blacklist):
@@ -125,7 +176,7 @@ class TextHelper:
         if len(surface) == 1:
             flag = False
 
-        if not TextHelper.contains_any_japanese(surface):
+        if not TextHelper.has_any_japanese(surface):
             flag = False
 
         return flag
