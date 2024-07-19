@@ -1,6 +1,7 @@
 import os
 import re
 import csv
+import copy
 import json
 import asyncio
 
@@ -75,8 +76,8 @@ def merge_and_count(words, full_text_string):
     words_categorized = {}
     for v in words:
         if v.surface not in words_categorized:
-            words_categorized[v.surface] = []
-        words_categorized[v.surface].append(v)
+            words_categorized[(v.surface, v.ner_type)] = [] # 只有文字和类型都一样才视为相同条目，避免跨类词条目合并
+        words_categorized[(v.surface, v.ner_type)].append(v)
 
     words_merged = []
     for k, v in words_categorized.items():
@@ -198,7 +199,8 @@ def read_data_file():
 
 # 获取指定类型的词
 def get_words_by_ner_type(words, ner_type):
-    return [word for word in words if word.ner_type == ner_type]
+    # 显式的复制对象，避免后续修改对原始列表的影响，浅拷贝不复制可变对象（列表、字典、自定义对象等），慎重修改它们
+    return [copy.copy(word) for word in words if word.ner_type == ner_type]
 
 # 移除指定类型的词
 def remove_words_by_ner_type(words, ner_type):
@@ -249,21 +251,31 @@ def search_for_entity(ner, full_text_lines, task_mode):
     LogHelper.print()
     LogHelper.info("[查找上下文] 已完成 ...")
 
-    # 通过分词器、上下文、出现次数还原词根
-    # 此时才有上下文
+    # 有了上下文译后才能执行后续的处理
+    # 执行还原词根
+    LogHelper.info("即将开始执行 [词根还原] ...")
     words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PERSON"))
     words_person = ner.lemmatize_words_by_rule(words_person)
     words_person = merge_and_count(words_person, "\n".join(full_text_lines))
     words_person = ner.lemmatize_words_by_count(words_person)
     words_person = merge_and_count(words_person, "\n".join(full_text_lines))
     words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PERSON"))
+    LogHelper.info(f"[词根还原] 已完成 ...")
 
-    # 按阈值筛选，但是保证至少有20个条目
+    # 执行语法校验
+    LogHelper.info("即将开始执行 [语法校验] ...")
+    words = ner.validate_words_by_morphology(words)
+    words = remove_words_by_ner_type(words, "")
+    LogHelper.info(f"[语法校验] 已完成 ...")
+
+    # 按阈值筛选角色实体，但是保证至少有20个条目
+    LogHelper.info(f"即将开始执行 [阈值筛选] ... 当前出现次数的筛选阈值设置为 {G.config.count_threshold} ...")
     words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PERSON"))
     words_with_threshold = [word for word in words_person if word.count >= G.config.count_threshold]
     words_all_filtered = [word for word in words_person if word not in words_with_threshold]
     words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
     words = replace_words_by_ner_type(words, words_with_threshold, NER.NER_TYPES.get("PERSON"))
+    LogHelper.info(f"[阈值筛选] 已完成 ... 出现次数 <= {G.config.count_threshold} 的条目已剔除 ...")
 
     return words
 
@@ -341,13 +353,21 @@ async def begin():
     LogHelper.info("即将开始执行 [词性判断] ...")
     words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PERSON"))
     words_person = await llm.analyze_attribute_batch(words_person)
+    words_person = remove_words_by_ner_type(words_person, "")
     words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PERSON"))
 
     # 等待词义分析任务结果
     LogHelper.info("即将开始执行 [词义分析] ...")
     words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PERSON"))
     words_person = await llm.summarize_context_batch(words_person)
+    words_person = remove_words_by_ner_type(words_person, "")
     words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PERSON"))
+
+    # 此时对角色实体的校验已全部完成，将其他类型实体中与角色名重复的剔除
+    LogHelper.info("即将开始执行 [重复性检验] ...")
+    words = ner.validate_words_by_duplication(words)
+    words = remove_words_by_ner_type(words, "")
+    LogHelper.info("[重复性检验] 已完成 ...")
 
     # 等待翻译词语任务结果
     if G.config.translate_surface_mode == 1:
@@ -398,7 +418,7 @@ def init():
 
     # 加载配置文件
     try:
-        config_file = "config.json"
+        config_file = "config_dev.json" if LogHelper.is_debug else "config.json"
 
         with open(config_file, "r", encoding="utf-8") as file:
             config = json.load(file)

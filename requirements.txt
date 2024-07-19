@@ -8,6 +8,9 @@ onnx
 optimum
 onnxruntime
 
+fugashi
+unidic_lite
+
 wheel
 setuptools
 spacy[ja]
