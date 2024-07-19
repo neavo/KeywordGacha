@@ -47,19 +47,7 @@ class NER:
         "施設名": "INS",
         "製品名": "PRODUCT",
         "イベント名": "EVENT",
-
-        "O": "",                # 表示非实体，数量极多
-        "PER": "PERSON",        # 表示人名，如"张三"、"约翰·多伊"等。
-        "ORG": "ORG",           # 表示组织，如"联合国"、"苹果公司"等。
-        "P": "ORG",             # 表示组织，如"联合国"、"苹果公司"等。
-        "O": "ORG",             # 表示组织，如"联合国"、"苹果公司"等。
-        "ORG-P": "ORG",         # 似乎是文档写错了，猜测： P = ORG-P
-        "ORG-O": "ORG",         # 似乎是文档写错了，猜测： O = ORG-O
-        "LOC": "LOC",           # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
-        "INS": "FAC",           # 表示设施，如"医院"、"学校"、"机场"等。
-        "PRD": "PRODUCT",       # 表示产品，如"iPhone"、"Windows操作系统"等。
-        "EVT": "EVENT",         # 表示事件，如"奥运会"、"地震"等。
-
+        
         "CARDINAL": "MISC",     # 表示基数词，如数字"1"、"三"等。
         "DATE": "MISC",         # 表示日期，如"2024年07月11日"。
         "EVENT": "EVENT",       # 表示事件，如"奥运会"、"地震"等。
@@ -111,7 +99,7 @@ class NER:
                 self.ONNX_PATH,
                 padding = True,
                 truncation = True,
-                max_length = 512
+                model_max_length = 512
             ),
             device = self.ONNX_DEVICE,
             batch_size = self.ONNX_BACTH_SIZE,
@@ -253,7 +241,7 @@ class NER:
             if abs(word.count - ex_word.count) / max(word.count, ex_word.count) > 0.05:
                 continue
 
-            if word.surface in ex_word.surface or ex_word.surface in word.surface:
+            if  (word.surface in ex_word.surface or ex_word.surface in word.surface) and word.surface != ex_word.surface:
                 LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.surface}, {ex_word.surface}")
                 words_map[key] = word if len(word.surface) > len(ex_word.surface) else ex_word
 
