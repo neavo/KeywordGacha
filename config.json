@@ -4,7 +4,7 @@
     "model_name": "glm-4-9b-chat",
     "count_threshold": 3,
     "request_timeout": 120,
-    "request_frequency_threshold": 32,
+    "request_frequency_threshold": 4,
     "translate_surface_mode": 1,
     "translate_context_mode": 1
 }
