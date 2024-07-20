@@ -459,7 +459,7 @@ def init():
 
     # 加载配置文件
     try:
-        config_file = "config_dev.json" if LogHelper.is_debug else "config.json"
+        config_file = "config_dev.json" if LogHelper.is_debug() else "config.json"
 
         with open(config_file, "r", encoding="utf-8") as file:
             config = json.load(file)
