@@ -8,6 +8,7 @@ onnx
 optimum
 onnxruntime
 
-wheel
-setuptools
-spacy[ja]
+fugashi
+unidic_lite
+sudachipy
+sudachidict_core

@@ -32,23 +32,27 @@ class LogHelper:
     )
 
     # 全局控制台实例
-    console = Console(highlight = False)
+    console_highlight = Console(highlight = True, tab_size = 4)
+    console_no_highlight = Console(highlight = False, tab_size = 4)
 
     @staticmethod
     def rule(*args, **kwargs):
-        LogHelper.console.rule(*args, **kwargs)
+        LogHelper.console_no_highlight.rule(*args, **kwargs)
         
     @staticmethod
     def json(json, *args, **kwargs):
-        LogHelper.console.print_json(str(json), *args, **kwargs)
+        LogHelper.console_no_highlight.print_json(str(json), *args, **kwargs)
 
     @staticmethod
     def print(*args, **kwargs):
-        LogHelper.console.print(*args, **kwargs)
+        if "highlight" in kwargs and kwargs["highlight"] == True:
+            LogHelper.console_highlight.print(*args, **kwargs)
+        else:
+            LogHelper.console_no_highlight.print(*args, **kwargs)
 
     @staticmethod
     def status(status, *args, **kwargs):
-        return LogHelper.console.status(status, *args, **kwargs)
+        return LogHelper.console_no_highlight.status(status, *args, **kwargs)
 
     @staticmethod
     def is_debug():

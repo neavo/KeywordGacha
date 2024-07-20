@@ -19,8 +19,8 @@
     powershell -Command ".\env\python.exe -m pip cache purge"
 
     @REM 部署模型
-    powershell -Command "Invoke-WebRequest -Uri https://github.com/neavo/KeywordGacha/releases/download/kg_ner_ja_onnx_avx512/kg_ner_ja_onnx_avx512.zip -OutFile onnx.zip"
-    powershell -Command "Expand-Archive -Path 'onnx.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_ja_onnx_avx512'"
+    powershell -Command "Invoke-WebRequest -Uri https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_ja_onnx_cpu/kg_ner_ja_onnx_cpu.zip -OutFile onnx.zip"
+    powershell -Command "Expand-Archive -Path 'onnx.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_ja_onnx_cpu'"
     powershell -Command "Remove-Item -Path 'onnx.zip' -Recurse -Force"    
 
     @REM 复制文件

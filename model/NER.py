@@ -2,7 +2,10 @@ import re
 import os
 import json
 
-import spacy
+import onnxruntime
+
+from sudachipy import tokenizer
+from sudachipy import dictionary
 from transformers import AutoTokenizer
 from optimum.pipelines import pipeline
 from optimum.onnxruntime import ORTModelForTokenClassification
@@ -18,14 +21,24 @@ class NER:
     TASK_MODES.QUICK = 10
     TASK_MODES.ACCURACY = 20
 
-    ONNX_PATH = "resource\\kg_ner_ja_onnx_fp16_O4" if LogHelper.is_debug() else "resource\\kg_ner_ja_onnx_avx512"
+    ONNX_PATH = "resource\\kg_ner_ja_onnx_gpu" if LogHelper.is_debug() else "resource\\kg_ner_ja_onnx_cpu"
     ONNX_DEVICE = "cuda" if LogHelper.is_debug() else "cpu"
-    ONNX_BACTH_SIZE = 512 if LogHelper.is_debug() else max(os.cpu_count(), 8)
+    ONNX_BACTH_SIZE = 256 if LogHelper.is_debug() else min(os.cpu_count(), 8)
     ONNX_SIZE_PER_GROUP = 512 if LogHelper.is_debug() else 256
 
-    SPACY_PATH = "resource\\kg_ner_ja"
-    SPACY_N_PROCESS = 2
-    SPACY_BACTH_SIZE = 128
+    RE_SPLIT_BY_PUNCTUATION = re.compile(
+        rf"[" +
+        rf"{TextHelper.GENERAL_PUNCTUATION[0]}-{TextHelper.GENERAL_PUNCTUATION[1]}" +
+        rf"{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0]}-{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]}" +
+        rf"{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_1[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_1[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_2[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_2[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_3[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_3[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_4[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_4[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_GENERAL[0]}-{TextHelper.LATIN_PUNCTUATION_GENERAL[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]}" +
+        rf"・♥]+"
+    )
 
     NER_TYPES = {
         "": "",                 # 表示非实体，数量极多
@@ -35,70 +48,39 @@ class NER:
         "INS": "INS",           # 表示设施，如"医院"、"学校"、"机场"等。
         "PRODUCT": "PRODUCT",   # 表示产品，如"iPhone"、"Windows操作系统"等。
         "EVENT": "EVENT",       # 表示事件，如"奥运会"、"地震"等。
-        "MISC": "MISC",         # 表示事件，如"奥运会"、"地震"等。
-    }
 
-    ONNX_TO_NER = {
-        "O": "",                # 表示非实体，数量极多
-        "PER": "PERSON",        # 表示人名，如"张三"、"约翰·多伊"等。
-        "ORG": "ORG",           # 表示组织，如"联合国"、"苹果公司"等。
-        "P": "ORG",             # 表示组织，如"联合国"、"苹果公司"等。
-        "O": "ORG",             # 表示组织，如"联合国"、"苹果公司"等。
-        "ORG-P": "ORG",         # 似乎是文档写错了，猜测： P = ORG-P
-        "ORG-O": "ORG",         # 似乎是文档写错了，猜测： O = ORG-O
-        "LOC": "LOC",           # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
-        "INS": "FAC",           # 表示设施，如"医院"、"学校"、"机场"等。
-        "PRD": "PRODUCT",       # 表示产品，如"iPhone"、"Windows操作系统"等。
-        "EVT": "EVENT",         # 表示事件，如"奥运会"、"地震"等。
-    }
-
-    SPACY_TO_NER = {
-        "": "",                 # 表示非实体，数量极多
-        "CARDINAL": "MISC",     # 表示基数词，如数字"1"、"三"等。
-        "DATE": "MISC",         # 表示日期，如"2024年07月11日"。
-        "EVENT": "EVENT",       # 表示事件，如"奥运会"、"地震"等。
-        "FAC": "FAC",           # 表示设施，如"医院"、"学校"、"机场"等。
-        "GPE": "LOC",           # 表示地理政治实体，如"中国"、"纽约"等。
-        "LANGUAGE": "MISC",     # 表示语言，如"英语"、"汉语"等。
-        "LAW": "MISC",          # 表示法律、法规，如"宪法"、"民法典"等。
-        "LOC": "LOC",           # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
-        "MONEY": "MISC",        # 表示货币，如"100美元"、"500欧元"等。
-        "MOVEMENT": "ORG",      # 表示运动或趋势，如"女权运动"、"环保运动"等。
-        "NORP": "ORG",          # 表示民族或宗教组织，如"基督教"、"伊斯兰教"等。
-        "ORDINAL": "MISC",      # 表示序数词，如"第一"、"第二"等。
-        "ORG": "ORG",           # 表示组织，如"联合国"、"苹果公司"等。
-        "PERCENT": "MISC",      # 表示百分比，如"50%"。
-        "PERSON": "PERSON",     # 表示人名，如"张三"、"约翰·多伊"等。
-        "PET_NAME": "PERSON",   # 表示宠物的名字，如"小白"、"Max"等。
-        "PHONE": "MISC",        # 表示电话号码，如"123-456-7890"。
-        "PRODUCT": "PRODUCT",   # 表示产品，如"iPhone"、"Windows操作系统"等。
-        "QUANTITY": "MISC",     # 表示数量，如"两公斤"、"三个"等。
-        "TIME": "MISC",         # 表示时间，如"下午三点"、"午夜"等。
-        "TITLE_AFFIX": "MISC",  # 表示头衔或后缀，如"博士"、"先生"、"女士"等。
-        "WORK_OF_ART": "MISC",  # 表示艺术作品，如"蒙娜丽莎"、"悲惨世界"等。
+        "人名": "PERSON",
+        "法人名": "ORG",
+        "政治的組織名": "ORG",
+        "その他の組織名": "ORG",
+        "地名": "LOC",
+        "施設名": "INS",
+        "製品名": "PRODUCT",
+        "イベント名": "EVENT",
     }
 
     def __init__(self):
         self.blacklist = ""
 
-        self.spacy_tokenizer = spacy.load(
-            self.SPACY_PATH,
-            exclude = [
-                "parser",
-                "tok2vec",
-                "morphologizer",
-                "attribute_ruler"
-            ]
-        )
+        self.sudachipy_mode = tokenizer.Tokenizer.SplitMode.C
+        self.sudachipy_tokenizer = dictionary.Dictionary().create()
 
+        session_options = onnxruntime.SessionOptions()
+        session_options.log_severity_level = 4
         self.onnx_tokenizer = pipeline(
             "token-classification",
             model = ORTModelForTokenClassification.from_pretrained(
-                self.ONNX_PATH, 
+                self.ONNX_PATH,
+                session_options = session_options,
                 use_io_binding = True, 
                 local_files_only = True,
             ),
-            tokenizer = AutoTokenizer.from_pretrained(self.ONNX_PATH),
+            tokenizer = AutoTokenizer.from_pretrained(
+                self.ONNX_PATH,
+                padding = True,
+                truncation = True,
+                model_max_length = 512
+            ),
             device = self.ONNX_DEVICE,
             batch_size = self.ONNX_BACTH_SIZE,
             aggregation_strategy = "simple", 
@@ -117,7 +99,7 @@ class NER:
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-    # 添加词语 
+    # 生成词语 
     def generate_words(self, score, surface, ner_type):
         surface = TextHelper.strip_not_japanese(surface)
         surface = surface.strip("の")
@@ -138,36 +120,6 @@ class NER:
 
         return words
 
-    # 查找 NER 实体 - 快速模式
-    def search_for_entity_qucik(self, full_text_lines):
-        words = []
-
-        LogHelper.print()
-        with ProgressHelper.get_progress() as progress:
-            pid = progress.add_task("查找 NER 实体", total = None)
-            for doc in self.spacy_tokenizer.pipe(full_text_lines, n_process = self.SPACY_N_PROCESS, batch_size = self.SPACY_BACTH_SIZE):
-                for token in doc:
-                    surfaces = re.split(r'[・ ]', token.text) # ・ 和 空格 都作为分隔符
-                    for surface in surfaces:
-                        # Spacy 结果中没有置信度参数，所以直接排除人名以外的条目
-                        if (
-                            self.SPACY_TO_NER.get(token.ent_type_, "") == self.NER_TYPES.get("PERSON") 
-                            or 
-                            self.SPACY_TO_NER.get(token.ent_type_, "") == self.NER_TYPES.get("PET_NAME")
-                        ):
-                            score = 1.0
-                        else:
-                            score = 0.0
-
-                        entity_group = self.SPACY_TO_NER.get(token.ent_type_, "")
-                        words.extend(self.generate_words(score, surface, entity_group))
-
-                progress.update(pid, advance = 1, total = len(full_text_lines))
-        LogHelper.print()
-        LogHelper.info(f"[查找 NER 实体] 已完成 ...")
-
-        return words
-        
     # 查找 NER 实体 - 精确模式
     def search_for_entity_accuracy(self, full_text_lines):
         words = []
@@ -181,12 +133,13 @@ class NER:
             pid = progress.add_task("使用查找 NER 实体", total = None)
 
             for k, lines in enumerate(full_text_lines):
+                self.onnx_tokenizer.call_count = 0 # 防止出现应使用 dateset 的提示
                 for i, doc in enumerate(self.onnx_tokenizer(lines)):
                     for token in doc:
-                        surfaces = re.split(r'[・ ]', token.get("word")) # ・ 和 空格 都作为分隔符
+                        surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, token.get("word").replace(" ", "")) # ・ 和 空格 都作为分隔符
                         for surface in surfaces:
                             score = token.get("score")
-                            entity_group = self.ONNX_TO_NER.get(token.get("entity_group"), "")
+                            entity_group = self.NER_TYPES.get(token.get("entity_group"), "")
                             words.extend(self.generate_words(score, surface, entity_group))
 
                 progress.update(pid, advance = 1, total = len(full_text_lines))
@@ -218,6 +171,7 @@ class NER:
             if len(no_suffix) == 1:
                 continue
 
+            LogHelper.info(f"通过 [green]规则还原[/] 还原词根 - {no_suffix}, {word.surface}")
             word.surface = no_suffix
 
         return words
@@ -237,8 +191,8 @@ class NER:
             if abs(word.count - ex_word.count) / max(word.count, ex_word.count) > 0.05:
                 continue
 
-            if word.surface in ex_word.surface or ex_word.surface in word.surface:
-                LogHelper.debug(f"通过上下文和出现次数还原词根 - {word.surface}, {ex_word.surface}")
+            if  (word.surface in ex_word.surface or ex_word.surface in word.surface) and word.surface != ex_word.surface:
+                LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.surface}, {ex_word.surface}")
                 words_map[key] = word if len(word.surface) > len(ex_word.surface) else ex_word
 
         # 根据 word_map 更新words
@@ -247,3 +201,31 @@ class NER:
             updated_words.append(words_map[tuple(word.context)])
 
         return updated_words
+
+    # 通过 词语形态学 校验词语
+    def validate_words_by_morphology(self, words):
+        for word in words:
+            if len(word.context) == 0:
+                continue
+
+            for token in self.sudachipy_tokenizer.tokenize("\n".join(word.context), self.sudachipy_mode):
+                if word.surface in token.surface() and "名詞" not in token.part_of_speech():
+                    LogHelper.info(f"通过 [green]词语形态学[/] 剔除词语 - {word.ner_type} - {word.surface}")
+                    word.ner_type = ""
+                    break
+
+        return words
+
+    # 通过 重复性 校验词语
+    def validate_words_by_duplication(self, words):
+        person_set = {word.surface for word in words if word.ner_type == "PERSON"}
+
+        for word in words:
+            if word.ner_type == "PERSON":
+                continue
+
+            if any(v in word.surface for v in person_set):
+                LogHelper.info(f"通过 [green]重复性校验[/] 剔除词语 - {word.ner_type} - {word.surface}")
+                word.ner_type = ""
+
+        return words

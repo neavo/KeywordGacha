@@ -11,5 +11,6 @@ __pycache__
 /debug*
 /all.orig*
 /words_dict*
+/config_dev*
 /ManualTransFile*
-/resource/kg_ner_ja_onnx*
+/resource/*onnx*
