@@ -101,7 +101,7 @@ def write_words_to_file(words, filename, detail):
     with open(filename, "w", encoding = "utf-8") as file:
         if not detail:
             data = {}
-            data["自动翻译条目仅作填充列表用途"] = data["请打开日志文件查看详细信息！！"]
+            data["自动翻译条目仅作填充列表用途"] = "请打开日志文件查看详细信息！！"
 
             for k, word in enumerate(words):
                 if word.surface_translation and len(word.surface_translation) > 0:
