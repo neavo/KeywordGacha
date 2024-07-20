@@ -25,6 +25,20 @@ class NER:
     ONNX_BACTH_SIZE = 256 if LogHelper.is_debug() else min(os.cpu_count(), 8)
     ONNX_SIZE_PER_GROUP = 512 if LogHelper.is_debug() else 256
 
+    RE_SPLIT_BY_PUNCTUATION = re.compile(
+        rf"[" +
+        rf"{TextHelper.GENERAL_PUNCTUATION[0]}-{TextHelper.GENERAL_PUNCTUATION[1]}" +
+        rf"{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0]}-{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]}" +
+        rf"{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_1[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_1[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_2[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_2[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_3[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_3[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_4[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_4[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_GENERAL[0]}-{TextHelper.LATIN_PUNCTUATION_GENERAL[1]}" +
+        rf"{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]}" +
+        rf"・♥]+"
+    )
+
     SPACY_PATH = "resource\\kg_ner_ja"
     SPACY_N_PROCESS = 2
     SPACY_BACTH_SIZE = 128
@@ -149,7 +163,7 @@ class NER:
             pid = progress.add_task("查找 NER 实体", total = None)
             for doc in self.spacy_tokenizer.pipe(full_text_lines, n_process = self.SPACY_N_PROCESS, batch_size = self.SPACY_BACTH_SIZE):
                 for token in doc:
-                    surfaces = re.split(r'[・]', token.text) # ・ 和 空格 都作为分隔符
+                    surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, token.text)
                     for surface in surfaces:
                         # Spacy 结果中没有置信度参数，所以直接排除人名以外的条目
                         if (
@@ -186,7 +200,7 @@ class NER:
                 self.onnx_tokenizer.call_count = 0 # 防止出现应使用 dateset 的提示
                 for i, doc in enumerate(self.onnx_tokenizer(lines)):
                     for token in doc:
-                        surfaces = re.split(r'[・ ]', token.get("word").replace(" ", "")) # ・ 和 空格 都作为分隔符
+                        surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, token.get("word").replace(" ", "")) # ・ 和 空格 都作为分隔符
                         for surface in surfaces:
                             score = token.get("score")
                             entity_group = self.NER_TYPES.get(token.get("entity_group"), "")
