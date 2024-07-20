@@ -217,13 +217,10 @@ def replace_words_by_ner_type(words, in_words, ner_type):
     return words
 
 # 查找 NER 实体
-def search_for_entity(ner, full_text_lines, task_mode):
+def search_for_entity(ner, full_text_lines):
     LogHelper.info("即将开始执行 [查找 NER 实体] ...")
 
-    if task_mode == NER.TASK_MODES.QUICK:
-        words = ner.search_for_entity_qucik(full_text_lines)
-    elif task_mode == NER.TASK_MODES.ACCURACY:
-        words = ner.search_for_entity_accuracy(full_text_lines)
+    words = ner.search_for_entity_accuracy(full_text_lines)
     words = merge_and_count(words, "\n".join(full_text_lines))
 
     if os.path.exists("debug.txt"):
@@ -289,11 +286,11 @@ def print_app_info():
     LogHelper.print()
     LogHelper.rule(f"KeywordGacha", style = "light_goldenrod2")
     LogHelper.rule(f"[blue]https://github.com/neavo/KeywordGacha", style = "light_goldenrod2")
-    LogHelper.rule(f"使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等任意文本中的词汇表的翻译辅助工具", style = "light_goldenrod2")
+    LogHelper.rule(f"使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等任意文本中的词语表的翻译辅助工具", style = "light_goldenrod2")
     LogHelper.print()
 
     table = Table(box = box.ASCII2, expand = True, highlight = True, show_lines = True, border_style = "light_goldenrod2")
-    table.add_column("设置", justify = "left", style = "white", width = 24,overflow = "fold")
+    table.add_column("设置", justify = "left", style = "white", width = 24, overflow = "fold")
     table.add_column("当前值", justify = "left", style = "white", width = 24, overflow = "fold")
     table.add_column("说明信息 - 修改设置请打开 [blue]Config.json[/] 文件", justify = "left", style = "white", overflow = "fold")
 
@@ -309,28 +306,68 @@ def print_app_info():
     LogHelper.print(table)
     LogHelper.print()
 
-# 主函数
-async def begin():
-    # 打印应用信息
-    print_app_info()
-
-    LogHelper.print(f"选择工作模式：")
-    LogHelper.print(f"　　--> 1. 快速模式 - 速度快，只能识别角色，无法识别其他类型的实体")
-    LogHelper.print(f"　　--> 2. 增强模式 - [green]默认模式[/]，速度较慢，识别能力强，可以识别角色、组织、道具等各种类型的实体")
+# 打印菜单
+def print_menu_main():
+    LogHelper.print(f"请选择：")
     LogHelper.print(f"")
-    G.work_mode = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 选择运行模式，默认为 [green]增强模式[/]", 
-        choices = ["1", "2"],
+    LogHelper.print(f"\t--> 1. 开始处理 [green]中文文本[/]（暂未实现）")
+    LogHelper.print(f"\t--> 2. 开始处理 [green]日文文本[/]")
+    LogHelper.print(f"\t--> 3. 开始处理 [green]英文文本[/]（暂未实现）")
+    LogHelper.print(f"\t--> 4. 开始处理 [green]韩文文本[/]（暂未实现）")
+    LogHelper.print(f"\t--> 5. 查看常见问题")
+    LogHelper.print(f"")
+    choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的功能（默认为 2）", 
+        choices = ["2", "5"],
         default = "2",
         show_choices = False,
         show_default = False
     ))
-    
-    if G.work_mode == 1:
-        LogHelper.info(f"您选择了 [green]快速模式[/] ...")
-        LogHelper.print()
-    elif G.work_mode == 2:
-        LogHelper.info(f"您选择了 [green]增强模式[/] ...")
-        LogHelper.print()
+    LogHelper.print(f"")
+
+    return choice
+
+def print_menu_qa():
+    os.system("cls")
+    LogHelper.print(f"Q：KeywordGacha 支持读取哪些格式的文本文件？", highlight = True)
+    LogHelper.print(f"A：目前支持三种不同的输入文本格式。", highlight = True)
+    LogHelper.print(f"\t• .txt 纯文本格式，会将文件内的每一行当作一个句子来处理；", highlight = True)
+    LogHelper.print(f"\t• .json 格式，会将文件内的每一条数据的 Key 的值当作一个句子来处理；", highlight = True)
+    LogHelper.print(f"\t• .csv 表格，会将文件内的每一行的第一列当作一个句子来处理；", highlight = True)
+    # LogHelper.print(f"\t• 如果输入路径是一个文件夹，那则会读取这个文件夹内所有的 .txt .csv .json 文件；", highlight = True)
+    LogHelper.print(f"", highlight = True)
+
+    LogHelper.print(f"Q：我该如何获得这些格式的文本文件？", highlight = True)
+    LogHelper.print(f"A：小说：", highlight = True)
+    LogHelper.print(f"\t• 一般都是 .txt 纯文本文件，可直接使用；", highlight = True)
+    LogHelper.print(f"A：游戏文本：", highlight = True)
+    LogHelper.print(f"\t• 可通过 [blue]MTool[/] 、 [blue]SExtractor[/] 、[blue]Translator++[/] 等工具导出可用的游戏文本；", highlight = True)
+    LogHelper.print(f"\t• 注意，虽然 KG 支持对 [blue]MTool[/] 导出文本的分析，但是因 [blue]MTool[/] 文本分割的特殊性，其分析效果较差；", highlight = True)
+    LogHelper.print(f"", highlight = True)
+
+    LogHelper.print(f"Q：处理过程中频繁报错错误提示怎么办？", highlight = True)
+    LogHelper.print(f"A：少量报错：", highlight = True)
+    LogHelper.print(f"\t• 一般不影响结果，不是强迫症可以无视。", highlight = True)
+    LogHelper.print(f"A：全部报错：", highlight = True)
+    LogHelper.print(f"\t• 一般是 接口信息填写错误 或者 本地服务器配置错误，请检查 [blue]config.cfg[/]。", highlight = True)
+    LogHelper.print(f"A：请求频率限制：", highlight = True)
+    LogHelper.print(f"\t• 如果报错信息中有错误码 [orange_red1]Error 429[/] 或者类似于 [orange_red1]请求过于频繁[/] 的错误信息，则为接口平台的请求频率限制。", highlight = True)
+    LogHelper.print(f"\t• 请在 [blue]config.cfg[/] 中逐步调小 [blue]request_frequency_threshold[/] 的值，一直到不报错为止，这个值可以小于 1。", highlight = True)
+    LogHelper.print(f"", highlight = True)
+
+    os.system("pause")
+    os.system("cls")
+
+# 主函数
+async def begin():
+    # 打印应用信息
+    choice = -1
+    while choice != 2:
+        print_app_info()
+        choice = print_menu_main()
+        if choice == 2:
+            None
+        elif choice == 5:
+            print_menu_qa()
 
     # 初始化 LLM 对象
     llm = LLM(G.config)
@@ -351,7 +388,7 @@ async def begin():
 
     # 查找 NER 实体
     words = []
-    words = search_for_entity(ner, full_text_lines, G.work_mode * 10)
+    words = search_for_entity(ner, full_text_lines)
 
     # 等待词性判断任务结果
     LogHelper.info("即将开始执行 [词性判断] ...")

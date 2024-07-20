@@ -10,7 +10,5 @@ onnxruntime
 
 fugashi
 unidic_lite
-
-wheel
-setuptools
-spacy[ja]
+sudachipy
+sudachidict_core

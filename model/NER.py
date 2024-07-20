@@ -2,9 +2,10 @@ import re
 import os
 import json
 
-import spacy
 import onnxruntime
 
+from sudachipy import tokenizer
+from sudachipy import dictionary
 from transformers import AutoTokenizer
 from optimum.pipelines import pipeline
 from optimum.onnxruntime import ORTModelForTokenClassification
@@ -39,10 +40,6 @@ class NER:
         rf"・♥]+"
     )
 
-    SPACY_PATH = "resource\\kg_ner_ja"
-    SPACY_N_PROCESS = 2
-    SPACY_BACTH_SIZE = 128
-
     NER_TYPES = {
         "": "",                 # 表示非实体，数量极多
         "PERSON": "PERSON",     # 表示人名，如"张三"、"约翰·多伊"等。
@@ -51,7 +48,6 @@ class NER:
         "INS": "INS",           # 表示设施，如"医院"、"学校"、"机场"等。
         "PRODUCT": "PRODUCT",   # 表示产品，如"iPhone"、"Windows操作系统"等。
         "EVENT": "EVENT",       # 表示事件，如"奥运会"、"地震"等。
-        "MISC": "MISC",         # 表示事件，如"奥运会"、"地震"等。
 
         "人名": "PERSON",
         "法人名": "ORG",
@@ -61,43 +57,13 @@ class NER:
         "施設名": "INS",
         "製品名": "PRODUCT",
         "イベント名": "EVENT",
-        
-        "CARDINAL": "MISC",     # 表示基数词，如数字"1"、"三"等。
-        "DATE": "MISC",         # 表示日期，如"2024年07月11日"。
-        "EVENT": "EVENT",       # 表示事件，如"奥运会"、"地震"等。
-        "FAC": "FAC",           # 表示设施，如"医院"、"学校"、"机场"等。
-        "GPE": "LOC",           # 表示地理政治实体，如"中国"、"纽约"等。
-        "LANGUAGE": "MISC",     # 表示语言，如"英语"、"汉语"等。
-        "LAW": "MISC",          # 表示法律、法规，如"宪法"、"民法典"等。
-        "LOC": "LOC",           # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
-        "MONEY": "MISC",        # 表示货币，如"100美元"、"500欧元"等。
-        "MOVEMENT": "ORG",      # 表示运动或趋势，如"女权运动"、"环保运动"等。
-        "NORP": "ORG",          # 表示民族或宗教组织，如"基督教"、"伊斯兰教"等。
-        "ORDINAL": "MISC",      # 表示序数词，如"第一"、"第二"等。
-        "ORG": "ORG",           # 表示组织，如"联合国"、"苹果公司"等。
-        "PERCENT": "MISC",      # 表示百分比，如"50%"。
-        "PERSON": "PERSON",     # 表示人名，如"张三"、"约翰·多伊"等。
-        "PET_NAME": "PERSON",   # 表示宠物的名字，如"小白"、"Max"等。
-        "PHONE": "MISC",        # 表示电话号码，如"123-456-7890"。
-        "PRODUCT": "PRODUCT",   # 表示产品，如"iPhone"、"Windows操作系统"等。
-        "QUANTITY": "MISC",     # 表示数量，如"两公斤"、"三个"等。
-        "TIME": "MISC",         # 表示时间，如"下午三点"、"午夜"等。
-        "TITLE_AFFIX": "MISC",  # 表示头衔或后缀，如"博士"、"先生"、"女士"等。
-        "WORK_OF_ART": "MISC",  # 表示艺术作品，如"蒙娜丽莎"、"悲惨世界"等。
     }
 
     def __init__(self):
         self.blacklist = ""
 
-        self.spacy_tokenizer = spacy.load(
-            self.SPACY_PATH,
-            exclude = [
-                # "parser",
-                # "tok2vec",
-                # "morphologizer",
-                # "attribute_ruler"
-            ]
-        )
+        self.sudachipy_mode = tokenizer.Tokenizer.SplitMode.C
+        self.sudachipy_tokenizer = dictionary.Dictionary().create()
 
         session_options = onnxruntime.SessionOptions()
         session_options.log_severity_level = 4
@@ -154,36 +120,6 @@ class NER:
 
         return words
 
-    # 查找 NER 实体 - 快速模式
-    def search_for_entity_qucik(self, full_text_lines):
-        words = []
-
-        LogHelper.print()
-        with ProgressHelper.get_progress() as progress:
-            pid = progress.add_task("查找 NER 实体", total = None)
-            for doc in self.spacy_tokenizer.pipe(full_text_lines, n_process = self.SPACY_N_PROCESS, batch_size = self.SPACY_BACTH_SIZE):
-                for token in doc:
-                    surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, token.text)
-                    for surface in surfaces:
-                        # Spacy 结果中没有置信度参数，所以直接排除人名以外的条目
-                        if (
-                            self.NER_TYPES.get(token.ent_type_, "") == self.NER_TYPES.get("PERSON") 
-                            or 
-                            self.NER_TYPES.get(token.ent_type_, "") == self.NER_TYPES.get("PET_NAME")
-                        ):
-                            score = 1.0
-                        else:
-                            score = 0.0
-
-                        entity_group = self.NER_TYPES.get(token.ent_type_, "")
-                        words.extend(self.generate_words(score, surface, entity_group))
-
-                progress.update(pid, advance = 1, total = len(full_text_lines))
-        LogHelper.print()
-        LogHelper.info(f"[查找 NER 实体] 已完成 ...")
-
-        return words
-        
     # 查找 NER 实体 - 精确模式
     def search_for_entity_accuracy(self, full_text_lines):
         words = []
@@ -272,9 +208,8 @@ class NER:
             if len(word.context) == 0:
                 continue
 
-            doc = self.spacy_tokenizer("\n".join(word.context))
-            for token in doc:
-                if word.surface in token.text and "名詞" not in token.tag_:
+            for token in self.sudachipy_tokenizer.tokenize("\n".join(word.context), self.sudachipy_mode):
+                if word.surface in token.surface() and "名詞" not in token.part_of_speech():
                     LogHelper.info(f"通过 [green]词语形态学[/] 剔除词语 - {word.ner_type} - {word.surface}")
                     word.ner_type = ""
                     break
