@@ -39,7 +39,6 @@ jobs:
           xcopy "model" "dist\KeywordGacha\model" /E /I /H /Y
           xcopy "helper" "dist\KeywordGacha\helper" /E /I /H /Y
           xcopy "prompt" "dist\KeywordGacha\prompt" /E /I /H /Y
-          xcopy "resource\kg_ner_ja" "dist\KeywordGacha\resource\kg_ner_ja" /E /I /H /Y
 
           copy "01_启动.bat" "dist\KeywordGacha\"
           copy "main.py" "dist\KeywordGacha\"
