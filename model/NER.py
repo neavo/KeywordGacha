@@ -2,6 +2,7 @@ import re
 import os
 import json
 
+import torch
 import onnxruntime
 
 from sudachipy import tokenizer
@@ -21,10 +22,10 @@ class NER:
     TASK_MODES.QUICK = 10
     TASK_MODES.ACCURACY = 20
 
-    ONNX_PATH = "resource\\kg_ner_ja_onnx_gpu" if LogHelper.is_debug() else "resource\\kg_ner_ja_onnx_cpu"
-    ONNX_DEVICE = "cuda" if LogHelper.is_debug() else "cpu"
-    ONNX_BACTH_SIZE = 256 if LogHelper.is_debug() else min(os.cpu_count(), 8)
-    ONNX_SIZE_PER_GROUP = 512 if LogHelper.is_debug() else 256
+    ONNX_PATH = "resource\\kg_ner_ja_onnx_gpu" if torch.cuda.is_available() else "resource\\kg_ner_ja_onnx_cpu"
+    ONNX_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    ONNX_BACTH_SIZE = 256 if torch.cuda.is_available() else min(os.cpu_count(), 8)
+    ONNX_SIZE_PER_GROUP = 512 if torch.cuda.is_available() else 256
 
     RE_SPLIT_BY_PUNCTUATION = re.compile(
         rf"[" +
@@ -188,7 +189,7 @@ class NER:
             else:
                 ex_word = words_map[key]
 
-            if abs(word.count - ex_word.count) / max(word.count, ex_word.count) > 0.05:
+            if abs(word.count - ex_word.count) / max(word.count, ex_word.count, 1) > 0.05:
                 continue
 
             if  (word.surface in ex_word.surface or ex_word.surface in word.surface) and word.surface != ex_word.surface:
