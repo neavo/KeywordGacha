@@ -23,53 +23,113 @@ from helper.ProgressHelper import ProgressHelper
 # 丑陋，但是有效，不服你咬我啊
 G = type("GClass", (), {})()
 
-# 读取TXT文件并返回
-def read_txt_file(filename):
+# 读取 .txt 文件
+def read_txt_file(file_path):
     try:
-        with open(filename, "r", encoding="utf-8") as file:
-            lines = file.readlines()
-        return lines
-    except FileNotFoundError:
-        LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.readlines()
+    except Exception as e:
+        LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-# 读取JSON文件并返回
-def read_json_file(filename):
+# 读取 .csv 文件
+def read_csv_file(file_path):
+    lines = []
+
+    try:
+        with open(file_path, "r", newline = "", encoding = "utf-8") as file:
+            reader = csv.reader(file)
+
+            for row in reader:
+                lines.append(row[0])         
+    except Exception as e:
+        LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
+
+    return lines
+
+# 读取 .json 文件
+def read_json_file(file_path):
+    lines = []
+
     try:
         # 读取并加载JSON文件
-        with open(filename, "r", encoding="utf-8") as file:
+        with open(file_path, "r", encoding="utf-8") as file:
             data = json.load(file)
 
-        # 遍历JSON数据，提取所有键
-        keys_list = []
-        for key in data.keys():
-            keys_list.append(key)
+            for key in data.keys():
+                lines.append(key)
+    except Exception as e:
+        LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-        # 返回包含所有键的列表
-        return keys_list
-    except FileNotFoundError:
-        LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
-    except json.JSONDecodeError:
-        LogHelper.error(f"读取文件 {filename} 时出错 : {str(error)}")
+    return lines
 
-# 遍历目录文件夹，读取所有csv文件并返回
-def read_csv_files(directory):
+# 读取数据文件
+def read_data_file():
     input_data = []
 
-    try:
-        for root, _, files in os.walk(directory):
-            for file in files:
-                if file.endswith(".csv"):
-                    file_path = os.path.join(root, file)
-                    with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
-                        reader = csv.reader(csvfile)
+    if os.path.exists("ManualTransFile.json"):
+        user_input = input(f'已找到数据文件 "ManualTransFile.json"，按回车直接使用或输入其他文件的路径：').strip('"')
 
-                        for row in reader:
-                            input_data.append(row[0])
-                        
-    except Exception as error:
-        LogHelper.error(f"读取文件夹 {directory} 时出错 : {str(error)}")
+        if user_input:
+            file_path = user_input
+        else:
+            file_path = "ManualTransFile.json"
+    elif os.path.exists("all.orig.txt"):
+        user_input = input(f'已找到数据文件 "all.orig.txt"，按回车直接使用或输入其他文件的路径：').strip('"')
 
-    return input_data
+        if user_input:
+            file_path = user_input
+        else:
+            file_path = "all.orig.txt"
+    elif os.path.exists("data"):
+        user_input = input(f'已找到数据文件夹 "data"，按回车直接使用或输入其他文件的路径：').strip('"')
+
+        if user_input:
+            file_path = user_input
+        else:
+            file_path = "data"
+    else:
+        file_path = input('请输入数据文件的路径: ').strip('"')
+
+    if file_path.endswith(".txt"):
+        input_data = read_txt_file(file_path)
+    elif file_path.endswith(".csv"):
+        input_data = read_csv_file(file_path)
+    elif file_path.endswith(".json"):
+        input_data = read_json_file(file_path)
+    elif os.path.isdir(file_path):
+        for entry in os.scandir(file_path):
+            if entry.is_file() and entry.name.endswith(".txt"):
+                input_data += read_txt_file(entry.path)
+            elif entry.is_file() and entry.name.endswith(".csv"):
+                input_data += read_csv_file(entry.path)
+            elif entry.is_file() and entry.name.endswith(".json"):
+                input_data += read_json_file(entry.path)
+    else:
+        LogHelper.warning(f"不支持的文件格式: {file_path}")
+        os.system("pause")
+        exit(1)
+
+    input_data_filtered = []
+    for k, line in enumerate(input_data):
+        # 【\N[123]】 这种形式是代指角色名字的变量
+        # 直接抹掉就没办法判断角色了
+        # 先把 \N 部分抹掉，保留 ID 部分
+        line = line.strip().replace(r'\\N', '')
+        line = re.sub(r'(\\\{)|(\\\})', '', line) # 放大或者缩小字体的代码
+        line = re.sub(r'\\[A-Z]{1,3}\[\d+\]', '', line, flags = re.IGNORECASE) # 干掉其他乱七八糟的部分代码
+        line = line.strip().replace("【】", "") # 由于上面的代码移除，可能会产生空人名框的情况，干掉
+        line = line.strip().replace('\n', '') # 干掉行内换行
+
+        if len(line) == 0:
+            continue
+
+        if not TextHelper.has_any_japanese(line):
+            continue
+
+        input_data_filtered.append(line.strip())
+
+    LogHelper.info(f"已读取到文本 {len(input_data)} 行，其中有效文本 {len(input_data_filtered)} 行 ...")
+    return input_data_filtered
 
 # 合并与计数
 def merge_and_count(words, full_text_string):
@@ -141,65 +201,6 @@ def write_words_to_file(words, filename, detail):
 
     LogHelper.info(f"结果已写入 - [green]{filename}[/]")
 
-# 读取数据文件
-def read_data_file():
-    input_data = []
-
-    if os.path.exists("ManualTransFile.json"):
-        user_input = input(f'已找到数据文件 "ManualTransFile.json"，按回车直接使用或输入其他文件的路径：').strip('"')
-
-        if user_input:
-            input_file_name = user_input
-        else:
-            input_file_name = "ManualTransFile.json"
-    elif os.path.exists("all.orig.txt"):
-        user_input = input(f'已找到数据文件 "all.orig.txt"，按回车直接使用或输入其他文件的路径：').strip('"')
-
-        if user_input:
-            input_file_name = user_input
-        else:
-            input_file_name = "all.orig.txt"
-    elif os.path.exists("data"):
-        user_input = input(f'已找到数据文件夹 "data"，按回车直接使用或输入其他文件的路径：').strip('"')
-
-        if user_input:
-            input_file_name = user_input
-        else:
-            input_file_name = "data"
-    else:
-        input_file_name = input('请输入数据文件的路径: ').strip('"')
-
-    if input_file_name.endswith(".txt"):
-        input_data = read_txt_file(input_file_name)
-    elif input_file_name.endswith(".json"):
-        input_data = read_json_file(input_file_name)
-    elif os.path.isdir(input_file_name):
-        input_data = read_csv_files(input_file_name)
-    else:
-        LogHelper.warning(f"不支持的文件格式: {input_file_name}")
-        os.system("pause")
-        exit(1)
-
-    input_data_filtered = []
-    for k, line in enumerate(input_data):
-        # 【\N[123]】 这种形式是代指角色名字的变量
-        # 直接抹掉就没办法判断角色了
-        # 先把 \N 部分抹掉，保留 ID 部分
-        line = line.strip().replace(r'\\N', '')
-        line = re.sub(r'(\\\{)|(\\\})', '', line) # 放大或者缩小字体的代码
-        line = re.sub(r'\\[A-Z]{1,3}\[\d+\]', '', line, flags=re.IGNORECASE) # 干掉其他乱七八糟的部分代码
-        line = line.strip().replace("【】", "") # 由于上面的代码移除，可能会产生空人名框的情况，干掉
-        line = line.strip().replace('\n', '') # 干掉行内换行
-
-        if len(line) == 0:
-            continue
-
-        if not TextHelper.has_any_japanese(line):
-            continue
-
-        input_data_filtered.append(line.strip())
-
-    return input_data_filtered
 
 # 获取指定类型的词
 def get_words_by_ner_type(words, ner_type):
