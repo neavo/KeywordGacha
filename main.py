@@ -97,13 +97,19 @@ def read_data_file():
     elif file_path.endswith(".json"):
         input_data = read_json_file(file_path)
     elif os.path.isdir(file_path):
-        for entry in os.scandir(file_path):
-            if entry.is_file() and entry.name.endswith(".txt"):
-                input_data += read_txt_file(entry.path)
-            elif entry.is_file() and entry.name.endswith(".csv"):
-                input_data += read_csv_file(entry.path)
-            elif entry.is_file() and entry.name.endswith(".json"):
-                input_data += read_json_file(entry.path)
+        def recursive_scan(path):
+            nonlocal input_data
+            for entry in os.scandir(path):
+                if entry.is_file():
+                    if entry.name.endswith(".txt"):
+                        input_data += read_txt_file(entry.path)
+                    elif entry.name.endswith(".csv"):
+                        input_data += read_csv_file(entry.path)
+                    elif entry.name.endswith(".json"):
+                        input_data += read_json_file(entry.path)
+                elif entry.is_dir():
+                    recursive_scan(entry.path)
+        recursive_scan(file_path)
     else:
         LogHelper.warning(f"不支持的文件格式: {file_path}")
         os.system("pause")
