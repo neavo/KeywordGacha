@@ -46,7 +46,7 @@ class LLM:
 
     # 请求参数配置 - 翻译上下文
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TEMPERATURE = 0
+    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TEMPERATURE = 1
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TOP_P = 1
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].FREQUENCY_PENALTY = 0
@@ -183,7 +183,7 @@ class LLM:
                 raise e
 
             if any(v in ["是", "は"] for v in result["character_name"]):
-                word.ner_type = NER.NER_TYPES.get("PERSON")
+                word.ner_type = NER.NER_TYPES.get("PER")
                 LogHelper.debug(f"{word.surface} - {result}")
             elif "否" in result["character_name"]:
                 word.ner_type = ""
@@ -244,7 +244,7 @@ class LLM:
     # 词语翻译任务
     async def translate_surface(self, word, retry):
         async with self.semaphore, self.async_limiter:
-            if word.ner_type != NER.NER_TYPES.get("PERSON"):
+            if word.ner_type != NER.NER_TYPES.get("PER"):
                 prompt = self.prompt_translate_surface_common
             else:
                 prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
@@ -408,7 +408,7 @@ class LLM:
                 raise e
 
             if any(v in ["是", "は"] for v in result["character_name"]):
-                word.ner_type = NER.NER_TYPES.get("PERSON")
+                word.ner_type = NER.NER_TYPES.get("PER")
                 LogHelper.debug(f"{word.surface} - {result}")
             elif "否" in result["character_name"]:
                 word.ner_type = ""

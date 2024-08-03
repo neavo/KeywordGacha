@@ -108,7 +108,7 @@ class TextHelper:
 
     # 判断字符串是否全部为平假名
     @staticmethod
-    def is_all_hiragana(ch):
+    def is_all_hiragana(text):
         return all(TextHelper.is_hiragana(ch) for ch in text)
 
     # 检查字符串是否包含至少一个平假名
