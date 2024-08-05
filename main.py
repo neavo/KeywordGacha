@@ -378,6 +378,11 @@ async def begin():
     # 初始化 LLM 对象
     llm = LLM(G.config)
     llm.load_blacklist("blacklist.txt")
+    llm.load_prompt_validate_ner_evt("prompt\\prompt_validate_ner_evt.txt")
+    llm.load_prompt_validate_ner_ins("prompt\\prompt_validate_ner_ins.txt")
+    llm.load_prompt_validate_ner_loc("prompt\\prompt_validate_ner_loc.txt")
+    llm.load_prompt_validate_ner_org("prompt\\prompt_validate_ner_org.txt")
+    llm.load_prompt_validate_ner_prd("prompt\\prompt_validate_ner_prd.txt")
     llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
     llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
     llm.load_prompt_translate_surface_common("prompt\\prompt_translate_surface_common.txt")
@@ -402,12 +407,19 @@ async def begin():
     words_person = remove_words_by_ner_type(words_person, "")
     words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PER"))
 
+    # 等待实体校验任务结果
+    # LogHelper.info("即将开始执行 [实体校验] ...")
+    # words = await llm.validate_ner_batch(words)
+    # LogHelper.debug(f"{len(words)}")
+    # words = remove_words_by_ner_type(words, "")
+    # LogHelper.debug(f"{len(words)}")
+
     # 等待翻译词语任务结果
     if G.config.translate_surface_mode == 1:
         LogHelper.info("即将开始执行 [词语翻译] ...")
         words = await llm.translate_surface_batch(words)
 
-    # 等待上下文词表任务结果
+    # 等待上下文翻译任务结果
     if G.config.translate_context_mode == 1:
         LogHelper.info("即将开始执行 [上下文翻译] ...")
         words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PER"))

@@ -239,10 +239,10 @@ class NER:
 
             if (word.surface in ex_word.surface or ex_word.surface in word.surface) and word.surface != ex_word.surface:
                 if len(word.surface) > len(ex_word.surface):
-                    LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {ex_word.surface}")
+                    LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.ner_type} - {ex_word.surface} [green]->[/] {word.surface}")
                     words_map[key] = word
                 else:
-                    LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.ner_type} - {ex_word.surface} [green]->[/] {word.surface}")
+                    LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {ex_word.surface}")
                     words_map[key] = ex_word
 
         # 根据 word_map 更新words
