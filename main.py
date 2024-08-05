@@ -186,7 +186,7 @@ def write_words_to_file(words, filename, detail):
                 if word.ner_type == NER.NER_TYPES.get("PER"):
                     file.write(f"角色性别 : {word.attribute}\n")
 
-                file.write(f"词义分析 : {word.context_summary.get("summary", "")}\n")
+                file.write(f"语义分析 : {word.context_summary.get("summary", "")}\n")
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'\n'.join(word.context)}\n")
 
@@ -196,7 +196,6 @@ def write_words_to_file(words, filename, detail):
 
                 if LogHelper.is_debug():
                     file.write(f"置信度 : {word.score}\n")
-                    file.write(f"{word.llmresponse_analyze_attribute}\n")
                     file.write(f"{word.llmresponse_summarize_context}\n")
                     file.write(f"{word.llmresponse_translate_context}\n")
                     file.write(f"{word.llmresponse_translate_surface}\n")
@@ -256,16 +255,15 @@ def search_for_entity(ner, full_lines):
     LogHelper.print()
     LogHelper.info("[查找上下文] 已完成 ...")
 
-    # 有了上下文以后，开始执行静态校验
-    LogHelper.info("即将开始执行 [静态校验] ...")
-    words = ner.validate_words_by_morphology(words, full_lines)
+    # 有了上下文以后，开始执行还原词根
+    LogHelper.info("即将开始执行 [还原词根] ...")
+    words = ner.lemmatize_words_by_morphology(words, full_lines)
     words = remove_words_by_ner_type(words, "")
     words = merge_and_count(words, full_lines)
-    words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PER"))
-    words_person = ner.lemmatize_words_by_count(words_person, full_lines)
-    words_person = merge_and_count(words_person, full_lines)
-    words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PER"))
-    LogHelper.info(f"[静态校验] 已完成 ...")
+    words = ner.lemmatize_words_by_count(words, full_lines)
+    words = remove_words_by_ner_type(words, "")
+    words = merge_and_count(words, full_lines)
+    LogHelper.info(f"[还原词根] 已完成 ...")
 
     # 按阈值筛选角色实体，但是保证至少有20个条目
     LogHelper.info(f"即将开始执行 [阈值筛选] ... 当前出现次数的筛选阈值设置为 {G.config.count_threshold} ...")
@@ -380,7 +378,6 @@ async def begin():
     # 初始化 LLM 对象
     llm = LLM(G.config)
     llm.load_blacklist("blacklist.txt")
-    llm.load_prompt_analyze_attribute("prompt\\prompt_analyze_attribute.txt")
     llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
     llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
     llm.load_prompt_translate_surface_common("prompt\\prompt_translate_surface_common.txt")
@@ -398,25 +395,12 @@ async def begin():
     words = []
     words = search_for_entity(ner, full_text_lines)
 
-    # 等待词性判断任务结果
-    LogHelper.info("即将开始执行 [词性判断] ...")
-    words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PER"))
-    words_person = await llm.analyze_attribute_batch(words_person)
-    words_person = remove_words_by_ner_type(words_person, "")
-    words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PER"))
-
-    # 等待词义分析任务结果
-    LogHelper.info("即将开始执行 [词义分析] ...")
+    # 等待语义分析任务结果
+    LogHelper.info("即将开始执行 [语义分析] ...")
     words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PER"))
     words_person = await llm.summarize_context_batch(words_person)
     words_person = remove_words_by_ner_type(words_person, "")
     words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PER"))
-
-    # 此时对角色实体的校验已全部完成，将其他类型实体中与角色名重复的剔除
-    LogHelper.info("即将开始执行 [重复性校验] ...")
-    words = ner.validate_words_by_duplication(words)
-    words = remove_words_by_ner_type(words, "")
-    LogHelper.info("[重复性校验] 已完成 ...")
 
     # 等待翻译词语任务结果
     if G.config.translate_surface_mode == 1:

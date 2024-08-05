@@ -198,3 +198,15 @@ class TextHelper:
         jsonstring = jsonstring.replace(",\n}", "\n}") if not jsonstring.endswith(",\n}") else jsonstring
 
         return jsonstring
+
+    # 按汉字、平假名、片假名拆开日文短语
+    @staticmethod
+    def extract_japanese(text):
+        return re.findall(
+            (
+                rf"(?:[{TextHelper.CJK[0]}-{TextHelper.CJK[1]}]+)|" +               # 汉字
+                rf"(?:[{TextHelper.HIRAGANA[0]}-{TextHelper.HIRAGANA[1]}]+)|" +     # 平假名
+                rf"(?:[{TextHelper.KATAKANA[0]}-{TextHelper.KATAKANA[1]}]+)"        # 片假名
+            ), 
+            text
+        )

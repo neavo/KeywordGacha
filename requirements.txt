@@ -7,8 +7,3 @@ aiolimiter
 onnx
 optimum
 onnxruntime
-
-fugashi
-unidic_lite
-sudachipy
-sudachidict_core

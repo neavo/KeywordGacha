@@ -27,7 +27,7 @@ class LogHelper:
         format = "[{time:YYYY-MM-DD HH:mm:ss}] [{level}] {message}",
         enqueue = True,
         encoding = "utf-8",
-        rotation = "1 MB",
+        rotation = "2 MB",
         retention = 3
     )
 
