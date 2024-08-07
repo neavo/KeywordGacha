@@ -26,7 +26,7 @@ G = type("GClass", (), {})()
 # 读取 .txt 文件
 def read_txt_file(file_path):
     try:
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, "r", encoding = "utf-8") as file:
             return file.readlines()
     except Exception as e:
         LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
@@ -52,7 +52,7 @@ def read_json_file(file_path):
 
     try:
         # 读取并加载JSON文件
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(file_path, "r", encoding = "utf-8") as file:
             data = json.load(file)
 
             for key in data.keys():
@@ -116,11 +116,12 @@ def read_data_file():
         # 【\N[123]】 这种形式是代指角色名字的变量
         # 直接抹掉就没办法判断角色了
         # 先把 \N 部分抹掉，保留 ID 部分
-        line = line.strip().replace(r'\\N', '')
-        line = re.sub(r'(\\\{)|(\\\})', '', line) # 放大或者缩小字体的代码
-        line = re.sub(r'\\[A-Z]{1,3}\[\d+\]', '', line, flags = re.IGNORECASE) # 干掉其他乱七八糟的部分代码
-        line = line.strip().replace("【】", "") # 由于上面的代码移除，可能会产生空人名框的情况，干掉
-        line = line.strip().replace('\n', '') # 干掉行内换行
+        line = line.strip().replace(r"\\N", "")
+        line = re.sub(r"(\\\{)|(\\\})", "", line) # 干掉放大或者缩小字体的代码
+        line = re.sub(r"\\[A-Z]{1,3}\[\d+\]", "", line, flags = re.IGNORECASE) # 干掉其他乱七八糟的部分代码
+        line = line.replace("【】", "") # 由于上面的代码移除，可能会产生空人名框的情况，干掉
+        line = line.replace("\n", "") # 干掉行内换行
+        line = re.sub(r"\s+", "", line) # 干掉行内空格，因为实体名称也会过滤掉空格，所以这样可以避免匹配次数时匹配不到
 
         if len(line) == 0:
             continue
@@ -133,8 +134,8 @@ def read_data_file():
     LogHelper.info(f"已读取到文本 {len(input_data)} 行，其中有效文本 {len(input_data_filtered)} 行 ...")
     return input_data_filtered
 
-# 合并与计数
-def merge_and_count(words, full_lines):
+# 合并、计数并按置信度过滤
+def merge_and_count(words, full_lines, score_threshold = 0.75):
     words_categorized = {}
     for v in words:
         if (v.surface, v.ner_type) not in words_categorized:
@@ -151,9 +152,9 @@ def merge_and_count(words, full_lines):
         word.score = score / len(v) # 平均分
 
         if (
-            word.ner_type == NER.NER_TYPES.get("PER") and word.score > 0.90
+            word.ner_type == NER.NER_TYPES.get("PER") and word.score > score_threshold
             or
-            word.ner_type != NER.NER_TYPES.get("PER") and word.score > 0.90
+            word.ner_type != NER.NER_TYPES.get("PER") and word.score > score_threshold
         ):
             words_merged.append(word)
 
@@ -219,37 +220,43 @@ def replace_words_by_ner_type(words, in_words, ner_type):
     words.extend(in_words)
     return words
 
+# 将实体字典写入文件
+def write_words_dict_to_file(words, path):
+    words_dict = {}
+    for k, word in enumerate(words):
+        if word.ner_type not in words_dict:
+            words_dict[word.ner_type] = []
+
+        t = {}
+        t["score"] = float(word.score)
+        t["count"] = word.count
+        t["surface"] = word.surface
+        t["ner_type"] = word.ner_type
+        words_dict[word.ner_type].append(t)
+
+    with open(path, "w", encoding = "utf-8") as file:
+        file.write(json.dumps(words_dict, indent = 4, ensure_ascii = False))
+
 # 查找 NER 实体
 def search_for_entity(ner, full_lines):
     LogHelper.info("即将开始执行 [查找 NER 实体] ...")
 
     words = ner.search_for_entity(full_lines)
-    words = merge_and_count(words, full_lines)
-
     if os.path.exists("debug.txt"):
-        words_dict = {}
-        for k, word in enumerate(words):
-            if word.ner_type not in words_dict:
-                words_dict[word.ner_type] = []
-
-            t = {}
-            t["score"] = float(word.score)
-            t["count"] = word.count
-            t["surface"] = word.surface
-            t["ner_type"] = word.ner_type
-            words_dict[word.ner_type].append(t)
-
-        with open("words_dict.json", "w", encoding="utf-8") as file:
-            file.write(json.dumps(words_dict, indent = 4, ensure_ascii = False))
+        LogHelper.print()
+        with LogHelper.status(f"正在将实体字典写入文件 ..."):
+            words = merge_and_count(words, full_lines, 0.50)
+            write_words_dict_to_file(words, "words_dict.json")
 
     # 查找上下文
     LogHelper.info("即将开始执行 [查找上下文] ...")
     LogHelper.print()
 
+    words = merge_and_count(words, full_lines)
     with ProgressHelper.get_progress() as progress:
         pid = progress.add_task("查找上下文", total = None)
         for k, word in enumerate(words):
-            word.set_context(word.surface, full_lines)
+            word.context = word.search_context(full_lines)
             progress.update(pid, advance = 1, total = len(words))
 
     LogHelper.print()
@@ -265,22 +272,9 @@ def search_for_entity(ner, full_lines):
     words = merge_and_count(words, full_lines)
     LogHelper.info(f"[还原词根] 已完成 ...")
 
-    # 按阈值筛选角色实体，但是保证至少有20个条目
+    # 按出现次数阈值进行筛选
     LogHelper.info(f"即将开始执行 [阈值筛选] ... 当前出现次数的筛选阈值设置为 {G.config.count_threshold} ...")
-    ner_tags = [
-        "PER",
-        "ORG",
-        "LOC",
-        "INS",
-        "PRD",
-        "EVT",
-    ]
-    for v in ner_tags:
-        words_type = get_words_by_ner_type(words, NER.NER_TYPES.get(v))
-        words_with_threshold = [word for word in words_type if word.count >= G.config.count_threshold]
-        words_all_filtered = [word for word in words_type if word not in words_with_threshold]
-        words_with_threshold.extend(words_all_filtered[:max(0, 20 - len(words_with_threshold))])
-        words = replace_words_by_ner_type(words, words_with_threshold, NER.NER_TYPES.get(v))
+    words = [word for word in words if word.count >= G.config.count_threshold]
     LogHelper.info(f"[阈值筛选] 已完成 ... 出现次数 < {G.config.count_threshold} 的条目已剔除 ...")
 
     return words
@@ -378,6 +372,7 @@ async def begin():
     # 初始化 LLM 对象
     llm = LLM(G.config)
     llm.load_blacklist("blacklist.txt")
+    llm.load_prompt_classify_ner("prompt\\prompt_classify_ner.txt")
     llm.load_prompt_validate_ner_evt("prompt\\prompt_validate_ner_evt.txt")
     llm.load_prompt_validate_ner_ins("prompt\\prompt_validate_ner_ins.txt")
     llm.load_prompt_validate_ner_loc("prompt\\prompt_validate_ner_loc.txt")
@@ -400,19 +395,29 @@ async def begin():
     words = []
     words = search_for_entity(ner, full_text_lines)
 
-    # 等待语义分析任务结果
+    # 等待 语义分析任务 结果
     LogHelper.info("即将开始执行 [语义分析] ...")
     words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PER"))
     words_person = await llm.summarize_context_batch(words_person)
     words_person = remove_words_by_ner_type(words_person, "")
     words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PER"))
 
+    # 等待 重复性校验任务 结果
+    LogHelper.info("即将开始执行 [重复性校验] ...")
+    words = ner.validate_words_by_duplication(words)
+    words = remove_words_by_ner_type(words, "")
+
+    # 等待 实体分类任务 结果
+    LogHelper.info("即将开始执行 [实体分类] ...")
+    words_prd = get_words_by_ner_type(words, "PRD")
+    words_prd = await llm.classify_ner_bacth(words_prd)
+    words_prd = remove_words_by_ner_type(words_prd, "")
+    words = replace_words_by_ner_type(words, words_prd, "PRD")
+
     # 等待实体校验任务结果
     # LogHelper.info("即将开始执行 [实体校验] ...")
     # words = await llm.validate_ner_batch(words)
-    # LogHelper.debug(f"{len(words)}")
     # words = remove_words_by_ner_type(words, "")
-    # LogHelper.debug(f"{len(words)}")
 
     # 等待翻译词语任务结果
     if G.config.translate_surface_mode == 1:
@@ -430,7 +435,6 @@ async def begin():
         ("PER", "角色实体"),
         ("ORG", "组织实体"),
         ("LOC", "地点实体"),
-        ("INS", "设施实体"),
         ("PRD", "物品实体"),
         ("EVT", "事件实体"),
     ]
@@ -464,7 +468,7 @@ def init():
     try:
         config_file = "config_dev.json" if LogHelper.is_debug() else "config.json"
 
-        with open(config_file, "r", encoding="utf-8") as file:
+        with open(config_file, "r", encoding = "utf-8") as file:
             config = json.load(file)
             G.config = type("GClass", (), {})()
 

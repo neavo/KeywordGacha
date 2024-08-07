@@ -17,6 +17,9 @@ class Word:
     CONTEXT_CACHE_LOCK = Lock()
     CONTEXT_TOKEN_THRESHOLD = 768
 
+    MATCH_LENGTHS_CACHE = {}
+    MATCH_LENGTHS_CACHE_LOCK = Lock()
+
     def __init__(self):
         self.score = 0
         self.count = 0
@@ -29,7 +32,6 @@ class Word:
         self.surface_translation_description = ""
         self.ner_type = ""
         self.attribute = ""
-        self.llmresponse_analyze_attribute = ""
         self.llmresponse_summarize_context = ""
         self.llmresponse_translate_context = ""
         self.llmresponse_translate_surface = ""
@@ -49,44 +51,47 @@ class Word:
             f"surface_translation_description={self.surface_translation_description},"
             f"ner_type={self.ner_type},"
             f"attribute={self.attribute},"
-            f"llmresponse_analyze_attribute={self.llmresponse_analyze_attribute},"
             f"llmresponse_summarize_context={self.llmresponse_summarize_context},"
             f"llmresponse_translate_context={self.llmresponse_translate_context},"
             f"llmresponse_translate_surface={self.llmresponse_translate_surface})"
         )
 
     # 从原文中提取上下文
-    def set_context(self, surface, original):
-        if surface in Word.CONTEXT_CACHE:
-            with self.CONTEXT_CACHE_LOCK:
-                self.context = Word.CONTEXT_CACHE.get(surface)
+    def search_context(self, original):
+        if self.surface in Word.CONTEXT_CACHE:
+            with Word.CONTEXT_CACHE_LOCK:
+                return Word.CONTEXT_CACHE.get(self.surface)
         else:
-            # 匹配原文，并且移除行内换行
-            matches = [re.sub(r'[\r\n]+', '', line.strip()) for line in original if surface in line]
-            
-            # 使用OrderedDict去除重复并保持顺序
-            unique_matches = list(OrderedDict.fromkeys(matches))
-            
+            # 创建一个字典来存储每个匹配项及其编码后的长度
+            match_lengths = {}
+
+            # 匹配原文并去重
+            for line in original:
+                if self.surface in line:
+                    # 检查缓存中是否有该行的长度
+                    with Word.MATCH_LENGTHS_CACHE_LOCK:
+                        if line not in Word.MATCH_LENGTHS_CACHE:
+                            Word.MATCH_LENGTHS_CACHE[line] = len(self.tiktoken_encoding.encode(line))
+                        match_lengths[line] = Word.MATCH_LENGTHS_CACHE[line]
+
             # 按长度降序排序
-            unique_matches.sort(key=lambda x: (-len(self.tiktoken_encoding.encode(x)), x))
+            sorted_matches = sorted(match_lengths.items(), key = lambda item: (-item[1], item[0]))
 
             # 在阈值范围内取 Token 最长的条数
             context = []
             context_length = 0
-            for k, line in enumerate(unique_matches):
-                line_lenght = len(self.tiktoken_encoding.encode(line))
-
-                if context_length + line_lenght > self.CONTEXT_TOKEN_THRESHOLD:
+            for line, length in sorted_matches:
+                if context_length + length > self.CONTEXT_TOKEN_THRESHOLD:
                     break
 
                 context.append(line)
-                context_length = context_length + line_lenght
-
-            self.context = context
+                context_length += length
 
             # 将结果保存到缓存中
-            with self.CONTEXT_CACHE_LOCK:
-                Word.CONTEXT_CACHE[surface] = context
+            with Word.CONTEXT_CACHE_LOCK:
+                Word.CONTEXT_CACHE[self.surface] = context
+
+            return context
 
     # 按长度截取上下文并返回
     def clip_context(self, threshold):

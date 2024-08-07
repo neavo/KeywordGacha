@@ -4,6 +4,6 @@ openai
 tiktoken
 aiolimiter
 
-onnx
+onnx==1.16.1
 optimum
 onnxruntime

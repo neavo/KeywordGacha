@@ -4,11 +4,9 @@ import json
 
 import torch
 import onnxruntime
-
-from transformers import pipeline as transformers_pipeline
+from transformers import pipeline
 from transformers import AutoTokenizer
 from transformers import AutoModelForTokenClassification
-from optimum.pipelines import pipeline as onnx_pipeline
 from optimum.onnxruntime import ORTModelForTokenClassification
 
 from model.Word import Word
@@ -22,8 +20,8 @@ class NER:
     TASK_MODES.QUICK = 10
     TASK_MODES.ACCURACY = 20
 
-    MODEL_PATH_CPU= "resource\\kg_ner_ja_onnx_cpu"
-    MODEL_PATH_GPU = "resource\\numind_NuNER_multilingual_v0_1_best"
+    GPU_ENABLE = torch.cuda.is_available() and LogHelper.is_debug()
+    MODEL_PATH = "resource\\kg_ner_ja_onnx_gpu" if GPU_ENABLE else "resource\\kg_ner_ja_onnx_cpu"
     LINE_SIZE_PER_GROUP = 256
 
     RE_SPLIT_BY_PUNCTUATION = re.compile(
@@ -44,65 +42,45 @@ class NER:
         "PER": "PER",       # 表示人名，如"张三"、"约翰·多伊"等。
         "ORG": "ORG",       # 表示组织，如"联合国"、"苹果公司"等。
         "LOC": "LOC",       # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
-        "INS": "INS",       # 表示设施，如"医院"、"学校"、"机场"等。
         "PRD": "PRD",       # 表示产品，如"iPhone"、"Windows操作系统"等。
         "EVT": "EVT",       # 表示事件，如"奥运会"、"地震"等。
-
-        "人名": "PER",
-        "法人名": "ORG",
-        "政治的組織名": "ORG",
-        "その他の組織名": "ORG",
-        "地名": "LOC",
-        "施設名": "INS",
-        "製品名": "PRD",
-        "イベント名": "EVT",
     }
 
     def __init__(self):
         self.blacklist = ""
 
-        # 在支持的设备和模型上启用 GPU 加速
-        if torch.cuda.is_available() and LogHelper.is_debug():
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.MODEL_PATH,
+            truncation = True,
+            max_length = 512,
+            model_max_length = 512,
+            local_files_only = True,
+        )
+
+        if self.GPU_ENABLE:
             self.model = AutoModelForTokenClassification.from_pretrained(
-                self.MODEL_PATH_GPU,
-                torch_dtype = torch.float16,
+                self.MODEL_PATH,            
                 local_files_only = True,
-            )
-
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.MODEL_PATH_GPU,
-                truncation = True,
-                max_length = 512,
-                model_max_length = 512,
-                local_files_only = True,
-            )
-
-            self.classifier = transformers_pipeline(
-                "token-classification",
-                model = self.model,
-                tokenizer = self.tokenizer,
-                device = "cuda",
-                batch_size = 256,
-                aggregation_strategy = "simple",
-            )
+            ).to(device = "cuda").to(torch.float16)
         else:
-            self.classifier = onnx_pipeline(
-                "token-classification",
-                model = ORTModelForTokenClassification.from_pretrained(
-                    self.MODEL_PATH_CPU,
-                    local_files_only = True,
-                ),
-                tokenizer = AutoTokenizer.from_pretrained(
-                    self.MODEL_PATH_CPU,
-                    truncation = True,
-                    max_length = 512,
-                    model_max_length = 512,
-                    local_files_only = True,
-                ),
-                device = "cpu",
-                batch_size = min(8, os.cpu_count()),
-                aggregation_strategy = "simple", 
+            session_options = onnxruntime.SessionOptions()
+            session_options.log_severity_level = 4
+            self.model = ORTModelForTokenClassification.from_pretrained(
+                self.MODEL_PATH, 
+                provider = "CPUExecutionProvider",
+                session_options = session_options,
+                use_io_binding = True,
+                local_files_only = True,
             )
+
+        self.classifier = pipeline(
+            "token-classification",
+            model = self.model,
+            device = "cuda" if self.GPU_ENABLE else "cpu",
+            tokenizer = self.tokenizer,
+            batch_size = 256 if self.GPU_ENABLE else min(16, os.cpu_count()),
+            aggregation_strategy = "simple",
+        )
 
     # 释放资源
     def release(self):
@@ -134,9 +112,13 @@ class NER:
         if not TextHelper.is_valid_japanese_word(surface, self.blacklist):
             return []
 
-        # 过滤非实体
-        if ner_type not in self.NER_TYPES:
+        # 过滤纯汉字词
+        if TextHelper.is_all_cjk(surface):
             return []
+
+        # 过滤非实体
+        # if ner_type not in self.NER_TYPES:
+        #     return []
 
         words = [Word()]
         words[0] = Word()
@@ -157,8 +139,7 @@ class NER:
 
         LogHelper.print()
         with ProgressHelper.get_progress() as progress:
-            pid = progress.add_task("查找 NER 实体", total = None)
-
+            pid = progress.add_task("查找 NER 实体", total = None)            
             for k, lines in enumerate(full_lines_chunked):
                 self.classifier.call_count = 0 # 防止出现应使用 dateset 的提示
                 for i, doc in enumerate(self.classifier(lines)):
@@ -170,6 +151,24 @@ class NER:
                             words.extend(self.generate_words(score, surface, entity_group))
 
                 progress.update(pid, advance = 1, total = len(full_lines_chunked))
+
+        # with ProgressHelper.get_progress() as progress:
+        #     pid = progress.add_task("查找 NER 实体", total = None)
+
+        #     from sudachipy import tokenizer
+        #     from sudachipy import dictionary
+
+        #     sudachi = dictionary.Dictionary(dict_type = "full").create()
+        #     for k, lines in enumerate(full_lines_chunked):
+        #         for token in sudachi.tokenize("\n".join(lines)):
+        #             if token.part_of_speech()[0] == "名詞":
+        #                 surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, token.surface().replace(" ", ""))
+        #                 for surface in surfaces:
+        #                     score = 0.95
+        #                     entity_group = ""
+        #                     words.extend(self.generate_words(score, surface, entity_group))
+
+        #         progress.update(pid, advance = 1, total = len(full_lines_chunked))
 
         self.release()
         LogHelper.print()
@@ -208,8 +207,8 @@ class NER:
                     word_ex.count = word.count
                     word_ex.score = word.score
                     word_ex.surface = v
-                    word_ex.ner_type = word.ner_type                
-                    word_ex.set_context(word_ex.surface, full_lines)
+                    word_ex.context = word_ex.search_context(full_lines)
+                    word_ex.ner_type = word.ner_type
 
                     roots.append(v)
                     words_ex.append(word_ex)
@@ -245,13 +244,27 @@ class NER:
                     LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {ex_word.surface}")
                     words_map[key] = ex_word
 
-        # 根据 word_map 更新words
+        # 根据 word_map 更新 words
         updated_words = []
         for word in words:
             updated_words.append(words_map[(word.ner_type, "".join(word.context))])
 
         # 更新上下文
         for word in updated_words:
-            word.set_context(word.surface, full_lines)
+            word.context = word.search_context(full_lines)
 
         return updated_words
+
+    # 通过 重复性 校验词语
+    def validate_words_by_duplication(self, words):
+        person_set = set(word.surface for word in words if word.ner_type == "PER")
+
+        for word in words:
+            if word.ner_type == "PER":
+                continue
+
+            if any(v in word.surface for v in person_set):
+                LogHelper.info(f"通过 [green]重复性校验[/] 剔除词语 - {word.ner_type} - {word.surface}")
+                word.ner_type = ""
+
+        return words
