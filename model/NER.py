@@ -4,11 +4,9 @@ import json
 
 import torch
 import onnxruntime
-
-from sudachipy import tokenizer
-from sudachipy import dictionary
+from transformers import pipeline
 from transformers import AutoTokenizer
-from optimum.pipelines import pipeline
+from transformers import AutoModelForTokenClassification
 from optimum.onnxruntime import ORTModelForTokenClassification
 
 from model.Word import Word
@@ -22,10 +20,9 @@ class NER:
     TASK_MODES.QUICK = 10
     TASK_MODES.ACCURACY = 20
 
-    ONNX_PATH = "resource\\kg_ner_ja_onnx_gpu" if torch.cuda.is_available() else "resource\\kg_ner_ja_onnx_cpu"
-    ONNX_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    ONNX_BACTH_SIZE = 256 if torch.cuda.is_available() else min(os.cpu_count(), 8)
-    ONNX_SIZE_PER_GROUP = 512 if torch.cuda.is_available() else 256
+    GPU_BOOST = torch.cuda.is_available() and LogHelper.is_gpu_boost()
+    MODEL_PATH = "resource\\kg_ner_ja_gpu" if GPU_BOOST else "resource\\kg_ner_ja_cpu"
+    LINE_SIZE_PER_GROUP = 256
 
     RE_SPLIT_BY_PUNCTUATION = re.compile(
         rf"[" +
@@ -42,56 +39,63 @@ class NER:
     )
 
     NER_TYPES = {
-        "": "",                 # 表示非实体，数量极多
-        "PERSON": "PERSON",     # 表示人名，如"张三"、"约翰·多伊"等。
-        "ORG": "ORG",           # 表示组织，如"联合国"、"苹果公司"等。
-        "LOC": "LOC",           # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
-        "INS": "INS",           # 表示设施，如"医院"、"学校"、"机场"等。
-        "PRODUCT": "PRODUCT",   # 表示产品，如"iPhone"、"Windows操作系统"等。
-        "EVENT": "EVENT",       # 表示事件，如"奥运会"、"地震"等。
-
-        "人名": "PERSON",
-        "法人名": "ORG",
-        "政治的組織名": "ORG",
-        "その他の組織名": "ORG",
-        "地名": "LOC",
-        "施設名": "INS",
-        "製品名": "PRODUCT",
-        "イベント名": "EVENT",
+        "PER": "PER",       # 表示人名，如"张三"、"约翰·多伊"等。
+        "ORG": "ORG",       # 表示组织，如"联合国"、"苹果公司"等。
+        "LOC": "LOC",       # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
+        "PRD": "PRD",       # 表示产品，如"iPhone"、"Windows操作系统"等。
+        "EVT": "EVT",       # 表示事件，如"奥运会"、"地震"等。
     }
 
     def __init__(self):
         self.blacklist = ""
 
-        self.sudachipy_mode = tokenizer.Tokenizer.SplitMode.C
-        self.sudachipy_tokenizer = dictionary.Dictionary().create()
-
-        session_options = onnxruntime.SessionOptions()
-        session_options.log_severity_level = 4
-        self.onnx_tokenizer = pipeline(
-            "token-classification",
-            model = ORTModelForTokenClassification.from_pretrained(
-                self.ONNX_PATH,
-                session_options = session_options,
-                use_io_binding = True, 
-                local_files_only = True,
-            ),
-            tokenizer = AutoTokenizer.from_pretrained(
-                self.ONNX_PATH,
-                padding = True,
-                truncation = True,
-                model_max_length = 512
-            ),
-            device = self.ONNX_DEVICE,
-            batch_size = self.ONNX_BACTH_SIZE,
-            aggregation_strategy = "simple", 
-            accelerator = "ort"
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.MODEL_PATH,
+            padding = "max_length",
+            truncation = True,
+            max_length = 512,
+            model_max_length = 512,
+            local_files_only = True,
         )
+
+        if self.GPU_BOOST:
+            self.model = AutoModelForTokenClassification.from_pretrained(
+                self.MODEL_PATH,            
+                local_files_only = True,
+            ).to(device = "cuda").to(torch.float16)
+        else:
+            session_options = onnxruntime.SessionOptions()
+            session_options.log_severity_level = 4
+            self.model = ORTModelForTokenClassification.from_pretrained(
+                self.MODEL_PATH, 
+                provider = "CPUExecutionProvider",
+                session_options = session_options,
+                use_io_binding = True,
+                local_files_only = True,
+            )
+
+        self.classifier = pipeline(
+            "token-classification",
+            model = self.model,
+            device = "cuda" if self.GPU_BOOST else "cpu",
+            tokenizer = self.tokenizer,
+            batch_size = 128 if self.GPU_BOOST else min(10, os.cpu_count()),
+            aggregation_strategy = "simple",
+        )
+
+    # 释放资源
+    def release(self):
+        if self.classifier:
+            del self.classifier
+        if self.model:
+            del self.model
+        if self.tokenizer:
+            del self.tokenizer
 
     # 从指定路径加载黑名单文件内容
     def load_blacklist(self, filepath):
         try:
-            with open(filepath, "r", encoding="utf-8") as file:
+            with open(filepath, "r", encoding = "utf-8") as file:
                 data = json.load(file)
 
                 self.blacklist = ""
@@ -109,7 +113,12 @@ class NER:
         if not TextHelper.is_valid_japanese_word(surface, self.blacklist):
             return []
 
-        if ner_type == "" or ner_type == self.NER_TYPES.get("MISC"):
+        # 过滤纯汉字词
+        # if TextHelper.is_all_cjk(surface):
+        #     return []
+
+        # 过滤非实体
+        if ner_type not in self.NER_TYPES:
             return []
 
         words = [Word()]
@@ -121,67 +130,85 @@ class NER:
 
         return words
 
-    # 查找 NER 实体 - 精确模式
-    def search_for_entity_accuracy(self, full_text_lines):
+    # 查找 NER 实体
+    def search_for_entity(self, full_lines):
         words = []
-        full_text_lines = [
-            full_text_lines[i : i + self.ONNX_SIZE_PER_GROUP]
-            for i in range(0, len(full_text_lines), self.ONNX_SIZE_PER_GROUP)
+        full_lines_chunked = [
+            full_lines[i : i + self.LINE_SIZE_PER_GROUP]
+            for i in range(0, len(full_lines), self.LINE_SIZE_PER_GROUP)
         ]
 
         LogHelper.print()
         with ProgressHelper.get_progress() as progress:
-            pid = progress.add_task("使用查找 NER 实体", total = None)
-
-            for k, lines in enumerate(full_text_lines):
-                self.onnx_tokenizer.call_count = 0 # 防止出现应使用 dateset 的提示
-                for i, doc in enumerate(self.onnx_tokenizer(lines)):
+            pid = progress.add_task("查找 NER 实体", total = None)            
+            for k, lines in enumerate(full_lines_chunked):
+                self.classifier.call_count = 0 # 防止出现应使用 dateset 的提示
+                for i, doc in enumerate(self.classifier(lines)):
                     for token in doc:
-                        surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, token.get("word").replace(" ", "")) # ・ 和 空格 都作为分隔符
+                        surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, token.get("word").replace(" ", ""))
                         for surface in surfaces:
                             score = token.get("score")
                             entity_group = self.NER_TYPES.get(token.get("entity_group"), "")
                             words.extend(self.generate_words(score, surface, entity_group))
 
-                progress.update(pid, advance = 1, total = len(full_text_lines))
+                progress.update(pid, advance = 1, total = len(full_lines_chunked))
+
+        self.release()
         LogHelper.print()
         LogHelper.info(f"[查找 NER 实体] 已完成 ...")
 
         return words
 
-    # 通过规则还原词根，如果词语为 假名 + 汉字 复合词，则移除末尾的汉字
-    def lemmatize_words_by_rule(self, words):
+    # 通过 词语形态 校验词语
+    def lemmatize_words_by_morphology(self, words, full_lines):
+        words_ex = []
         for word in words:
-            if TextHelper.is_all_cjk(word.surface):
+            # 以下步骤只对角色实体进行
+            if not word.ner_type == self.NER_TYPES.get("PER"):
                 continue
 
-            # 判断是否是一个假名与汉字的混合词语 
-            if not (
-                TextHelper.has_any_cjk(word.surface)
-                and 
-                (TextHelper.has_any_hiragana(word.surface) or TextHelper.has_any_katakanae(word.surface))
-            ):
-                continue
-
-            # 在前面的步骤中已经移除了首尾的 "の"，如还有，那就是 AAのBB 这种形式，应保留
+            # 前面的步骤中已经移除了首尾的 の，如果还有，那就是 AのB 的形式，跳过
             if "の" in word.surface:
                 continue
 
-            no_suffix = TextHelper.remove_suffix_cjk(word.surface)
-
-            if len(no_suffix) == 1:
+            # 如果开头结尾都是汉字，跳过
+            if TextHelper.is_cjk(word.surface[0]) and TextHelper.is_cjk(word.surface[-1]):
                 continue
 
-            LogHelper.info(f"通过 [green]规则还原[/] 还原词根 - {no_suffix}, {word.surface}")
-            word.surface = no_suffix
+            # 拆分词根
+            tokens = TextHelper.extract_japanese(word.surface)
 
+            # 如果已不能再拆分，跳过
+            if len(tokens) == 1:
+                continue
+          
+            # 获取词根，获取成功则更新词语
+            roots = []
+            for k, v in enumerate(tokens):
+                if TextHelper.is_valid_japanese_word(v, self.blacklist):
+                    word_ex = Word()
+                    word_ex.count = word.count
+                    word_ex.score = word.score
+                    word_ex.surface = v
+                    word_ex.context = word_ex.search_context(full_lines)
+                    word_ex.ner_type = word.ner_type
+
+                    roots.append(v)
+                    words_ex.append(word_ex)
+
+            if len(roots) > 0:
+                LogHelper.info(f"通过 [green]词语形态[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {" / ".join(roots)}")               
+                word.ner_type = ""
+
+        # 合并拆分出来的词语
+        words.extend(words_ex)
         return words
 
-    # 通过出现次数还原词根
-    def lemmatize_words_by_count(self, words):
+    # 通过 出现次数 还原词根
+    def lemmatize_words_by_count(self, words, full_lines):
         words_map = {}
         for word in words:
-            key = tuple(word.context)
+            key = (word.ner_type, "".join(word.context))
 
             if key not in words_map:
                 words_map[key] = word
@@ -189,40 +216,34 @@ class NER:
             else:
                 ex_word = words_map[key]
 
-            if abs(word.count - ex_word.count) / max(word.count, ex_word.count, 1) > 0.05:
+            if word.count != ex_word.count and abs(word.count - ex_word.count) / max(word.count, ex_word.count, 1) > 0.05:
                 continue
 
-            if  (word.surface in ex_word.surface or ex_word.surface in word.surface) and word.surface != ex_word.surface:
-                LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.surface}, {ex_word.surface}")
-                words_map[key] = word if len(word.surface) > len(ex_word.surface) else ex_word
+            if (word.surface in ex_word.surface or ex_word.surface in word.surface) and word.surface != ex_word.surface:
+                if len(word.surface) > len(ex_word.surface):
+                    LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.ner_type} - {ex_word.surface} [green]->[/] {word.surface}")
+                    words_map[key] = word
+                else:
+                    LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {ex_word.surface}")
+                    words_map[key] = ex_word
 
-        # 根据 word_map 更新words
+        # 根据 word_map 更新 words
         updated_words = []
         for word in words:
-            updated_words.append(words_map[tuple(word.context)])
+            updated_words.append(words_map[(word.ner_type, "".join(word.context))])
+
+        # 更新上下文
+        for word in updated_words:
+            word.context = word.search_context(full_lines)
 
         return updated_words
 
-    # 通过 词语形态学 校验词语
-    def validate_words_by_morphology(self, words):
-        for word in words:
-            if len(word.context) == 0:
-                continue
-
-            for token in self.sudachipy_tokenizer.tokenize("\n".join(word.context), self.sudachipy_mode):
-                if word.surface in token.surface() and "名詞" not in token.part_of_speech():
-                    LogHelper.info(f"通过 [green]词语形态学[/] 剔除词语 - {word.ner_type} - {word.surface}")
-                    word.ner_type = ""
-                    break
-
-        return words
-
     # 通过 重复性 校验词语
     def validate_words_by_duplication(self, words):
-        person_set = {word.surface for word in words if word.ner_type == "PERSON"}
+        person_set = set(word.surface for word in words if word.ner_type == "PER")
 
         for word in words:
-            if word.ner_type == "PERSON":
+            if word.ner_type == "PER":
                 continue
 
             if any(v in word.surface for v in person_set):

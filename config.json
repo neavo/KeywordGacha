@@ -1,10 +1,39 @@
 {
-    "api_key": "sk-no-key-required",
-    "base_url": "http://localhost:8080/v1",
-    "model_name": "glm-4-9b-chat",
-    "count_threshold": 3,
-    "request_timeout": 120,
-    "request_frequency_threshold": 4,
-    "translate_surface_mode": 1,
-    "translate_context_mode": 1
+    "api_key": [
+        "sk-no-key-required",
+        "接口密钥，从接口平台方获取，使用在线接口时一定要设置正确。"
+    ],
+    "base_url": [
+        "http://localhost:8080/v1",
+        "请求地址，从接口平台方获取，使用在线接口时一定要设置正确。"
+    ],
+    "model_name": [
+        "glm-4-9b-chat",
+        "模型名称，从接口平台方获取，使用在线接口时一定要设置正确。"
+    ],
+    "count_threshold": [
+        3,
+        "出现次数阈值，出现次数低于此值的词语会被过滤掉，调低它可以抓取更多低频词语。"
+    ],
+    "request_timeout": [
+        180,
+        "网络请求超时时间，如果频繁出现 timeout 字样的网络错误，可以调大这个值。"
+    ],
+    "request_frequency_threshold": [
+        4,
+        "网络请求频率阈值，单位为 次/秒，值可以小于 1，如果频繁出现 429 代码的网络错误，可以调小这个值，特别很多便宜的中转。",
+        "使用 DeepSeeker 等不限制并发数的接口可以调大，可以极大的加快处理的速度。"
+    ],
+    "translate_surface": [
+        1,
+        "是否翻译词语，1 - 翻译，0 - 不翻译，启用词语翻译后会自动完成词表。"
+    ],
+    "translate_context_per": [
+        1,
+        "是否翻译人名实体上下文，1 - 翻译，0 - 不翻译，比较慢，根据需求自己决定是否开启。"
+    ],
+    "translate_context_other": [
+        0,
+        "是否翻译其他实体上下文，1 - 翻译，0 - 不翻译，比较慢，根据需求自己决定是否开启。"
+    ]
 }

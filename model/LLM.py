@@ -15,55 +15,56 @@ class LLM:
 
     MAX_RETRY = 2 # 最大重试次数
 
-    TASK_TYPE_ANALYZE_ATTRIBUTE = 10 # 判断词性
-    TASK_TYPE_SUMMAIRZE_CONTEXT = 20 # 语义分析
-    TASK_TYPE_TRANSLATE_SURFACE = 30 # 翻译词语
-    TASK_TYPE_TRANSLATE_CONTEXT = 40 # 翻译上下文
+    TASK_TYPE_API_TEST = 10             # 语义分析
+    TASK_TYPE_CLASSIFY_NER = 20         # 实体分类
+    TASK_TYPE_SUMMAIRZE_CONTEXT = 30    # 语义分析
+    TASK_TYPE_TRANSLATE_SURFACE = 40    # 翻译词语
+    TASK_TYPE_TRANSLATE_CONTEXT = 50    # 翻译上下文
 
     # 初始化请求配置参数
     LLMCONFIG = {}
 
-    # 请求参数配置 - 判断词性
-    LLMCONFIG[TASK_TYPE_ANALYZE_ATTRIBUTE] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_ANALYZE_ATTRIBUTE].TEMPERATURE = 0
-    LLMCONFIG[TASK_TYPE_ANALYZE_ATTRIBUTE].TOP_P = 1
-    LLMCONFIG[TASK_TYPE_ANALYZE_ATTRIBUTE].MAX_TOKENS = 512
-    LLMCONFIG[TASK_TYPE_ANALYZE_ATTRIBUTE].FREQUENCY_PENALTY = 0
+    # 请求参数配置 - 接口测试
+    LLMCONFIG[TASK_TYPE_API_TEST] = type("GClass", (), {})()
+    LLMCONFIG[TASK_TYPE_API_TEST].TEMPERATURE = 0.01
+    LLMCONFIG[TASK_TYPE_API_TEST].TOP_P = 1
+    LLMCONFIG[TASK_TYPE_API_TEST].MAX_TOKENS = 512
+    LLMCONFIG[TASK_TYPE_API_TEST].FREQUENCY_PENALTY = 0
+
+    # 请求参数配置 - 实体分类
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER] = type("GClass", (), {})()
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TEMPERATURE = 0.01
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TOP_P = 1
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].MAX_TOKENS = 512
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 语义分析
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].TEMPERATURE = 0
+    LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].TEMPERATURE = 0.01
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].TOP_P = 1
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].MAX_TOKENS = 512
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 翻译词语
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].TEMPERATURE = 0
+    LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].TEMPERATURE = 0.01
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].TOP_P = 1
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS = 512
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 翻译上下文
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TEMPERATURE = 0
+    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TEMPERATURE = 0.99
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TOP_P = 1
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].FREQUENCY_PENALTY = 0
-
+    
     def __init__(self, config):
         # 初始化OpenAI API密钥、基础URL和模型名称
         self.api_key = config.api_key
         self.base_url = config.base_url
         self.model_name = config.model_name
         
-        # 初始化各类prompt和黑名单
-        self.black_list = ""
-        self.prompt_analyze_attribute = ""
-        self.prompt_summarize_context = ""
-        self.prompt_translate_surface = ""
-        self.prompt_translate_context = ""
-
         # 请求限制器
         if config.request_frequency_threshold > 1:
             self.semaphore = asyncio.Semaphore(config.request_frequency_threshold)
@@ -96,10 +97,10 @@ class LLM:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 根据类型加载不同的prompt模板文件
-    def load_prompt_analyze_attribute(self, filepath):
+    def load_prompt_classify_ner(self, filepath):
         try:
             with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_analyze_attribute = file.read()
+                self.prompt_classify_ner = file.read()
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
@@ -135,9 +136,8 @@ class LLM:
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-
     # 异步发送请求到OpenAI获取模型回复
-    async def request(self, prompt, content, task_type, retry = False):
+    async def request(self, content, task_type, retry = False):
         completion = await self.openai_handler.chat.completions.create(
             model = self.model_name,
             temperature = self.LLMCONFIG[task_type].TEMPERATURE,
@@ -145,10 +145,6 @@ class LLM:
             max_tokens = self.LLMCONFIG[task_type].MAX_TOKENS,
             frequency_penalty = self.LLMCONFIG[task_type].FREQUENCY_PENALTY + 0.2 if retry else self.LLMCONFIG[task_type].FREQUENCY_PENALTY,
             messages = [
-                {
-                    "role": "system",
-                    "content": prompt,
-                },
                 {
                     "role": "user", 
                     "content": content
@@ -162,97 +158,49 @@ class LLM:
 
         return usage, message, llmresponse
 
-    # 词性判断任务
-    async def analyze_attribute(self, word, retry):
+    # 接口测试任务
+    async def api_test(self):
         async with self.semaphore, self.async_limiter:
-            prompt = self.prompt_analyze_attribute.replace("{surface}", word.surface)
-            task_type = self.TASK_TYPE_ANALYZE_ATTRIBUTE
-            usage, message, word.llmresponse_analyze_attribute = await self.request(prompt, "\n".join(word.context), task_type, retry)
-
-            if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
-                raise Exception("usage.completion_tokens >= MAX_TOKENS")
+            result = True
 
             try:
-                result = json.loads(
+                usage, message, _ = await self.request(
+                    self.prompt_translate_surface_person.replace("{attribute}", "女性").replace("{surface}", "ダリヤ").replace("{context}", "ダリヤ"),
+                    self.TASK_TYPE_API_TEST,
+                    True
+                )
+
+                if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_API_TEST].MAX_TOKENS:
+                    raise Exception("usage.completion_tokens >= MAX_TOKENS")                
+            
+                data = json.loads(
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
+                LogHelper.info(f"{data}")
             except Exception as e:
+                result = False
                 LogHelper.debug(f"{LogHelper.get_trackback(e)}")
-                LogHelper.debug(message.content.strip())
-                LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
-                raise e
-
-            if any(v in ["是", "は"] for v in result["character_name"]):
-                word.ner_type = NER.NER_TYPES.get("PERSON")
-                LogHelper.debug(f"{word.surface} - {result}")
-            elif "否" in result["character_name"]:
-                word.ner_type = ""
-                LogHelper.info(f"[词性判断] 已剔除 - {word.surface} - {result}")
-            else:
-                raise Exception(f"不正确的返回值 - {word.surface} - {result["character_name"]}")
             
-            return word
-
-    # 词性判断任务完成时的回调
-    def on_analyze_attribute_task_done(self, future, words, words_failed, words_successed):
-        try:
-            word = future.result()
-            words_successed.append(word)
-            LogHelper.info(f"[词性判断] 已完成 {len(words_successed)} / {len(words)} ...")       
-        except Exception as e:
-            LogHelper.warning(f"[词性判断] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
-
-    # 批量执行词性判断任务的具体实现
-    async def do_analyze_attribute_batch(self, words, words_failed, words_successed):
-        if len(words_failed) == 0:
-            retry = False
-            words_this_round = words
-        else:
-            retry = True
-            words_this_round = words_failed       
-
-        tasks = []
-        for k, word in enumerate(words_this_round):
-            task = asyncio.create_task(self.analyze_attribute(word, retry))
-            task.add_done_callback(lambda future: self.on_analyze_attribute_task_done(future, words, words_failed, words_successed))
-            tasks.append(task)
-
-        # 等待异步任务完成 
-        await asyncio.gather(*tasks, return_exceptions=True)
-
-        # 获得失败任务的列表
-        words_failed = [word_a for word_a in words if not any(word_a.surface == word_b.surface for word_b in words_successed)]
-
-        return words_failed, words_successed
-
-    # 批量执行词性判断任务
-    async def analyze_attribute_batch(self, words):
-        words_failed = []
-        words_successed = []
-
-        # 第一次请求
-        words_failed, words_successed = await self.do_analyze_attribute_batch(words, words_failed, words_successed)
-
-        # 开始重试流程
-        for i in range(self.MAX_RETRY):
-            if len(words_failed) > 0:
-                LogHelper.warning( f"[词语词性] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
-                words_failed, words_successed = await self.do_analyze_attribute_batch(words, words_failed, words_successed)
-
-        return words
+            return result
 
     # 词语翻译任务
     async def translate_surface(self, word, retry):
         async with self.semaphore, self.async_limiter:
-            if word.ner_type != NER.NER_TYPES.get("PERSON"):
-                prompt = self.prompt_translate_surface_common
+            if word.ner_type != NER.NER_TYPES.get("PER"):
+                prompt = self.prompt_translate_surface_common.replace("{surface}", word.surface)
+                prompt = prompt.replace("{context}", "\n".join(word.clip_context(128)))
             else:
                 prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
+                prompt = prompt.replace("{surface}", word.surface)
+                prompt = prompt.replace("{context}", "\n".join(word.clip_context(128)))
 
-            task_type = self.TASK_TYPE_TRANSLATE_SURFACE
-            usage, message, word.llmresponse_translate_surface = await self.request(prompt, word.surface, task_type, retry)
+            usage, message, word.llmresponse_translate_surface = await self.request(
+                prompt,
+                self.TASK_TYPE_TRANSLATE_SURFACE,
+                retry
+            )
 
-            if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
+            if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS:
                 raise Exception("usage.completion_tokens >= MAX_TOKENS")
 
             try:
@@ -324,14 +272,16 @@ class LLM:
     # 上下文翻译任务
     async def translate_context(self, word, retry):
         async with self.semaphore, self.async_limiter:
-            context_translation = []
-            prompt = self.prompt_translate_context
-            task_type = self.TASK_TYPE_TRANSLATE_CONTEXT
-            usage, message, word.llmresponse_translate_context = await self.request(prompt, "\n".join(word.context), task_type, retry)
+            usage, message, word.llmresponse_translate_context = await self.request(
+                self.prompt_translate_context.replace("{context}", "\n".join(word.context)),
+                self.TASK_TYPE_TRANSLATE_CONTEXT,
+                retry
+            )
 
-            if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
+            if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS:
                 raise Exception("usage.completion_tokens >= MAX_TOKENS")
             
+            context_translation = []
             for k, line in enumerate(message.content.split("\n")):
                 if len(line) > 0:
                     context_translation.append(line)
@@ -390,11 +340,13 @@ class LLM:
     # 语义分析任务 
     async def summarize_context(self, word, retry):
         async with self.semaphore, self.async_limiter:
-            prompt = self.prompt_summarize_context.replace("{surface}", word.surface)
-            task_type = self.TASK_TYPE_SUMMAIRZE_CONTEXT
-            usage, message, word.llmresponse_summarize_context = await self.request(prompt, "\n".join(word.context), task_type, retry)
+            usage, message, word.llmresponse_summarize_context = await self.request(
+                self.prompt_summarize_context.replace("{surface}", word.surface).replace("{context}", "\n".join(word.context)),
+                self.TASK_TYPE_SUMMAIRZE_CONTEXT,
+                retry
+            )
 
-            if usage.completion_tokens >= self.LLMCONFIG[task_type].MAX_TOKENS:
+            if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_SUMMAIRZE_CONTEXT].MAX_TOKENS:
                 raise Exception("usage.completion_tokens >= MAX_TOKENS")
     
             try:
@@ -407,14 +359,11 @@ class LLM:
                 LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
                 raise e
 
-            if any(v in ["是", "は"] for v in result["character_name"]):
-                word.ner_type = NER.NER_TYPES.get("PERSON")
-                LogHelper.debug(f"{word.surface} - {result}")
-            elif "否" in result["character_name"]:
+            if "否" in result["is_name"]:
                 word.ner_type = ""
-                LogHelper.info(f"[词性判断] 已剔除 - {word.surface} - {result}")
+                LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
             else:
-                raise Exception(f"不正确的返回值 - {word.surface} - {result["character_name"]}")
+                LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
 
             word.attribute = result["sex"]
             word.context_summary = result
@@ -468,3 +417,95 @@ class LLM:
                 words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed)
 
         return words
+
+    # 实体分类任务 
+    async def classify_ner(self, chunk, retry):
+        async with self.semaphore, self.async_limiter:
+            surface = [word.surface for word in chunk]
+            context = ["".join(word.clip_context(128)) for word in chunk]
+
+            usage, message, _ = await self.request(
+                self.prompt_classify_ner.replace("{surface}", "\n".join(surface)).replace("{context}", "\n".join(context)),
+                self.TASK_TYPE_CLASSIFY_NER,
+                retry
+            )
+
+            if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_CLASSIFY_NER].MAX_TOKENS:
+                raise Exception("usage.completion_tokens >= MAX_TOKENS")
+
+            try:
+                result = json.loads(
+                    message.content.strip().replace("```json", "").replace("```", "")
+                )
+            except Exception as e:
+                LogHelper.debug(f"{LogHelper.get_trackback(e)}")
+                LogHelper.debug(message.content.strip())
+                raise e
+
+            result_dict = {v["name"]: v["ner_type"] for v in result}
+            for word in chunk:
+                if (
+                    word.surface not in result_dict
+                    or
+                    (word.surface in result_dict and result_dict[word.surface] != word.ner_type)
+                ):
+                    LogHelper.info(f"[实体分类] 已剔除 - {word.ner_type} - {word.surface}")
+                    word.ner_type = ""
+
+            # for word in chunk:
+            #     for v in result:
+            #         if word.surface == v["name"]:
+            #             word.ner_type = v["ner_type"]
+            #             LogHelper.info(f"[实体分类] 已识别 - {word.ner_type} - {word.surface}")
+            #             break  # 找到匹配后立即退出内层循环
+
+            return chunk
+
+    # 实体分类任务 完成时的回调
+    def on_classify_ner_task_done(self, future, chunks, chunks_failed, chunks_successed):
+        try:
+            chunk = future.result()
+            chunks_successed.append(chunk)
+            LogHelper.info(f"[实体分类] 已完成 {len(chunks_successed)} / {len(chunks)} ...")       
+        except Exception as e:
+            LogHelper.warning(f"[实体分类] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
+
+    # 批量执行 实体分类任务 的具体实现
+    async def do_classify_ner_bacth(self, chunks, chunks_failed, chunks_successed):
+        if len(chunks_failed) == 0:
+            retry = False
+            chunks_this_round = chunks
+        else:
+            retry = True
+            chunks_this_round = chunks_failed       
+
+        tasks = []
+        for chunk in chunks_this_round:
+            task = asyncio.create_task(self.classify_ner(chunk, retry))
+            task.add_done_callback(lambda future: self.on_classify_ner_task_done(future, chunks, chunks_failed, chunks_successed))
+            tasks.append(task)
+
+        # 等待异步任务完成 
+        await asyncio.gather(*tasks, return_exceptions = True)
+
+        # 获得失败任务的列表
+        chunks_failed = [chunk for chunk in chunks if chunk not in chunks_successed]
+
+        return chunks_failed, chunks_successed
+
+    # 批量执行 实体分类任务 
+    async def classify_ner_bacth(self, words):
+        chunks_failed = []
+        chunks_successed = []
+        chunks = [words[i:(i + 5)] for i in range(0, len(words), 5)]
+
+        # 第一次请求
+        chunks_failed, chunks_successed = await self.do_classify_ner_bacth(chunks, chunks_failed, chunks_successed)
+
+        # 开始重试流程
+        for i in range(self.MAX_RETRY):
+            if len(chunks_failed) > 0:
+                LogHelper.warning( f"[实体分类] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
+                chunks_failed, chunks_successed = await self.do_classify_ner_bacth(chunks, chunks_failed, chunks_successed)
+
+        return words        

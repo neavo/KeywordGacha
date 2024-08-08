@@ -27,7 +27,7 @@ class LogHelper:
         format = "[{time:YYYY-MM-DD HH:mm:ss}] [{level}] {message}",
         enqueue = True,
         encoding = "utf-8",
-        rotation = "1 MB",
+        rotation = "2 MB",
         retention = 3
     )
 
@@ -57,6 +57,10 @@ class LogHelper:
     @staticmethod
     def is_debug():
         return os.path.exists("debug.txt")
+
+    @staticmethod
+    def is_gpu_boost():
+        return os.path.exists("gpuboost.txt")
 
     @staticmethod
     def get_trackback(e):
