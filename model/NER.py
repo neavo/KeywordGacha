@@ -78,7 +78,7 @@ class NER:
             model = self.model,
             device = "cuda" if self.GPU_ENABLE else "cpu",
             tokenizer = self.tokenizer,
-            batch_size = 256 if self.GPU_ENABLE else min(16, os.cpu_count()),
+            batch_size = 128 if self.GPU_ENABLE else min(16, os.cpu_count()),
             aggregation_strategy = "simple",
         )
 
@@ -113,12 +113,12 @@ class NER:
             return []
 
         # 过滤纯汉字词
-        if TextHelper.is_all_cjk(surface):
-            return []
+        # if TextHelper.is_all_cjk(surface):
+        #     return []
 
         # 过滤非实体
-        # if ner_type not in self.NER_TYPES:
-        #     return []
+        if ner_type not in self.NER_TYPES:
+            return []
 
         words = [Word()]
         words[0] = Word()
@@ -151,24 +151,6 @@ class NER:
                             words.extend(self.generate_words(score, surface, entity_group))
 
                 progress.update(pid, advance = 1, total = len(full_lines_chunked))
-
-        # with ProgressHelper.get_progress() as progress:
-        #     pid = progress.add_task("查找 NER 实体", total = None)
-
-        #     from sudachipy import tokenizer
-        #     from sudachipy import dictionary
-
-        #     sudachi = dictionary.Dictionary(dict_type = "full").create()
-        #     for k, lines in enumerate(full_lines_chunked):
-        #         for token in sudachi.tokenize("\n".join(lines)):
-        #             if token.part_of_speech()[0] == "名詞":
-        #                 surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, token.surface().replace(" ", ""))
-        #                 for surface in surfaces:
-        #                     score = 0.95
-        #                     entity_group = ""
-        #                     words.extend(self.generate_words(score, surface, entity_group))
-
-        #         progress.update(pid, advance = 1, total = len(full_lines_chunked))
 
         self.release()
         LogHelper.print()
@@ -214,7 +196,7 @@ class NER:
                     words_ex.append(word_ex)
 
             if len(roots) > 0:
-                LogHelper.info(f"通过 [green]词语形态[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {' / '.join(roots)}")               
+                LogHelper.info(f"通过 [green]词语形态[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {" / ".join(roots)}")               
                 word.ner_type = ""
 
         # 合并拆分出来的词语

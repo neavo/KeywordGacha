@@ -135,7 +135,7 @@ def read_data_file():
     return input_data_filtered
 
 # 合并、计数并按置信度过滤
-def merge_and_count(words, full_lines, score_threshold = 0.75):
+def merge_and_count(words, full_lines, per_score_threshold = 0.75, other_score_threshold = 0.90):
     words_categorized = {}
     for v in words:
         if (v.surface, v.ner_type) not in words_categorized:
@@ -152,14 +152,15 @@ def merge_and_count(words, full_lines, score_threshold = 0.75):
         word.score = score / len(v) # 平均分
 
         if (
-            word.ner_type == NER.NER_TYPES.get("PER") and word.score > score_threshold
+            word.ner_type == "PER" and word.score > per_score_threshold
             or
-            word.ner_type != NER.NER_TYPES.get("PER") and word.score > score_threshold
+            word.ner_type != "PER" and word.score > other_score_threshold
         ):
             words_merged.append(word)
 
+    lines_joined = "".join(full_lines)
     for word in words_merged:
-        word.count = "".join(full_lines).count(word.surface)
+        word.count = lines_joined.count(word.surface)
 
     return sorted(words_merged, key = lambda x: x.count, reverse = True)
 
@@ -238,19 +239,19 @@ def write_words_dict_to_file(words, path):
         file.write(json.dumps(words_dict, indent = 4, ensure_ascii = False))
 
 # 查找 NER 实体
-def search_for_entity(ner, full_lines):
+def search_for_entity(full_lines):
     LogHelper.info("即将开始执行 [查找 NER 实体] ...")
 
-    words = ner.search_for_entity(full_lines)
+    words = G.ner.search_for_entity(full_lines)
     if os.path.exists("debug.txt"):
-        LogHelper.print()
+        LogHelper.info(f"")
         with LogHelper.status(f"正在将实体字典写入文件 ..."):
-            words = merge_and_count(words, full_lines, 0.50)
+            words = merge_and_count(words, full_lines)
             write_words_dict_to_file(words, "words_dict.json")
 
     # 查找上下文
     LogHelper.info("即将开始执行 [查找上下文] ...")
-    LogHelper.print()
+    LogHelper.info(f"")
 
     words = merge_and_count(words, full_lines)
     with ProgressHelper.get_progress() as progress:
@@ -259,15 +260,15 @@ def search_for_entity(ner, full_lines):
             word.context = word.search_context(full_lines)
             progress.update(pid, advance = 1, total = len(words))
 
-    LogHelper.print()
+    LogHelper.info(f"")
     LogHelper.info("[查找上下文] 已完成 ...")
 
     # 有了上下文以后，开始执行还原词根
     LogHelper.info("即将开始执行 [还原词根] ...")
-    words = ner.lemmatize_words_by_morphology(words, full_lines)
+    words = G.ner.lemmatize_words_by_morphology(words, full_lines)
     words = remove_words_by_ner_type(words, "")
     words = merge_and_count(words, full_lines)
-    words = ner.lemmatize_words_by_count(words, full_lines)
+    words = G.ner.lemmatize_words_by_count(words, full_lines)
     words = remove_words_by_ner_type(words, "")
     words = merge_and_count(words, full_lines)
     LogHelper.info(f"[还原词根] 已完成 ...")
@@ -278,6 +279,82 @@ def search_for_entity(ner, full_lines):
     LogHelper.info(f"[阈值筛选] 已完成 ... 出现次数 < {G.config.count_threshold} 的条目已剔除 ...")
 
     return words
+
+# 开始处理日文
+async def do_process_japanese():
+    # 查找 NER 实体
+    words = []
+    words = search_for_entity(read_data_file())
+
+    # 等待 语义分析任务 结果
+    LogHelper.info("即将开始执行 [语义分析] ...")
+    words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PER"))
+    words_person = await G.llm.summarize_context_batch(words_person)
+    words_person = remove_words_by_ner_type(words_person, "")
+    words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PER"))
+
+    # 等待 重复性校验任务 结果
+    LogHelper.info("即将开始执行 [重复性校验] ...")
+    words = G.ner.validate_words_by_duplication(words)
+    words = remove_words_by_ner_type(words, "")
+
+    # 等待 实体分类任务 结果
+    # LogHelper.info("即将开始执行 [实体分类] ...")
+    # words_prd = get_words_by_ner_type(words, "PRD")
+    # words_prd = await G.llm.classify_ner_bacth(words_prd)
+    # words_prd = remove_words_by_ner_type(words_prd, "")
+    # words = replace_words_by_ner_type(words, words_prd, "PRD")
+
+    # 等待实体校验任务结果
+    # LogHelper.info("即将开始执行 [实体校验] ...")
+    # words = await G.llm.validate_ner_batch(words)
+    # words = remove_words_by_ner_type(words, "")
+
+    # 等待翻译词语任务结果
+    if G.config.translate_surface_mode == 1:
+        LogHelper.info("即将开始执行 [词语翻译] ...")
+        words = await G.llm.translate_surface_batch(words)
+
+    # 等待上下文翻译任务结果
+    if G.config.translate_context_mode == 1:
+        LogHelper.info("即将开始执行 [上下文翻译] ...")
+        words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PER"))
+        words_person = await G.llm.translate_context_batch(words_person)
+        words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PER"))
+
+    ner_type = (
+        ("PER", "角色实体"),
+        ("ORG", "组织实体"),
+        ("LOC", "地点实体"),
+        ("PRD", "物品实体"),
+        ("EVT", "事件实体"),
+    )
+
+    dir_name, file_name_with_extension = os.path.split(G.config.input_file_path)
+    file_name, extension = os.path.splitext(file_name_with_extension)
+
+    LogHelper.info("")
+    for v in ner_type:
+        words_ner_type = get_words_by_ner_type(words, NER.NER_TYPES.get(v[0]))
+        write_words_to_file(words_ner_type, f"{file_name}_{v[1]}_日志.txt", True)
+        write_words_to_file(words_ner_type, f"{file_name}_{v[1]}_列表.json", False)
+
+    # 等待用户退出
+    LogHelper.info("")
+    LogHelper.info(f"工作流程已结束 ... 请检查生成的数据文件 ...")
+    LogHelper.info("")
+    LogHelper.info("")
+    os.system("pause")
+
+async def do_api_test():
+    if await G.llm.api_test():
+        LogHelper.info("接口测试 [green]执行成功[/] ...")
+    else:
+        LogHelper.warning("接口测试 [red]执行失败[/], 请检查配置文件 ...")
+
+    LogHelper.print("")
+    os.system("pause")
+    os.system("cls")
 
 # 打印应用信息
 def print_app_info():
@@ -309,15 +386,13 @@ def print_app_info():
 def print_menu_main():
     LogHelper.print(f"请选择：")
     LogHelper.print(f"")
-    LogHelper.print(f"\t--> 1. 开始处理 [green]中文文本[/]（暂未实现）")
-    LogHelper.print(f"\t--> 2. 开始处理 [green]日文文本[/]")
-    LogHelper.print(f"\t--> 3. 开始处理 [green]英文文本[/]（暂未实现）")
-    LogHelper.print(f"\t--> 4. 开始处理 [green]韩文文本[/]（暂未实现）")
-    LogHelper.print(f"\t--> 5. 查看常见问题")
+    LogHelper.print(f"\t--> 1. 开始处理 [green]日文文本[/]")
+    LogHelper.print(f"\t--> 2. 开始执行 [green]接口测试[/]")
+    LogHelper.print(f"\t--> 3. 查看常见问题")
     LogHelper.print(f"")
-    choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的功能（默认为 2）", 
-        choices = ["2", "5"],
-        default = "2",
+    choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的功能，默认为 [green][1][/] ", 
+        choices = ["1", "2", "3"],
+        default = "1",
         show_choices = False,
         show_default = False
     ))
@@ -333,7 +408,7 @@ def print_menu_qa():
     LogHelper.print(f"\t• .txt 纯文本格式，会将文件内的每一行当作一个句子来处理；", highlight = True)
     LogHelper.print(f"\t• .json 格式，会将文件内的每一条数据的 Key 的值当作一个句子来处理；", highlight = True)
     LogHelper.print(f"\t• .csv 表格，会将文件内的每一行的第一列当作一个句子来处理；", highlight = True)
-    # LogHelper.print(f"\t• 如果输入路径是一个文件夹，那则会读取这个文件夹内所有的 .txt .csv .json 文件；", highlight = True)
+    LogHelper.print(f"\t• 如果输入路径是一个文件夹，那则会读取这个文件夹内所有的 .txt .csv .json 文件；", highlight = True)
     LogHelper.print(f"", highlight = True)
 
     LogHelper.print(f"Q：我该如何获得这些格式的文本文件？", highlight = True)
@@ -354,130 +429,60 @@ def print_menu_qa():
     LogHelper.print(f"\t• 请在 [blue]config.cfg[/] 中逐步调小 [blue]request_frequency_threshold[/] 的值，一直到不报错为止，这个值可以小于 1。", highlight = True)
     LogHelper.print(f"", highlight = True)
 
+    LogHelper.print(f"")
     os.system("pause")
     os.system("cls")
 
 # 主函数
 async def begin():
-    # 打印应用信息
     choice = -1
-    while choice != 2:
+    while choice != 1:
         print_app_info()
+
         choice = print_menu_main()
-        if choice == 2:
-            None
-        elif choice == 5:
+        if choice == 1:
+            await do_process_japanese()
+        elif choice == 2:
+            await do_api_test()
+        elif choice == 3:
             print_menu_qa()
-
-    # 初始化 LLM 对象
-    llm = LLM(G.config)
-    llm.load_blacklist("blacklist.txt")
-    llm.load_prompt_classify_ner("prompt\\prompt_classify_ner.txt")
-    llm.load_prompt_validate_ner_evt("prompt\\prompt_validate_ner_evt.txt")
-    llm.load_prompt_validate_ner_ins("prompt\\prompt_validate_ner_ins.txt")
-    llm.load_prompt_validate_ner_loc("prompt\\prompt_validate_ner_loc.txt")
-    llm.load_prompt_validate_ner_org("prompt\\prompt_validate_ner_org.txt")
-    llm.load_prompt_validate_ner_prd("prompt\\prompt_validate_ner_prd.txt")
-    llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
-    llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
-    llm.load_prompt_translate_surface_common("prompt\\prompt_translate_surface_common.txt")
-    llm.load_prompt_translate_surface_person("prompt\\prompt_translate_surface_person.txt")
-
-    # 初始化 NER 对象
-    with LogHelper.status(f"正在初始化 NER 引擎 ..."):
-        ner = NER()
-        ner.load_blacklist("blacklist.txt")
-
-    # 读取数据文件
-    full_text_lines = read_data_file()
-
-    # 查找 NER 实体
-    words = []
-    words = search_for_entity(ner, full_text_lines)
-
-    # 等待 语义分析任务 结果
-    LogHelper.info("即将开始执行 [语义分析] ...")
-    words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PER"))
-    words_person = await llm.summarize_context_batch(words_person)
-    words_person = remove_words_by_ner_type(words_person, "")
-    words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PER"))
-
-    # 等待 重复性校验任务 结果
-    LogHelper.info("即将开始执行 [重复性校验] ...")
-    words = ner.validate_words_by_duplication(words)
-    words = remove_words_by_ner_type(words, "")
-
-    # 等待 实体分类任务 结果
-    LogHelper.info("即将开始执行 [实体分类] ...")
-    words_prd = get_words_by_ner_type(words, "PRD")
-    words_prd = await llm.classify_ner_bacth(words_prd)
-    words_prd = remove_words_by_ner_type(words_prd, "")
-    words = replace_words_by_ner_type(words, words_prd, "PRD")
-
-    # 等待实体校验任务结果
-    # LogHelper.info("即将开始执行 [实体校验] ...")
-    # words = await llm.validate_ner_batch(words)
-    # words = remove_words_by_ner_type(words, "")
-
-    # 等待翻译词语任务结果
-    if G.config.translate_surface_mode == 1:
-        LogHelper.info("即将开始执行 [词语翻译] ...")
-        words = await llm.translate_surface_batch(words)
-
-    # 等待上下文翻译任务结果
-    if G.config.translate_context_mode == 1:
-        LogHelper.info("即将开始执行 [上下文翻译] ...")
-        words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PER"))
-        words_person = await llm.translate_context_batch(words_person)
-        words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PER"))
-
-    ner_type = [
-        ("PER", "角色实体"),
-        ("ORG", "组织实体"),
-        ("LOC", "地点实体"),
-        ("PRD", "物品实体"),
-        ("EVT", "事件实体"),
-    ]
-
-    dir_name, file_name_with_extension = os.path.split(G.config.input_file_path)
-    file_name, extension = os.path.splitext(file_name_with_extension)
-
-    LogHelper.info("")
-    for v in ner_type:
-        words_ner_type = get_words_by_ner_type(words, NER.NER_TYPES.get(v[0]))
-        write_words_to_file(words_ner_type, f"{file_name}_{v[1]}_日志.txt", True)
-        write_words_to_file(words_ner_type, f"{file_name}_{v[1]}_列表.json", False)
-
-    # 等待用户退出
-    LogHelper.info("")
-    LogHelper.info(f"工作流程已结束 ... 请检查生成的数据文件 ...")
-    LogHelper.info("")
-    LogHelper.info("")
-    os.system("pause")
 
 # 一些初始化步骤
 def init():
-    # 测试
-    if LogHelper.is_debug():
-        TestHelper.check_duplicates()
+    with LogHelper.status(f"正在初始化 [green]KG[/] 引擎 ..."):
+        if LogHelper.is_debug():
+            TestHelper.check_duplicates()
 
-    # 注册全局异常追踪器
-    rich.traceback.install()
+        # 注册全局异常追踪器
+        rich.traceback.install()
 
-    # 加载配置文件
-    try:
-        config_file = "config_dev.json" if LogHelper.is_debug() else "config.json"
+        # 加载配置文件
+        try:
+            config_file = "config_dev.json" if LogHelper.is_debug() else "config.json"
 
-        with open(config_file, "r", encoding = "utf-8") as file:
-            config = json.load(file)
-            G.config = type("GClass", (), {})()
+            with open(config_file, "r", encoding = "utf-8") as file:
+                config = json.load(file)
+                G.config = type("GClass", (), {})()
 
-            for key in config:
-                setattr(G.config, key, config[key])
-    except FileNotFoundError:
-        LogHelper.error(f"文件 {config_file} 未找到.")
-    except json.JSONDecodeError:
-        LogHelper.error(f"文件 {config_file} 不是有效的JSON格式.")
+                for key in config:
+                    setattr(G.config, key, config[key])
+        except FileNotFoundError:
+            LogHelper.error(f"文件 {config_file} 未找到.")
+        except json.JSONDecodeError:
+            LogHelper.error(f"文件 {config_file} 不是有效的JSON格式.")
+
+        # 初始化 LLM 对象
+        G.llm = LLM(G.config)
+        G.llm.load_blacklist("blacklist.txt")
+        G.llm.load_prompt_classify_ner("prompt\\prompt_classify_ner.txt")
+        G.llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
+        G.llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
+        G.llm.load_prompt_translate_surface_common("prompt\\prompt_translate_surface_common.txt")
+        G.llm.load_prompt_translate_surface_person("prompt\\prompt_translate_surface_person.txt")
+
+        # 初始化 NER 对象
+        G.ner = NER()
+        G.ner.load_blacklist("blacklist.txt")
 
 # 确保程序出错时可以捕捉到错误日志
 async def main():

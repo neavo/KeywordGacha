@@ -15,14 +15,28 @@ class LLM:
 
     MAX_RETRY = 2 # 最大重试次数
 
-    TASK_TYPE_SUMMAIRZE_CONTEXT = 10    # 语义分析
-    TASK_TYPE_TRANSLATE_SURFACE = 20    # 翻译词语
-    TASK_TYPE_TRANSLATE_CONTEXT = 30    # 翻译上下文
-    TASK_TYPE_VALIDATE_NER = 40         # 实体校验
-    TASK_TYPE_CLASSIFY_NER = 50         # 实体分类
+    TASK_TYPE_API_TEST = 10             # 语义分析
+    TASK_TYPE_CLASSIFY_NER = 20         # 实体分类
+    TASK_TYPE_SUMMAIRZE_CONTEXT = 30    # 语义分析
+    TASK_TYPE_TRANSLATE_SURFACE = 40    # 翻译词语
+    TASK_TYPE_TRANSLATE_CONTEXT = 50    # 翻译上下文
 
     # 初始化请求配置参数
     LLMCONFIG = {}
+
+    # 请求参数配置 - 接口测试
+    LLMCONFIG[TASK_TYPE_API_TEST] = type("GClass", (), {})()
+    LLMCONFIG[TASK_TYPE_API_TEST].TEMPERATURE = 0.01
+    LLMCONFIG[TASK_TYPE_API_TEST].TOP_P = 1
+    LLMCONFIG[TASK_TYPE_API_TEST].MAX_TOKENS = 512
+    LLMCONFIG[TASK_TYPE_API_TEST].FREQUENCY_PENALTY = 0
+
+    # 请求参数配置 - 实体分类
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER] = type("GClass", (), {})()
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TEMPERATURE = 0.01
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TOP_P = 1
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].MAX_TOKENS = 512
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 语义分析
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT] = type("GClass", (), {})()
@@ -44,34 +58,13 @@ class LLM:
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TOP_P = 1
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].FREQUENCY_PENALTY = 0
-
-    # 请求参数配置 - 实体校验
-    LLMCONFIG[TASK_TYPE_VALIDATE_NER] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_VALIDATE_NER].TEMPERATURE = 0.01
-    LLMCONFIG[TASK_TYPE_VALIDATE_NER].TOP_P = 1
-    LLMCONFIG[TASK_TYPE_VALIDATE_NER].MAX_TOKENS = 512
-    LLMCONFIG[TASK_TYPE_VALIDATE_NER].FREQUENCY_PENALTY = 0
     
-    # 请求参数配置 - 实体分类
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TEMPERATURE = 0.01
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TOP_P = 1
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].MAX_TOKENS = 512
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].FREQUENCY_PENALTY = 0
-
     def __init__(self, config):
         # 初始化OpenAI API密钥、基础URL和模型名称
         self.api_key = config.api_key
         self.base_url = config.base_url
         self.model_name = config.model_name
         
-        # 初始化各类prompt和黑名单
-        self.black_list = ""
-        self.prompt_analyze_attribute = ""
-        self.prompt_summarize_context = ""
-        self.prompt_translate_surface = ""
-        self.prompt_translate_context = ""
-
         # 请求限制器
         if config.request_frequency_threshold > 1:
             self.semaphore = asyncio.Semaphore(config.request_frequency_threshold)
@@ -108,46 +101,6 @@ class LLM:
         try:
             with open(filepath, "r", encoding="utf-8") as file:
                 self.prompt_classify_ner = file.read()
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
-
-    # 根据类型加载不同的prompt模板文件
-    def load_prompt_validate_ner_evt(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_validate_ner_evt = file.read()
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
-
-    # 根据类型加载不同的prompt模板文件
-    def load_prompt_validate_ner_ins(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_validate_ner_ins = file.read()
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
-
-    # 根据类型加载不同的prompt模板文件
-    def load_prompt_validate_ner_loc(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_validate_ner_loc = file.read()
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
-
-    # 根据类型加载不同的prompt模板文件
-    def load_prompt_validate_ner_org(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_validate_ner_org = file.read()
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
-
-    # 根据类型加载不同的prompt模板文件
-    def load_prompt_validate_ner_prd(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_validate_ner_prd = file.read()
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
@@ -205,13 +158,41 @@ class LLM:
 
         return usage, message, llmresponse
 
+    # 接口测试任务
+    async def api_test(self):
+        async with self.semaphore, self.async_limiter:
+            result = True
+
+            try:
+                usage, message, _ = await self.request(
+                    self.prompt_translate_surface_person.replace("{attribute}", "女性").replace("{surface}", "ダリヤ").replace("{context}", "ダリヤ"),
+                    self.TASK_TYPE_API_TEST,
+                    True
+                )
+
+                if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_API_TEST].MAX_TOKENS:
+                    raise Exception("usage.completion_tokens >= MAX_TOKENS")                
+            
+                data = json.loads(
+                    TextHelper.fix_broken_json_string(message.content.strip())
+                )
+                LogHelper.info(f"{data}")
+            except Exception as e:
+                result = False
+                LogHelper.debug(f"{LogHelper.get_trackback(e)}")
+            
+            return result
+
     # 词语翻译任务
     async def translate_surface(self, word, retry):
         async with self.semaphore, self.async_limiter:
             if word.ner_type != NER.NER_TYPES.get("PER"):
                 prompt = self.prompt_translate_surface_common.replace("{surface}", word.surface)
+                prompt = prompt.replace("{context}", "\n".join(word.clip_context(128)))
             else:
-                prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute).replace("{surface}", word.surface)
+                prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
+                prompt = prompt.replace("{surface}", word.surface)
+                prompt = prompt.replace("{context}", "\n".join(word.clip_context(128)))
 
             usage, message, word.llmresponse_translate_surface = await self.request(
                 prompt,
@@ -437,93 +418,11 @@ class LLM:
 
         return words
 
-    # 实体校验任务 
-    async def validate_ner(self, prompt, chunk, retry):
-        async with self.semaphore, self.async_limiter:
-            surfaces = [word.surface for word in chunk]
-
-            usage, message, _ = await self.request(
-                prompt.replace("{surfaces}", "\n".join(surfaces)),
-                self.TASK_TYPE_VALIDATE_NER,
-                retry
-            )
-
-            if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_VALIDATE_NER].MAX_TOKENS:
-                raise Exception("usage.completion_tokens >= MAX_TOKENS")
-
-            results = message.content.strip().split(",")
-            for v in results:
-                for word in chunk:
-                    if word.surface == v:
-                        LogHelper.info(f"[实体校验] 已剔除 - {word.ner_type} - {word.surface}")
-                        word.ner_type = ""
-
-            return chunk
-
-    # 实体校验任务完成时的回调
-    def on_validate_ner_task_done(self, future, chunks, chunks_failed, chunks_successed):
-        try:
-            chunk = future.result()
-            chunks_successed.append(chunk)
-            LogHelper.info(f"[实体校验] 已完成 {len(chunks_successed)} / {len(chunks)} ...")       
-        except Exception as e:
-            LogHelper.warning(f"[实体校验] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
-
-    # 批量执行实体校验任务的具体实现
-    async def do_validate_ner_batch(self, prompt, chunks, chunks_failed, chunks_successed):
-        if len(chunks_failed) == 0:
-            retry = False
-            chunks_this_round = chunks
-        else:
-            retry = True
-            chunks_this_round = chunks_failed       
-
-        tasks = []
-        for chunk in chunks_this_round:
-            task = asyncio.create_task(self.validate_ner(prompt, chunk, retry))
-            task.add_done_callback(lambda future: self.on_validate_ner_task_done(future, chunks, chunks_failed, chunks_successed))
-            tasks.append(task)
-
-        # 等待异步任务完成 
-        await asyncio.gather(*tasks, return_exceptions = True)
-
-        # 获得失败任务的列表
-        chunks_failed = [chunk for chunk in chunks if chunk not in chunks_successed]
-
-        return chunks_failed, chunks_successed
- 
-    # 批量执行实体校验任务
-    async def validate_ner_batch(self, words):
-        ner_type = [
-            ("EVT", self.prompt_validate_ner_evt),
-            ("INS", self.prompt_validate_ner_ins),
-            ("LOC", self.prompt_validate_ner_loc),
-            ("ORG", self.prompt_validate_ner_org),
-            ("PRD", self.prompt_validate_ner_prd),
-        ]
-
-        for v in ner_type:
-            chunks_failed = []
-            chunks_successed = []
-            chunks = [word for word in words if word.ner_type == v[0]]
-            chunks = [chunks[i:(i + 20)] for i in range(0, len(chunks), 20)]
-
-            # 第一次请求
-            chunks_failed, chunks_successed = await self.do_validate_ner_batch(v[1], chunks, chunks_failed, chunks_successed)
-
-            # 开始重试流程
-            for i in range(self.MAX_RETRY):
-                if len(chunks_failed) > 0:
-                    LogHelper.warning( f"[实体校验] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
-                    chunks_failed, chunks_successed = await self.do_validate_ner_batch(v[1], chunks, chunks_failed, chunks_successed)
-
-        return words
-
     # 实体分类任务 
     async def classify_ner(self, chunk, retry):
         async with self.semaphore, self.async_limiter:
             surface = [word.surface for word in chunk]
-            context = [word.context[0] for word in chunk]
+            context = ["".join(word.clip_context(128)) for word in chunk]
 
             usage, message, _ = await self.request(
                 self.prompt_classify_ner.replace("{surface}", "\n".join(surface)).replace("{context}", "\n".join(context)),

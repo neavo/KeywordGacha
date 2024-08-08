@@ -93,14 +93,15 @@ class Word:
 
             return context
 
-    # 按长度截取上下文并返回
+    # 按长度截取上下文并返回，至少取一条
     def clip_context(self, threshold):
         context = []
         context_length = 0
         for k, line in enumerate(self.context):
             line_lenght = len(self.tiktoken_encoding.encode(line))
 
-            if context_length + line_lenght > threshold:
+            # 第一次循环时不检测长度
+            if k >= 1 and context_length + line_lenght > threshold:
                 break
 
             context.append(line)
