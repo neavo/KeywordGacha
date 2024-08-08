@@ -14,11 +14,11 @@ jobs:
                  
       - name: Create Env
         run: |
-          call resource\aria2c.exe https://www.python.org/ftp/python/3.12.4/python-3.12.4-embed-amd64.zip -o python.zip
+          resource\aria2c.exe https://www.python.org/ftp/python/3.12.4/python-3.12.4-embed-amd64.zip -o python.zip
           powershell -Command "Expand-Archive -Path 'python.zip' -DestinationPath 'env'"
           powershell -Command "Remove-Item -Path 'python.zip' -Recurse -Force -ErrorAction SilentlyContinue"
 
-          call resource\aria2c.exe https://bootstrap.pypa.io/pip/get-pip.py -o get-pip.py
+          resource\aria2c.exe https://bootstrap.pypa.io/pip/get-pip.py -o get-pip.py
           powershell -Command ".\env\python.exe get-pip.py"
           powershell -Command "Remove-Item -Path 'get-pip.py' -Recurse -Force -ErrorAction SilentlyContinue"
           powershell -Command "Copy-Item -Path 'resource\python312._pth' -Destination 'env\python312._pth' -Force"
@@ -30,7 +30,7 @@ jobs:
 
       - name: Install Model
         run: |          
-          call resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_ja_cpu/kg_ner_ja_cpu.zip -o kg_ner_ja_cpu.zip
+          resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_ja_cpu/kg_ner_ja_cpu.zip -o kg_ner_ja_cpu.zip
           powershell -Command "Expand-Archive -Path 'kg_ner_ja_cpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_ja_cpu'"
           powershell -Command "Remove-Item -Path 'kg_ner_ja_cpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"   
 
