@@ -28,8 +28,18 @@ def read_txt_file(file_path):
     try:
         with open(file_path, "r", encoding = "utf-8") as file:
             return file.readlines()
-    except Exception as e:
-        LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
+    except UnicodeDecodeError as e:
+        LogHelper.warning(f"读取数据文件时发生编码错误，尝试使用utf-16编码 - {LogHelper.get_trackback(e)}")
+        try:
+            with open(file_path, "r", encoding="utf-16") as file:
+                return file.readlines()
+        except Exception as e:
+            LogHelper.warning(f"读取数据文件时发生编码错误，尝试使用shift-jis编码 - {LogHelper.get_trackback(e)}")
+            try:
+                with open(file_path, "r", encoding="shift-jis") as file:
+                    return file.readlines()
+            except Exception as e:
+                LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
 
 # 读取 .csv 文件
 def read_csv_file(file_path):
@@ -54,9 +64,21 @@ def read_json_file(file_path):
         # 读取并加载JSON文件
         with open(file_path, "r", encoding = "utf-8") as file:
             data = json.load(file)
-
-            for key in data.keys():
-                lines.append(key)
+            if isinstance(data, dict):
+                # 原有的处理方式
+                for key in data.keys():
+                    lines.append(key)
+            elif isinstance(data, list):
+                # name message json的处理方式
+                for item in data:
+                    if "message" in item:
+                        if "name" in item:
+                            lines.append(f"{item['name']}：{item['message']}")
+                            if not hasattr(G, 'names'):
+                                G.names = set()
+                            G.names.add(item['name'])
+                        else:
+                            lines.append(item['message'])
     except Exception as e:
         LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
 
@@ -241,8 +263,10 @@ def write_words_dict_to_file(words, path):
 # 查找 NER 实体
 def search_for_entity(full_lines):
     LogHelper.info("即将开始执行 [查找 NER 实体] ...")
+    
+    predefined_names = G.names if hasattr(G, 'names') else None
+    words = G.ner.search_for_entity(full_lines, predefined_names)
 
-    words = G.ner.search_for_entity(full_lines)
     if os.path.exists("debug.txt"):
         LogHelper.info(f"")
         with LogHelper.status(f"正在将实体字典写入文件 ..."):
