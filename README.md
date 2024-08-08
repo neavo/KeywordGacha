@@ -7,10 +7,10 @@
 
 
 ## 概述 📢
-- [KeywordGacha](https://github.com/neavo/KeywordGacha)，简称 KG，使用 AI 技术来自动生成文本中词汇表的次世代工具
-- 从长篇文本中 `一键抓取实体`、`自动翻译`、`自动总结相关信息`
+- [KeywordGacha](https://github.com/neavo/KeywordGacha)，简称 KG，使用 AI 技术来自动生成文本中词语表的次世代工具
+- 从长篇文本中一键 `抓取实体词语`、`自动翻译`、`自动总结`
 - 相较传统工具，具有高命中、语义化、智能总结角色信息等特色，对文本的兼容性更好
-- 极大的提升 小说、漫画、字幕、游戏脚本 等内容译前准备时制作统一词汇表的工作效率
+- 极大的提升 `小说`、`漫画`、`字幕`、`游戏脚本` 等内容译前准备时制作词语表的工作效率
 - 随机选取 [绿站榜单作品](https://books.fishhawk.top) 作为测试样本，与人工校对制作的词表对比，命中率约为 `80%-90%`
 
 > <img src="image/01.jpg" style="width: 80%;" alt="image/01.jpg">
@@ -34,12 +34,10 @@
 ## 抓取效果 ⚡
 - `抓取`、`总结` 和 `翻译` 效果取决于模型的能力，使用 💪 ~~更昂贵~~ 更强力  的模型可以显著提升效果
 - 是的，氪金可以变强
-- 各家的旗舰模型的 如 [GPT4o](https://chatgpt.com/)、[Claude 3.5 Sonnet](https://claude.ai/) 效果十分好，但是很贵
-- 不过本地小模型的效果也很不差
-- 但即使只使用运行在个人电脑上的小规模开源模型，也能很好的效果
-- 使用本地模型需要一块至少 8G 显存的 Nvidia 显卡，具体步骤请点击移步 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 安装一键包
-- 注意：受限于性能与开发资源，使用本地模型时，开发者仅能保证与 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 的兼容性
-- 如果您计划使用本地模型，请务必严格按照 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 页面描述的步骤进行部署
+- 各家的旗舰模型的如 [GPT4o](https://chatgpt.com/)、[Claude 3.5 Sonnet](https://claude.ai/) 效果十分好
+- 本地小模型的效果也还不错
+- 总体来说在线接口的效果远好于本地模型，推荐使用在线模型，便宜的就行
+- 在本页后续的 `傻瓜教程 📖` 章节中有使用 `在线模型 `和 `本地模型` 的相关教程
 
 ## 近期更新 📅
 - 20240808
@@ -74,12 +72,14 @@
     - 命中率约为 `80%-90%`
     - 现在 `快速模式` 也可以处理纯汉字词语了
 
-## 文本格式 🆗
+## 文本格式 🏷️
 - 目前支持三种不同的输入文本格式
 - 对文本内容没什么要求，`小说` 、`字幕`、`游戏脚本` 等都可以直接读取
-- 文件中 每一行/每一条 应只包含一个句子，太长的话请先手动处理一下
-- 路径是文件夹时，会读取文件夹内所有的 `txt`、`csv` 和 `json` 文件
-- 如当前目录下有 `data 文件夹` 、`all.orig.txt` 或 `ManualTransFile.json` 文件，会自动识别
+- 文件中 每一行/每一条 的长度不要超过500字，太长的话请先手动处理一下
+- 输入路径是文件夹时，会读取文件夹内所有的 `txt`、`csv` 和 `json` 文件
+- 当前目录下有 `data 文件夹` 、`all.orig.txt` 或 `ManualTransFile.json` 文件，会自动识别
+
+## 格式示例 📑
 - 当文件后缀名为 .json 时，会将其内容按以下模式处理，这也是 [MTool](https://afdian.net/a/AdventCirno) 导出翻译原文的格式
 
 ```json
@@ -151,10 +151,10 @@
 ```
 
 ## 傻瓜教程 📖
-- 在线接口（正在编写）
-- 本地模型（正在编写）
+- [推荐 👏] 如果愿意出一点小钱（一本书几毛钱）来获得快速且高质量的抓取结果，请查看 [此教程](doc/deepseek.md)
+- 如果希望完全白嫖又正好拥有一块 8G+（最好 12G+）的 Nvidia 显卡，请使用 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 搭建本地接口
 
-## 最佳实践 🔎
+## 最佳实践 💰
 - 处理 `游戏文本` 时，建议使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的文本，[MTool](https://afdian.net/a/AdventCirno) 导出的文本有时效果较差
 
 ## 开发计划 📈
