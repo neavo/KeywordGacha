@@ -181,7 +181,7 @@ def write_words_to_file(words, filename, detail):
                 file.write(f"词语原文 : {word.surface}\n")
                 file.write(f"出现次数 : {word.count}\n")
 
-                if G.config.translate_surface_mode == 1:
+                if G.config.translate_surface == 1:
                     file.write(f"罗马音 : {word.surface_romaji}\n")
                     file.write(f"词语翻译 : {', '.join(word.surface_translation)}, {word.surface_translation_description}\n")
                 
@@ -192,12 +192,12 @@ def write_words_to_file(words, filename, detail):
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                 file.write(f"{'\n'.join(word.context)}\n")
 
-                if G.config.translate_context_mode == 1 and len(word.context_translation) > 0:
+                if G.config.translate_context_per == 1 and len(word.context_translation) > 0:
                     file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
                     file.write(f"{'\n'.join(word.context_translation)}\n")
 
+                file.write(f"置信度 : {word.score}\n")
                 if LogHelper.is_debug():
-                    file.write(f"置信度 : {word.score}\n")
                     file.write(f"{word.llmresponse_summarize_context}\n")
                     file.write(f"{word.llmresponse_translate_context}\n")
                     file.write(f"{word.llmresponse_translate_surface}\n")
@@ -305,39 +305,39 @@ async def do_process_japanese():
     # words_prd = remove_words_by_ner_type(words_prd, "")
     # words = replace_words_by_ner_type(words, words_prd, "PRD")
 
-    # 等待实体校验任务结果
-    # LogHelper.info("即将开始执行 [实体校验] ...")
-    # words = await G.llm.validate_ner_batch(words)
-    # words = remove_words_by_ner_type(words, "")
-
     # 等待翻译词语任务结果
-    if G.config.translate_surface_mode == 1:
+    if G.config.translate_surface == 1:
         LogHelper.info("即将开始执行 [词语翻译] ...")
         words = await G.llm.translate_surface_batch(words)
 
-    # 等待上下文翻译任务结果
-    if G.config.translate_context_mode == 1:
-        LogHelper.info("即将开始执行 [上下文翻译] ...")
-        words_person = get_words_by_ner_type(words, NER.NER_TYPES.get("PER"))
-        words_person = await G.llm.translate_context_batch(words_person)
-        words = replace_words_by_ner_type(words, words_person, NER.NER_TYPES.get("PER"))
+    ner_type = {
+        "PER": "角色实体",
+        "ORG": "组织实体",
+        "LOC": "地点实体",
+        "PRD": "物品实体",
+        "EVT": "事件实体",
+    }
 
-    ner_type = (
-        ("PER", "角色实体"),
-        ("ORG", "组织实体"),
-        ("LOC", "地点实体"),
-        ("PRD", "物品实体"),
-        ("EVT", "事件实体"),
-    )
+    # 等待 上下文翻译 任务结果
+    for k, v in ner_type.items():
+        if (
+            (k == "PER" and G.config.translate_context_per == 1)
+            or
+            (k != "PER" and G.config.translate_context_other == 1)
+        ):
+            LogHelper.info(f"即将开始执行 [上下文翻译 - {v}] ...")
+            word_type = get_words_by_ner_type(words, k)
+            word_type = await G.llm.translate_context_batch(word_type)
+            words = replace_words_by_ner_type(words, word_type, k)
 
     dir_name, file_name_with_extension = os.path.split(G.config.input_file_path)
     file_name, extension = os.path.splitext(file_name_with_extension)
 
     LogHelper.info("")
-    for v in ner_type:
-        words_ner_type = get_words_by_ner_type(words, NER.NER_TYPES.get(v[0]))
-        write_words_to_file(words_ner_type, f"{file_name}_{v[1]}_日志.txt", True)
-        write_words_to_file(words_ner_type, f"{file_name}_{v[1]}_列表.json", False)
+    for k, v in ner_type.items():
+        words_ner_type = get_words_by_ner_type(words, k)
+        write_words_to_file(words_ner_type, f"{file_name}_{v}_日志.txt", True)
+        write_words_to_file(words_ner_type, f"{file_name}_{v}_列表.json", False)
 
     # 等待用户退出
     LogHelper.info("")
@@ -374,8 +374,8 @@ def print_app_info():
     table.add_row("base_url", str(G.config.base_url), "请求地址，从接口平台方获取，使用在线接口时一定要设置正确")
     table.add_row("model_name", str(G.config.model_name), "模型名称，从接口平台方获取，使用在线接口时一定要设置正确")
     table.add_row("count_threshold", str(G.config.count_threshold), "出现次数低于此值的词语会被过滤掉，调低它可以抓取更多低频词语")
-    table.add_row("translate_surface_mode", str(G.config.translate_surface_mode), "是否启用词语翻译功能，0 - 禁用，1 - 启用")
-    table.add_row("translate_context_mode", str(G.config.translate_context_mode), "是否启用上下文翻译功能，只对角色实体生效，0 - 禁用，1 - 启用")
+    table.add_row("translate_surface", str(G.config.translate_surface), "是否启用词语翻译功能，0 - 禁用，1 - 启用")
+    table.add_row("translate_context_per", str(G.config.translate_context_per), "是否启用上下文翻译功能，只对角色实体生效，0 - 禁用，1 - 启用")
     table.add_row("request_timeout", str(G.config.request_timeout), "网络请求超时时间（秒）如果频繁出现网络错误，可以调大这个值")
     table.add_row("request_frequency_threshold", str(G.config.request_frequency_threshold), "网络请求频率阈值（次/秒，可以小于 1）\n如果频繁出现网络错误，特别是使用中转平台时，可以调小这个值")
 
