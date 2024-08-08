@@ -365,21 +365,32 @@ def print_app_info():
     LogHelper.rule(f"使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等任意文本中的词语表的翻译辅助工具", style = "light_goldenrod2")
     LogHelper.print()
 
-    table = Table(box = box.ASCII2, expand = True, highlight = True, show_lines = True, border_style = "light_goldenrod2")
-    table.add_column("设置", justify = "left", style = "white", width = 24, overflow = "fold")
-    table.add_column("当前值", justify = "left", style = "white", width = 24, overflow = "fold")
-    table.add_column("说明信息 - 修改设置请打开 [blue]Config.json[/] 文件", justify = "left", style = "white", overflow = "fold")
+    table = Table(
+        box = box.ASCII2,
+        expand = True, 
+        highlight = True,
+        show_lines = True,
+        border_style = "light_goldenrod2"
+    )
+    table.add_column("设置", style = "white", ratio = 1, overflow = "fold")
+    table.add_column("当前值", style = "white", ratio = 1, overflow = "fold")
+    table.add_column("设置", style = "white", ratio = 1, overflow = "fold")
+    table.add_column("当前值", style = "white", ratio = 1, overflow = "fold")
 
-    table.add_row("api_key", str(G.config.api_key), "授权密钥，从接口平台方获取，使用在线接口时一定要设置正确")
-    table.add_row("base_url", str(G.config.base_url), "请求地址，从接口平台方获取，使用在线接口时一定要设置正确")
-    table.add_row("model_name", str(G.config.model_name), "模型名称，从接口平台方获取，使用在线接口时一定要设置正确")
-    table.add_row("count_threshold", str(G.config.count_threshold), "出现次数低于此值的词语会被过滤掉，调低它可以抓取更多低频词语")
-    table.add_row("translate_surface", str(G.config.translate_surface), "是否启用词语翻译功能，0 - 禁用，1 - 启用")
-    table.add_row("translate_context_per", str(G.config.translate_context_per), "是否启用上下文翻译功能，只对角色实体生效，0 - 禁用，1 - 启用")
-    table.add_row("request_timeout", str(G.config.request_timeout), "网络请求超时时间（秒）如果频繁出现网络错误，可以调大这个值")
-    table.add_row("request_frequency_threshold", str(G.config.request_frequency_threshold), "网络请求频率阈值（次/秒，可以小于 1）\n如果频繁出现网络错误，特别是使用中转平台时，可以调小这个值")
+    rows = [
+        ("接口密钥", str(G.config.api_key), "模型名称", str(G.config.model_name)),
+        ("接口地址", str(G.config.base_url)),
+        ("出现次数阈值", str(G.config.count_threshold), "是否翻译词语", "是" if G.config.translate_surface == 1 else "否"),
+        ("是否翻译角色实体上下文", "是" if G.config.translate_context_per == 1 else "否", "是否翻译其他实体上下文", "是" if G.config.translate_context_other == 1 else "否"),
+        ("网络请求超时时间", f"{G.config.request_timeout} 秒" , "网络请求频率阈值", f"{G.config.request_frequency_threshold} 次/秒"),
+    ]
+
+    for row in rows:
+        table.add_row(*row)
 
     LogHelper.print(table)
+    LogHelper.print()
+    LogHelper.print(f"请编辑 [green]config.json[/] 文件来修改应用设置 ...")
     LogHelper.print()
 
 # 打印菜单
@@ -464,8 +475,8 @@ def init():
                 config = json.load(file)
                 G.config = type("GClass", (), {})()
 
-                for key in config:
-                    setattr(G.config, key, config[key])
+                for k, v in config.items():
+                    setattr(G.config, k, v[0])
         except FileNotFoundError:
             LogHelper.error(f"文件 {config_file} 未找到.")
         except json.JSONDecodeError:
