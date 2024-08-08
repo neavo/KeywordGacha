@@ -9,8 +9,10 @@ __pycache__
 
 /data*
 /debug*
+/gpuboost*
 /all.orig*
 /words_dict*
 /config_dev*
 /ManualTransFile*
-/resource/*onnx*
+/resource/kg_ner_ja_cpu
+/resource/kg_ner_ja_gpu

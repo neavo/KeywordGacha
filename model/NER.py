@@ -20,8 +20,8 @@ class NER:
     TASK_MODES.QUICK = 10
     TASK_MODES.ACCURACY = 20
 
-    GPU_ENABLE = torch.cuda.is_available() and LogHelper.is_debug()
-    MODEL_PATH = "resource\\kg_ner_ja_onnx_gpu" if GPU_ENABLE else "resource\\kg_ner_ja_onnx_cpu"
+    GPU_BOOST = torch.cuda.is_available() and LogHelper.is_gpu_boost()
+    MODEL_PATH = "resource\\kg_ner_ja_gpu" if GPU_BOOST else "resource\\kg_ner_ja_cpu"
     LINE_SIZE_PER_GROUP = 256
 
     RE_SPLIT_BY_PUNCTUATION = re.compile(
@@ -51,13 +51,14 @@ class NER:
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.MODEL_PATH,
+            padding = "max_length",
             truncation = True,
             max_length = 512,
             model_max_length = 512,
             local_files_only = True,
         )
 
-        if self.GPU_ENABLE:
+        if self.GPU_BOOST:
             self.model = AutoModelForTokenClassification.from_pretrained(
                 self.MODEL_PATH,            
                 local_files_only = True,
@@ -76,9 +77,9 @@ class NER:
         self.classifier = pipeline(
             "token-classification",
             model = self.model,
-            device = "cuda" if self.GPU_ENABLE else "cpu",
+            device = "cuda" if self.GPU_BOOST else "cpu",
             tokenizer = self.tokenizer,
-            batch_size = 128 if self.GPU_ENABLE else min(16, os.cpu_count()),
+            batch_size = 128 if self.GPU_BOOST else min(10, os.cpu_count()),
             aggregation_strategy = "simple",
         )
 

@@ -59,6 +59,10 @@ class LogHelper:
         return os.path.exists("debug.txt")
 
     @staticmethod
+    def is_gpu_boost():
+        return os.path.exists("gpuboost.txt")
+
+    @staticmethod
     def get_trackback(e):
         return f"{e}\n{("".join(traceback.format_exception(None, e, e.__traceback__))).strip()}"
 

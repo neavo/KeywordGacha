@@ -14,12 +14,13 @@ jobs:
                  
       - name: Create Env
         run: |
-          powershell -Command "Invoke-WebRequest -Uri https://www.python.org/ftp/python/3.12.4/python-3.12.4-embed-amd64.zip -OutFile python.zip"
+          call resource\aria2c.exe https://www.python.org/ftp/python/3.12.4/python-3.12.4-embed-amd64.zip -o python.zip
           powershell -Command "Expand-Archive -Path 'python.zip' -DestinationPath 'env'"
-          powershell -Command "Remove-Item -Path 'python.zip' -Recurse -Force"
-          powershell -Command "Invoke-WebRequest -Uri https://bootstrap.pypa.io/pip/get-pip.py -OutFile get-pip.py"
+          powershell -Command "Remove-Item -Path 'python.zip' -Recurse -Force -ErrorAction SilentlyContinue"
+
+          call resource\aria2c.exe https://bootstrap.pypa.io/pip/get-pip.py -o get-pip.py
           powershell -Command ".\env\python.exe get-pip.py"
-          powershell -Command "Remove-Item -Path 'get-pip.py' -Recurse -Force"
+          powershell -Command "Remove-Item -Path 'get-pip.py' -Recurse -Force -ErrorAction SilentlyContinue"
           powershell -Command "Copy-Item -Path 'resource\python312._pth' -Destination 'env\python312._pth' -Force"
 
       - name: Install Requirements
@@ -29,9 +30,9 @@ jobs:
 
       - name: Install Model
         run: |          
-          powershell -Command "Invoke-WebRequest -Uri https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_ja_onnx_cpu/kg_ner_ja_onnx_cpu.zip -OutFile onnx.zip"
-          powershell -Command "Expand-Archive -Path 'onnx.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_ja_onnx_cpu'"
-          powershell -Command "Remove-Item -Path 'onnx.zip' -Recurse -Force"    
+          call resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_ja_cpu/kg_ner_ja_cpu.zip -o kg_ner_ja_cpu.zip
+          powershell -Command "Expand-Archive -Path 'kg_ner_ja_cpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_ja_cpu'"
+          powershell -Command "Remove-Item -Path 'kg_ner_ja_cpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"   
 
       - name: Copy Files
         run: |          
@@ -41,9 +42,12 @@ jobs:
           xcopy "prompt" "dist\KeywordGacha\prompt" /E /I /H /Y
 
           copy "01_启动.bat" "dist\KeywordGacha\"
+          copy "02_启用应用内GPU加速.bat" "dist\KeywordGacha\"
+          copy "03_关闭应用内GPU加速.bat" "dist\KeywordGacha\"
           copy "main.py" "dist\KeywordGacha\"
           copy "config.json" "dist\KeywordGacha\"
           copy "blacklist.txt" "dist\KeywordGacha\"
+          copy "resource\aria2c.exe" "dist\KeywordGacha\resource\"
           copy "resource\python312._pth" "dist\KeywordGacha\resource\"
 
       - name: Compress Archive
