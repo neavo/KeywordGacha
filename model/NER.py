@@ -129,10 +129,28 @@ class NER:
         words[0].ner_type = ner_type
 
         return words
+    
+    # 添加预定义的名字
+    def add_predefined_names(self, names, full_lines):
+        words = []
+        for name in names:
+            word = Word()
+            word.surface = name
+            word.ner_type = self.NER_TYPES.get("PER")
+            word.score = 1.0  # 给予最高置信度
+            word.context = word.search_context(full_lines)
+            words.extend(self.generate_words(word.score, word.surface, word.ner_type))
+        return words
 
     # 查找 NER 实体
-    def search_for_entity(self, full_lines):
+    def search_for_entity(self, full_lines, predefined_names=None):
         words = []
+        
+        # 如果存在预定义的名字，先添加它们
+        if predefined_names:
+            words.extend(self.add_predefined_names(predefined_names, full_lines))
+            LogHelper.info(f"已从 name message json 文件中添加 {len(predefined_names)} 个预定义角色名称 ...")
+
         full_lines_chunked = [
             full_lines[i : i + self.LINE_SIZE_PER_GROUP]
             for i in range(0, len(full_lines), self.LINE_SIZE_PER_GROUP)
