@@ -129,37 +129,23 @@ class NER:
         words[0].ner_type = ner_type
 
         return words
-    
-    # 添加预定义的名字
-    def add_predefined_names(self, names, full_lines):
-        words = []
-        for name in names:
-            word = Word()
-            word.surface = name
-            word.ner_type = self.NER_TYPES.get("PER")
-            word.score = 1.0  # 给予最高置信度
-            word.context = word.search_context(full_lines)
-            words.extend(self.generate_words(word.score, word.surface, word.ner_type))
-        return words
 
     # 查找 NER 实体
-    def search_for_entity(self, full_lines, predefined_names=None):
-        words = []
-        
-        # 如果存在预定义的名字，先添加它们
-        if predefined_names:
-            words.extend(self.add_predefined_names(predefined_names, full_lines))
-            LogHelper.info(f"已从 name message json 文件中添加 {len(predefined_names)} 个预定义角色名称 ...")
+    def search_for_entity(self, input_lines, input_names):
+        words = []     
 
-        full_lines_chunked = [
-            full_lines[i : i + self.LINE_SIZE_PER_GROUP]
-            for i in range(0, len(full_lines), self.LINE_SIZE_PER_GROUP)
+        input_lines_chunked = [
+            input_lines[i : i + self.LINE_SIZE_PER_GROUP]
+            for i in range(0, len(input_lines), self.LINE_SIZE_PER_GROUP)
         ]
 
         LogHelper.print()
         with ProgressHelper.get_progress() as progress:
-            pid = progress.add_task("查找 NER 实体", total = None)            
-            for k, lines in enumerate(full_lines_chunked):
+            pid = progress.add_task("查找 NER 实体", total = None)   
+
+            seen = set()
+            for k, lines in enumerate(input_lines_chunked):
+                # 使用 NER 模型抓取实体
                 self.classifier.call_count = 0 # 防止出现应使用 dateset 的提示
                 for i, doc in enumerate(self.classifier(lines)):
                     for token in doc:
@@ -168,8 +154,29 @@ class NER:
                             score = token.get("score")
                             entity_group = self.NER_TYPES.get(token.get("entity_group"), "")
                             words.extend(self.generate_words(score, surface, entity_group))
+                
+                # 匹配【】中的字符串
+                for name in re.findall(r"【(.*?)】", "\n".join(lines)):
+                    if name in seen:
+                        continue
+                    else:
+                        seen.add(name)
 
-                progress.update(pid, advance = 1, total = len(full_lines_chunked))
+                    if len(name) <= 12:
+                        surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, name.replace(" ", ""))
+                        for surface in surfaces:
+                            results = self.generate_words(0.95, surface, "PER")
+                            if len(results) > 0:
+                                words.extend(results)
+                                LogHelper.debug(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 匹配到角色实体 - {results[0].surface}")              
+
+                progress.update(pid, advance = 1, total = len(input_lines_chunked))
+
+        # 添加输入文件中读取到的角色名
+        for name in input_names:
+            surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, name.replace(" ", ""))
+            for surface in surfaces:
+                words.extend(self.generate_words(0.95, surface, "PER"))
 
         self.release()
         LogHelper.print()
