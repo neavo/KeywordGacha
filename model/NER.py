@@ -60,9 +60,10 @@ class NER:
 
         if self.GPU_BOOST:
             self.model = AutoModelForTokenClassification.from_pretrained(
-                self.MODEL_PATH,            
+                self.MODEL_PATH,
+                torch_dtype = torch.float16,
                 local_files_only = True,
-            ).to(device = "cuda").to(torch.float16)
+            ).to(device = "cuda")
         else:
             session_options = onnxruntime.SessionOptions()
             session_options.log_severity_level = 4
@@ -157,16 +158,16 @@ class NER:
                 
                 # 匹配【】中的字符串
                 for name in re.findall(r"【(.*?)】", "\n".join(lines)):
-                    if name in seen:
-                        continue
-                    else:
-                        seen.add(name)
-
                     if len(name) <= 12:
                         surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, name.replace(" ", ""))
                         for surface in surfaces:
                             results = self.generate_words(0.95, surface, "PER")
                             if len(results) > 0:
+                                if results[0].surface in seen:
+                                    continue
+                                else:
+                                    seen.add(results[0].surface)
+
                                 words.extend(results)
                                 LogHelper.debug(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 匹配到角色实体 - {results[0].surface}")              
 
