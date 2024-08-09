@@ -243,7 +243,7 @@ def search_for_entity(full_lines):
     LogHelper.info("即将开始执行 [查找 NER 实体] ...")
 
     words = G.ner.search_for_entity(full_lines)
-    if os.path.exists("debug.txt"):
+    if LogHelper.is_debug():
         LogHelper.info(f"")
         with LogHelper.status(f"正在将实体字典写入文件 ..."):
             words = merge_and_count(words, full_lines)
