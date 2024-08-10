@@ -17,7 +17,7 @@ jobs:
         shell: pwsh
         run: |
           $version = Get-Content -Path version.txt
-          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Create Env
         shell: cmd
