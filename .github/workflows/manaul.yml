@@ -40,10 +40,10 @@ jobs:
       - name: Copy Files
         shell: cmd
         run: |
-          xcopy "env" ".\dist\KeywordGacha\env" /E /I /H /Y
-          xcopy "model" ".\dist\KeywordGacha\model" /E /I /H /Y
-          xcopy "helper" ".\dist\KeywordGacha\helper" /E /I /H /Y
-          xcopy "prompt" ".\dist\KeywordGacha\prompt" /E /I /H /Y
+          xcopy "env" ".\dist\KeywordGacha\env" /E /I /Q /H /Y
+          xcopy "model" ".\dist\KeywordGacha\model" /E /I /Q /H /Y
+          xcopy "helper" ".\dist\KeywordGacha\helper" /E /I /Q /H /Y
+          xcopy "prompt" ".\dist\KeywordGacha\prompt" /E /I /Q /H /Y
 
           copy "01_启动.bat" ".\dist\KeywordGacha\"
           copy "main.py" ".\dist\KeywordGacha\"
@@ -62,13 +62,13 @@ jobs:
           $timestamp = ([System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::ParseExact($timestamp, "yyyyMMdd_HHmmss", $null), [System.TimeZoneInfo]::Utc.Id, 'China Standard Time')).ToString("yyyyMMdd_HHmmss")
 
           # 输出 timestamp 变量以供后续步骤使用
-          echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
+          "TIMESTAMP=$timestamp" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Compress Archive
         shell: cmd
         run: |
           # 压缩dist目录下的所有文件，不包括dist目录本身
-          .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}.zip .\dist\*
+          .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_$TIMESTAMP.zip .\dist\*
 
       - name: Change To NV Version
         shell: cmd
@@ -86,7 +86,7 @@ jobs:
         shell: cmd
         run: |
           # 压缩dist目录下的所有文件，不包括dist目录本身
-          .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip .\dist\*
+          .\resource\7za.exe a -y -bt -mx5 -slp -v2000M KeywordGacha_NV_$TIMESTAMP.zip .\dist\*
 
       - name: Create Release
         id: create_release
@@ -94,8 +94,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
-          tag_name: MANAUL_BUILD_${{ steps.create_timestamp.outputs.timestamp }}
-          release_name: KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}
+          tag_name: MANAUL_BUILD_$TIMESTAMP
+          release_name: KeywordGacha_$TIMESTAMP
           draft: true
           prerelease: false
 
@@ -105,8 +105,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}.zip
-          asset_name: KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}.zip
+          asset_path: ./KeywordGacha_$TIMESTAMP.zip
+          asset_name: KeywordGacha_$TIMESTAMP.zip
           asset_content_type: application/octet-stream
 
       - name: Upload Release NV
@@ -115,6 +115,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip
-          asset_name: KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip
+          asset_path: ./KeywordGacha_NV_$TIMESTAMP.zip
+          asset_name: KeywordGacha_NV_$TIMESTAMP.zip
           asset_content_type: application/octet-stream

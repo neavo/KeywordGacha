@@ -44,7 +44,6 @@
 
     @REM 切换 Torch 版本
     .\dist\KeywordGacha\env\python.exe -m pip uninstall --yes torch torchvision torchaudio
-    @REM .\dist\KeywordGacha\env\python.exe -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 --no-cache-dir
     .\dist\KeywordGacha\env\python.exe -m pip install D:\AI\torch-2.3.1+cu121-cp312-cp312-win_amd64.whl
     .\dist\KeywordGacha\env\python.exe -m pip cache purge
 
@@ -54,6 +53,6 @@
     echo > .\dist\KeywordGacha\gpuboost.txt
 
     @REM  压缩dist目录下的所有文件，不包括dist目录本身
-    .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_NV.zip .\dist\*
+    .\resource\7za.exe a -y -bt -mx1 -slp -v2000M KeywordGacha_NV.zip .\dist\*
 
 pause
