@@ -23,13 +23,13 @@
 - 也可以运行 `本地模型` 来获得 `完全免费` 的服务（需要 8G 以上显存的 Nvidia 显卡）
 
 ## 使用流程 🛸
-- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载 `KeywordGacha_DEV_*.zip` 并本地并解压缩
-- 打开配置文件 `config.json` ，填入 API 信息，如使用本地接口则不需要修改
-- [可选] Nvidia 显卡用户双击 `02_启用应用内GPU加速` 启用 GPU 加速
-- 双击 `01_启动.bat`，按提示操作即可
-- 流程执行完毕后，会生成类似于 `角色实体_日志.txt` 与 `角色实体_列表.json` 的结果文件
+- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载应用，两个版本任选其一；
+- `KeywordGacha_*.zip` 是基础版本，适用于所有设备；
+- `KeywordGacha_NV_*.zip` 是 GPU 加速版，可以极大幅度提升处理速度，暂时只支持 Nvidia 显卡；
+- 打开配置文件 `config.json`，填入 API 信息，默认为本地接口；
+- 双击 `01_启动.bat` 启动应用，流程技术后，会生成一系列的结果文件；
 - `*_日志.txt` 中包含抓取到的词语的原文、上下文、翻译建议、角色信息总结等信息
-- 参考日志中的信息完成 `*_列表.json` 后，可以直接导入到 [AiNiee](https://github.com/NEKOparapa/AiNiee) 等翻译器中使用
+- 在参考日志中的信息对 `*_列表.json` 进行校对确认后，可以直接导入到 [AiNiee](https://github.com/NEKOparapa/AiNiee) 等翻译器中使用
 
 ## 抓取效果 ⚡
 - `抓取`、`总结` 和 `翻译` 效果取决于模型的能力，使用 💪 ~~更昂贵~~ 更强力  的模型可以显著提升效果
@@ -40,6 +40,10 @@
 - 在本页后续的 `傻瓜教程 📖` 章节中有使用 `在线模型 `和 `本地模型` 的相关教程
 
 ## 近期更新 📅
+- 20240810
+  - 修正 - 一个系统兼容性问题
+  - 调整 - 优化了对游戏文本的支持和抓取能力
+
 - 20240808
   - 新增 - 接口测试 功能
   - 新增 - 非人名实体上下文翻译 功能，默认关闭
@@ -152,7 +156,7 @@
 
 ## 傻瓜教程 📖
 - [推荐 👏] 如果愿意出一点小钱（一本书几毛钱）来获得快速且高质量的抓取结果，请查看 [此教程](doc/deepseek.md)
-- 如果希望完全白嫖又正好拥有一块 8G+（最好 12G+）的 Nvidia 显卡，请使用 [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer) 搭建本地接口
+- 如果拥有 8G+ 显存的 Nvidia 显卡，可以使用 [一键包](https://github.com/neavo/KeywordGachaServer) 搭建本地接口实现完全的白嫖
 
 ## 最佳实践 💰
 - 处理 `游戏文本` 时，建议使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的文本，[MTool](https://afdian.net/a/AdventCirno) 导出的文本有时效果较差
