@@ -44,6 +44,10 @@ class LogHelper:
         LogHelper.console_no_highlight.print_json(str(json), *args, **kwargs)
 
     @staticmethod
+    def input(prompt, *args, **kwargs):
+        return LogHelper.console_no_highlight.input(prompt, *args, **kwargs)
+
+    @staticmethod
     def print(*args, **kwargs):
         if "highlight" in kwargs and kwargs["highlight"] == True:
             LogHelper.console_highlight.print(*args, **kwargs)

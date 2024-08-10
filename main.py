@@ -96,19 +96,26 @@ def read_json_file(file_path):
     return lines, names
 
 # 读取数据文件
-def read_data_file():
+def read_input_file():
     # 先尝试自动寻找数据文件，找不到提示用户输入
     file_path = ""
-    preset_path = ["transDic.output.txt", "transDic.output.json", "all.orig.txt", "all.orig.json", "ManualTransFile.json", "data"]
 
-    for v in preset_path:
-        if os.path.exists(v):
-            user_input = input(f'已找到数据文件 "{v}"，按回车直接使用或输入其他文件路径：').strip('"')
-            file_path = user_input if user_input else v
-            break
+    num = 0
+    if os.path.exists(".\\input") and os.path.isdir(".\\input"):
+        for entry in os.scandir(".\\input"):
+            if entry.is_file() and entry.name.endswith(".txt"):
+                num = num + 1
+            elif entry.is_file() and entry.name.endswith(".csv"):
+                num = num + 1
+            elif entry.is_file() and entry.name.endswith(".json"):
+                num = num + 1
+
+    if num > 0:
+        user_input = LogHelper.input(f"已在 [green].\\input[/] 路径下找到数据文件 {num} 个，按回车直接使用或输入其他文件路径：").strip('"')
+        file_path = user_input if user_input else ".\\input"
     
     if file_path == "":
-        file_path = input(f'请输入数据文件的路径: ').strip('"')
+        file_path = LogHelper.input(f"请输入数据文件的路径: ").strip('"')
 
     G.config.input_file_path = file_path
 
@@ -200,48 +207,6 @@ def merge_and_count(words, full_lines, per_score_threshold = 0.75, other_score_t
 
     return sorted(words_merged, key = lambda x: x.count, reverse = True)
 
-# 将 Word 列表写入文件
-def write_words_to_file(words, filename, detail):
-    with open(filename, "w", encoding = "utf-8") as file:
-        if not detail:
-            data = {}
-            for k, word in enumerate(words):
-                if word.surface_translation and len(word.surface_translation) > 0:
-                    data[word.surface] = word.surface_translation[0]
-                else:
-                    data[word.surface] = ""
-
-            file.write(json.dumps(data, indent = 4, ensure_ascii = False))
-        else:
-            for k, word in enumerate(words):
-                file.write(f"词语原文 : {word.surface}\n")
-                file.write(f"出现次数 : {word.count}\n")
-
-                if G.config.translate_surface == 1:
-                    file.write(f"罗马音 : {word.surface_romaji}\n")
-                    file.write(f"词语翻译 : {', '.join(word.surface_translation)}, {word.surface_translation_description}\n")
-                
-                if word.ner_type == NER.NER_TYPES.get("PER"):
-                    file.write(f"角色性别 : {word.attribute}\n")
-
-                file.write(f"语义分析 : {word.context_summary.get("summary", "")}\n")
-                file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                file.write(f"{'\n'.join(word.context)}\n")
-
-                if G.config.translate_context_per == 1 and len(word.context_translation) > 0:
-                    file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                    file.write(f"{'\n'.join(word.context_translation)}\n")
-
-                file.write(f"置信度 : {word.score}\n")
-                if LogHelper.is_debug():
-                    file.write(f"{word.llmresponse_summarize_context}\n")
-                    file.write(f"{word.llmresponse_translate_context}\n")
-                    file.write(f"{word.llmresponse_translate_surface}\n")
-                    
-                file.write("\n")
-
-    LogHelper.info(f"结果已写入 - [green]{filename}[/]")
-
 # 获取指定类型的词
 def get_words_by_ner_type(words, ner_type):
     # 显式的复制对象，避免后续修改对原始列表的影响，浅拷贝不复制可变对象（列表、字典、自定义对象等），慎重修改它们
@@ -257,7 +222,7 @@ def replace_words_by_ner_type(words, in_words, ner_type):
     words.extend(in_words)
     return words
 
-# 将实体字典写入文件
+# 将 词语字典 写入文件
 def write_words_dict_to_file(words, path):
     words_dict = {}
     for k, word in enumerate(words):
@@ -273,6 +238,116 @@ def write_words_dict_to_file(words, path):
 
     with open(path, "w", encoding = "utf-8") as file:
         file.write(json.dumps(words_dict, indent = 4, ensure_ascii = False))
+
+# 将 词语日志 写入文件
+def write_words_log_to_file(words, path):
+    with open(path, "w", encoding = "utf-8") as file:
+        for k, word in enumerate(words):
+            file.write(f"词语原文 : {word.surface}\n")
+            file.write(f"出现次数 : {word.count}\n")
+
+            if G.config.translate_surface == 1:
+                file.write(f"罗马音 : {word.surface_romaji}\n")
+                file.write(f"词语翻译 : {', '.join(word.surface_translation)}, {word.surface_translation_description}\n")
+            
+            if word.ner_type == NER.NER_TYPES.get("PER"):
+                file.write(f"角色性别 : {word.attribute}\n")
+
+            file.write(f"语义分析 : {word.context_summary.get("summary", "")}\n")
+            file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
+            file.write(f"{'\n'.join(word.context)}\n")
+
+            if G.config.translate_context_per == 1 and len(word.context_translation) > 0:
+                file.write(f"上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
+                file.write(f"{'\n'.join(word.context_translation)}\n")
+
+            file.write(f"置信度 : {word.score}\n")
+            if LogHelper.is_debug():
+                file.write(f"{word.llmresponse_summarize_context}\n")
+                file.write(f"{word.llmresponse_translate_context}\n")
+                file.write(f"{word.llmresponse_translate_surface}\n")
+                
+            file.write("\n")
+
+    LogHelper.info(f"结果已写入 - [green]{path}[/]")
+
+# 将 词语列表 写入文件
+def write_words_list_to_file(words, path):
+    with open(path, "w", encoding = "utf-8") as file:
+        data = {}
+        for k, word in enumerate(words):
+            if word.surface_translation and len(word.surface_translation) > 0:
+                data[word.surface] = word.surface_translation[0]
+            else:
+                data[word.surface] = ""
+
+        file.write(json.dumps(data, indent = 4, ensure_ascii = False))
+        LogHelper.info(f"结果已写入 - [green]{path}[/]")
+
+# 将 AiNiee 词典写入文件
+def write_ainiee_dict_to_file(words, path):
+    type_map = {
+        "PER": "角色",      # 表示人名，如"张三"、"约翰·多伊"等。
+        "ORG": "组织",      # 表示组织，如"联合国"、"苹果公司"等。
+        "LOC": "地点",      # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
+        "PRD": "物品",      # 表示产品，如"iPhone"、"Windows操作系统"等。
+        "EVT": "事件",      # 表示事件，如"奥运会"、"地震"等。
+    }
+
+    with open(path, "w", encoding = "utf-8") as file:
+        datas = []
+        for word in words:
+            if not (word.surface_translation and len(word.surface_translation) > 0):
+                continue
+
+            data = {}
+            data["srt"] = word.surface
+            data["dst"] = word.surface_translation[0]
+
+            if word.ner_type == "PER" and "男" in word.attribute:
+                data["info"] = f"男性角色的名字"
+            elif word.ner_type == "PER" and "女" in word.attribute:
+                data["info"] = f"女性角色的名字"
+            elif word.ner_type == "PER":
+                data["info"] = f"未知性别角色的名字"
+            else:
+                data["info"] = f"{type_map.get(word.ner_type)}名称"
+
+            datas.append(data)
+
+        file.write(json.dumps(datas, indent = 4, ensure_ascii = False))
+        LogHelper.info(f"结果已写入 - [green]{path}[/]")
+
+# 将 GalTransl 词典写入文件
+def write_galtransl_dict_to_file(words, path):
+    type_map = {
+        "PER": "角色",      # 表示人名，如"张三"、"约翰·多伊"等。
+        "ORG": "组织",      # 表示组织，如"联合国"、"苹果公司"等。
+        "LOC": "地点",      # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
+        "PRD": "物品",      # 表示产品，如"iPhone"、"Windows操作系统"等。
+        "EVT": "事件",      # 表示事件，如"奥运会"、"地震"等。
+    }
+
+    with open(path, "w", encoding = "utf-8") as file:
+        for word in words:
+            if not (word.surface_translation and len(word.surface_translation) > 0):
+                continue
+
+            line = f"{word.surface}\t{word.surface_translation[0]}"
+
+            if word.ner_type == "PER" and "男" in word.attribute:
+                line = line + f"\t男性角色的名字"
+            elif word.ner_type == "PER" and "女" in word.attribute:
+                line = line + f"\t女性角色的名字"
+            elif word.ner_type == "PER":
+                line = line + f"\t未知性别角色的名字"
+            else:
+                line = line + f"\t{type_map.get(word.ner_type)}名称"
+
+            file.write(f"{line}\n")
+        LogHelper.info(f"结果已写入 - [green]{path}[/]")
+
+
 
 # 查找 NER 实体
 def search_for_entity(input_lines, input_names):
@@ -319,7 +394,7 @@ def search_for_entity(input_lines, input_names):
 # 开始处理日文
 async def do_process_japanese():
     # 读取输入文件
-    input_lines, input_names = read_data_file()
+    input_lines, input_names = read_input_file()
 
     # 查找 NER 实体
     words = []
@@ -373,10 +448,13 @@ async def do_process_japanese():
     file_name, extension = os.path.splitext(file_name_with_extension)
 
     LogHelper.info("")
+    os.makedirs(".\\output", exist_ok = True)
     for k, v in ner_type.items():
         words_ner_type = get_words_by_ner_type(words, k)
-        write_words_to_file(words_ner_type, f"{file_name}_{v}_日志.txt", True)
-        write_words_to_file(words_ner_type, f"{file_name}_{v}_列表.json", False)
+        write_words_log_to_file(words_ner_type, f".\\output\\{file_name}_{v}_日志.txt")
+        write_words_list_to_file(words_ner_type, f".\\output\\{file_name}_{v}_列表.json")
+        write_ainiee_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_ainiee.json")
+        write_galtransl_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_galtransl.txt")
 
     # 等待用户退出
     LogHelper.info("")
