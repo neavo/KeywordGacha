@@ -1,4 +1,5 @@
 import re
+import gc
 import os
 import json
 
@@ -86,12 +87,20 @@ class NER:
 
     # 释放资源
     def release(self):
+        LogHelper.debug(f"显存保留量 - {torch.cuda.memory_reserved()/1024/1024} MB")
+        LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024} MB")
+
         if self.classifier:
             del self.classifier
         if self.model:
             del self.model
         if self.tokenizer:
             del self.tokenizer
+
+        gc.collect()
+        torch.cuda.empty_cache()
+        LogHelper.debug(f"显存保留量 - {torch.cuda.memory_reserved()/1024/1024} MB")
+        LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024} MB")
 
     # 从指定路径加载黑名单文件内容
     def load_blacklist(self, filepath):

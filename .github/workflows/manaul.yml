@@ -13,45 +13,46 @@ jobs:
         uses: actions/checkout@v4
                  
       - name: Create Env
+        shell: cmd
         run: |
-          resource\aria2c.exe https://www.python.org/ftp/python/3.12.4/python-3.12.4-embed-amd64.zip -o python.zip
+          .\resource\aria2c.exe https://www.python.org/ftp/python/3.12.4/python-3.12.4-embed-amd64.zip -o python.zip
           powershell -Command "Expand-Archive -Path 'python.zip' -DestinationPath 'env'"
           powershell -Command "Remove-Item -Path 'python.zip' -Recurse -Force -ErrorAction SilentlyContinue"
 
-          resource\aria2c.exe https://bootstrap.pypa.io/pip/get-pip.py -o get-pip.py
-          powershell -Command ".\env\python.exe get-pip.py"
+          .\resource\aria2c.exe https://bootstrap.pypa.io/pip/get-pip.py -o get-pip.py
+          .\env\python.exe get-pip.py
           powershell -Command "Remove-Item -Path 'get-pip.py' -Recurse -Force -ErrorAction SilentlyContinue"
           powershell -Command "Copy-Item -Path 'resource\python312._pth' -Destination 'env\python312._pth' -Force"
 
       - name: Install Requirements
+        shell: cmd
         run: |
-          powershell -Command ".\env\python.exe -m pip install -r requirements.txt"
-          powershell -Command ".\env\python.exe -m pip cache purge"
+          .\env\python.exe -m pip install -r requirements.txt
+          .\env\python.exe -m pip cache purge
 
       - name: Install Model
-        run: |          
-          resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_ja_cpu/kg_ner_ja_cpu.zip -o kg_ner_ja_cpu.zip
+        shell: cmd
+        run: |
+          .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_ja_cpu/kg_ner_ja_cpu.zip -o kg_ner_ja_cpu.zip
           powershell -Command "Expand-Archive -Path 'kg_ner_ja_cpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_ja_cpu'"
           powershell -Command "Remove-Item -Path 'kg_ner_ja_cpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"   
 
       - name: Copy Files
-        run: |          
-          xcopy "env" "dist\KeywordGacha\env" /E /I /H /Y
-          xcopy "model" "dist\KeywordGacha\model" /E /I /H /Y
-          xcopy "helper" "dist\KeywordGacha\helper" /E /I /H /Y
-          xcopy "prompt" "dist\KeywordGacha\prompt" /E /I /H /Y
+        shell: cmd
+        run: |
+          xcopy "env" ".\dist\KeywordGacha\env" /E /I /H /Y
+          xcopy "model" ".\dist\KeywordGacha\model" /E /I /H /Y
+          xcopy "helper" ".\dist\KeywordGacha\helper" /E /I /H /Y
+          xcopy "prompt" ".\dist\KeywordGacha\prompt" /E /I /H /Y
 
-          copy "01_启动.bat" "dist\KeywordGacha\"
-          copy "02_启用应用内GPU加速.bat" "dist\KeywordGacha\"
-          copy "03_关闭应用内GPU加速.bat" "dist\KeywordGacha\"
-          copy "main.py" "dist\KeywordGacha\"
-          copy "config.json" "dist\KeywordGacha\"
-          copy "blacklist.txt" "dist\KeywordGacha\"
-          copy "resource\aria2c.exe" "dist\KeywordGacha\resource\"
-          copy "resource\python312._pth" "dist\KeywordGacha\resource\"
+          copy "01_启动.bat" ".\dist\KeywordGacha\"
+          copy "main.py" ".\dist\KeywordGacha\"
+          copy "config.json" ".\dist\KeywordGacha\"
+          copy "blacklist.txt" ".\dist\KeywordGacha\"
+          copy "libomp140.x86_64.dll" ".\dist\KeywordGacha\"
 
-      - name: Compress Archive
-        id: compress_files
+      - name: Create Timestamp
+        id: create_timestamp
         shell: pwsh
         run: |
           # 获取当前UTC时间
@@ -60,11 +61,32 @@ jobs:
           # 调整为东八区时间（北京时间）
           $timestamp = ([System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::ParseExact($timestamp, "yyyyMMdd_HHmmss", $null), [System.TimeZoneInfo]::Utc.Id, 'China Standard Time')).ToString("yyyyMMdd_HHmmss")
 
-          # 压缩dist目录下的所有文件，不包括dist目录本身
-          Compress-Archive -Path "dist\*" -DestinationPath "KeywordGacha_DEV_$timestamp.zip" -Force
-
           # 输出 timestamp 变量以供后续步骤使用
-          echo "::set-output name=timestamp::$timestamp"
+          echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
+
+      - name: Compress Archive
+        shell: cmd
+        run: |
+          # 压缩dist目录下的所有文件，不包括dist目录本身
+          .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}.zip .\dist\*
+
+      - name: Change To NV Version
+        shell: cmd
+        run: |
+          .\dist\KeywordGacha\env\python.exe -m pip uninstall --yes torch torchvision torchaudio
+          .\dist\KeywordGacha\env\python.exe -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+          .\dist\KeywordGacha\env\python.exe -m pip cache purge
+
+          .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_ja_gpu/kg_ner_ja_gpu.zip -o kg_ner_ja_gpu.zip
+          powershell -Command "Expand-Archive -Path 'kg_ner_ja_gpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_ja_gpu'"
+          powershell -Command "Remove-Item -Path 'kg_ner_ja_gpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
+          echo > .\dist\KeywordGacha\gpuboost.txt
+
+      - name: Compress Archive NV
+        shell: cmd
+        run: |
+          # 压缩dist目录下的所有文件，不包括dist目录本身
+          .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip .\dist\*
 
       - name: Create Release
         id: create_release
@@ -72,9 +94,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
-          tag_name: MANAUL_BUILD_${{ steps.compress_files.outputs.timestamp }}
-          release_name: KeywordGacha_DEV_${{ steps.compress_files.outputs.timestamp }}
-          draft: false
+          tag_name: MANAUL_BUILD_${{ steps.create_timestamp.outputs.timestamp }}
+          release_name: KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}
+          draft: true
           prerelease: false
 
       - name: Upload Release
@@ -83,6 +105,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_DEV_${{ steps.compress_files.outputs.timestamp }}.zip
-          asset_name: KeywordGacha_DEV_${{ steps.compress_files.outputs.timestamp }}.zip
+          asset_path: ./KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}.zip
+          asset_name: KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}.zip
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release NV
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip
+          asset_name: KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip
           asset_content_type: application/octet-stream
