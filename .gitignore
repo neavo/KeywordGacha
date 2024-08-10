@@ -7,12 +7,14 @@
 /build*
 __pycache__
 
+/all*
 /data*
+/transDic*
+/words_dict*
+/ManualTransFile*
+
 /debug*
 /gpuboost*
-/all.orig*
-/words_dict*
 /config_dev*
-/ManualTransFile*
-/resource/kg_ner_ja_cpu
-/resource/kg_ner_ja_gpu
+/resource/kg_ner_ja_cpu*
+/resource/kg_ner_ja_gpu*

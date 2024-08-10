@@ -25,25 +25,26 @@ G = type("GClass", (), {})()
 
 # 读取 .txt 文件
 def read_txt_file(file_path):
-    try:
-        with open(file_path, "r", encoding = "utf-8") as file:
-            return file.readlines()
-    except UnicodeDecodeError as e:
-        LogHelper.warning(f"读取数据文件时发生编码错误，尝试使用utf-16编码 - {LogHelper.get_trackback(e)}")
+    lines = []
+    names = []
+    encodings = ["utf-8", "utf-16", "shift-jis"]
+
+    for encoding in encodings:
         try:
-            with open(file_path, "r", encoding="utf-16") as file:
-                return file.readlines()
+            with open(file_path, "r", encoding = encoding) as file:
+                return file.readlines(), []
+        except UnicodeDecodeError as e:
+            LogHelper.debug(f"使用 {encoding} 编码读取数据文件时发生错误 - {e}")
         except Exception as e:
-            LogHelper.warning(f"读取数据文件时发生编码错误，尝试使用shift-jis编码 - {LogHelper.get_trackback(e)}")
-            try:
-                with open(file_path, "r", encoding="shift-jis") as file:
-                    return file.readlines()
-            except Exception as e:
-                LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
+            LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
+            break
+
+    return lines, names
 
 # 读取 .csv 文件
 def read_csv_file(file_path):
     lines = []
+    names = []
 
     try:
         with open(file_path, "r", newline = "", encoding = "utf-8") as file:
@@ -54,96 +55,109 @@ def read_csv_file(file_path):
     except Exception as e:
         LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-    return lines
+    return lines, names
 
 # 读取 .json 文件
 def read_json_file(file_path):
     lines = []
+    names = []
 
     try:
         # 读取并加载JSON文件
         with open(file_path, "r", encoding = "utf-8") as file:
-            data = json.load(file)
-            if isinstance(data, dict):
-                # 原有的处理方式
-                for key in data.keys():
-                    lines.append(key)
-            elif isinstance(data, list):
-                # name message json的处理方式
-                for item in data:
-                    if "message" in item:
-                        if "name" in item:
-                            lines.append(f"{item['name']}：{item['message']}")
-                            if not hasattr(G, 'names'):
-                                G.names = set()
-                            G.names.add(item['name'])
-                        else:
-                            lines.append(item['message'])
+            datas = json.load(file)
+
+            # 针对 MTool 导出文本
+            # {
+            #   "「お前かよ。開けて。着替えなきゃ」" : "「お前かよ。開けて。着替えなきゃ」"
+            # }
+            if isinstance(datas, dict):
+                for k, v in datas.items():
+                    if isinstance(k, str) and isinstance(v, str):
+                        lines.append(k)
+
+            # 针对 SExtractor 导出的带name字段JSON数据
+            # [{
+            #   "name": "少年",
+            #   "message": "「お前かよ。開けて。着替えなきゃ」"
+            # }]
+            if isinstance(datas, list):
+                for data in datas:
+                    name = data.get("name", "").strip()
+                    if isinstance(name, str) and name != "":
+                        names.append(name)
+                    
+                    message = data.get("message", "").strip()
+                    if isinstance(message, str) and message != "":
+                        lines.append(message)
     except Exception as e:
         LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-    return lines
+    return lines, names
 
 # 读取数据文件
 def read_data_file():
-    input_data = []
+    # 先尝试自动寻找数据文件，找不到提示用户输入
+    file_path = ""
+    preset_path = ["transDic.output.txt", "transDic.output.json", "all.orig.txt", "all.orig.json", "ManualTransFile.json", "data"]
 
-    if os.path.exists("ManualTransFile.json"):
-        user_input = input(f'已找到数据文件 "ManualTransFile.json"，按回车直接使用或输入其他文件的路径：').strip('"')
-
-        if user_input:
-            file_path = user_input
-        else:
-            file_path = "ManualTransFile.json"
-    elif os.path.exists("all.orig.txt"):
-        user_input = input(f'已找到数据文件 "all.orig.txt"，按回车直接使用或输入其他文件的路径：').strip('"')
-
-        if user_input:
-            file_path = user_input
-        else:
-            file_path = "all.orig.txt"
-    elif os.path.exists("data"):
-        user_input = input(f'已找到数据文件夹 "data"，按回车直接使用或输入其他文件的路径：').strip('"')
-
-        if user_input:
-            file_path = user_input
-        else:
-            file_path = "data"
-    else:
-        file_path = input('请输入数据文件的路径: ').strip('"')
+    for v in preset_path:
+        if os.path.exists(v):
+            user_input = input(f'已找到数据文件 "{v}"，按回车直接使用或输入其他文件路径：').strip('"')
+            file_path = user_input if user_input else v
+            break
+    
+    if file_path == "":
+        file_path = input(f'请输入数据文件的路径: ').strip('"')
 
     G.config.input_file_path = file_path
 
+    # 开始读取数据
+    input_lines = []
+    input_names = []
     if file_path.endswith(".txt"):
-        input_data = read_txt_file(file_path)
+        input_lines, input_names = read_txt_file(file_path)
     elif file_path.endswith(".csv"):
-        input_data = read_csv_file(file_path)
+        input_lines, input_names = read_csv_file(file_path)
     elif file_path.endswith(".json"):
-        input_data = read_json_file(file_path)
+        input_lines, input_names = read_json_file(file_path)
     elif os.path.isdir(file_path):
         for entry in os.scandir(file_path):
             if entry.is_file() and entry.name.endswith(".txt"):
-                input_data += read_txt_file(entry.path)
+                input_lines_ex, input_names_ex = read_txt_file(entry.path)
+                input_lines.extend(input_lines_ex)
+                input_names.extend(input_names_ex)
             elif entry.is_file() and entry.name.endswith(".csv"):
-                input_data += read_csv_file(entry.path)
+                input_lines_ex, input_names_ex = read_csv_file(entry.path)
+                input_lines.extend(input_lines_ex)
+                input_names.extend(input_names_ex)
             elif entry.is_file() and entry.name.endswith(".json"):
-                input_data += read_json_file(entry.path)
+                input_lines_ex, input_names_ex = read_json_file(entry.path)
+                input_lines.extend(input_lines_ex)
+                input_names.extend(input_names_ex)
     else:
         LogHelper.warning(f"不支持的文件格式: {file_path}")
         os.system("pause")
         exit(1)
 
-    input_data_filtered = []
-    for k, line in enumerate(input_data):
+    input_lines_filtered = []
+    for line in input_lines:
         # 【\N[123]】 这种形式是代指角色名字的变量
-        # 直接抹掉就没办法判断角色了
-        # 先把 \N 部分抹掉，保留 ID 部分
+        # 直接抹掉就没办法判断角色了，只把 \N 部分抹掉，保留 ID 部分
         line = line.strip().replace(r"\\N", "")
-        line = re.sub(r"(\\\{)|(\\\})", "", line) # 干掉放大或者缩小字体的代码
-        line = re.sub(r"\\[A-Z]{1,3}\[\d+\]", "", line, flags = re.IGNORECASE) # 干掉其他乱七八糟的部分代码
-        line = line.replace("【】", "") # 由于上面的代码移除，可能会产生空人名框的情况，干掉
-        line = line.replace("\n", "") # 干掉行内换行
-        line = re.sub(r"\s+", "", line) # 干掉行内空格，因为实体名称也会过滤掉空格，所以这样可以避免匹配次数时匹配不到
+
+        # 放大或者缩小字体的代码，干掉
+        # \{\{ゴゴゴゴゴゴゴゴゴッ・・・\r\n（大地の揺れる音）
+        line = re.sub(r"(\\\{)|(\\\})", "", line) 
+
+        # \\C[4] 这种形式的代码，干掉
+        line = re.sub(r"\\[A-Z]{1,3}\[\d+\]", "", line, flags = re.IGNORECASE)
+
+        # 由于上面的代码移除，可能会产生空人名框的情况，干掉
+        line = line.replace("【】", "") 
+
+        # 干掉行内空字符（包括空格、制表符、换行符等），因为实体名称会过滤掉空格，所以这样可以避免匹配次数时匹配不到
+        line = re.sub(r"\s+", "", line) 
 
         if len(line) == 0:
             continue
@@ -151,10 +165,10 @@ def read_data_file():
         if not TextHelper.has_any_japanese(line):
             continue
 
-        input_data_filtered.append(line.strip())
+        input_lines_filtered.append(line.strip())
 
-    LogHelper.info(f"已读取到文本 {len(input_data)} 行，其中有效文本 {len(input_data_filtered)} 行 ...")
-    return input_data_filtered
+    LogHelper.info(f"已读取到文本 {len(input_lines)} 行，其中有效文本 {len(input_lines_filtered)} 行, 角色名 {len(input_names)} 个...")
+    return input_lines_filtered, input_names
 
 # 合并、计数并按置信度过滤
 def merge_and_count(words, full_lines, per_score_threshold = 0.75, other_score_threshold = 0.90):
@@ -261,27 +275,25 @@ def write_words_dict_to_file(words, path):
         file.write(json.dumps(words_dict, indent = 4, ensure_ascii = False))
 
 # 查找 NER 实体
-def search_for_entity(full_lines):
+def search_for_entity(input_lines, input_names):
     LogHelper.info("即将开始执行 [查找 NER 实体] ...")
-    
-    predefined_names = G.names if hasattr(G, 'names') else None
-    words = G.ner.search_for_entity(full_lines, predefined_names)
+    words = G.ner.search_for_entity(input_lines, input_names)
 
-    if os.path.exists("debug.txt"):
+    if LogHelper.is_debug():
         LogHelper.info(f"")
         with LogHelper.status(f"正在将实体字典写入文件 ..."):
-            words = merge_and_count(words, full_lines)
+            words = merge_and_count(words, input_lines)
             write_words_dict_to_file(words, "words_dict.json")
 
     # 查找上下文
     LogHelper.info("即将开始执行 [查找上下文] ...")
     LogHelper.info(f"")
 
-    words = merge_and_count(words, full_lines)
+    words = merge_and_count(words, input_lines)
     with ProgressHelper.get_progress() as progress:
         pid = progress.add_task("查找上下文", total = None)
         for k, word in enumerate(words):
-            word.context = word.search_context(full_lines)
+            word.context = word.search_context(input_lines)
             progress.update(pid, advance = 1, total = len(words))
 
     LogHelper.info(f"")
@@ -289,12 +301,12 @@ def search_for_entity(full_lines):
 
     # 有了上下文以后，开始执行还原词根
     LogHelper.info("即将开始执行 [还原词根] ...")
-    words = G.ner.lemmatize_words_by_morphology(words, full_lines)
+    words = G.ner.lemmatize_words_by_morphology(words, input_lines)
     words = remove_words_by_ner_type(words, "")
-    words = merge_and_count(words, full_lines)
-    words = G.ner.lemmatize_words_by_count(words, full_lines)
+    words = merge_and_count(words, input_lines)
+    words = G.ner.lemmatize_words_by_count(words, input_lines)
     words = remove_words_by_ner_type(words, "")
-    words = merge_and_count(words, full_lines)
+    words = merge_and_count(words, input_lines)
     LogHelper.info(f"[还原词根] 已完成 ...")
 
     # 按出现次数阈值进行筛选
@@ -306,9 +318,12 @@ def search_for_entity(full_lines):
 
 # 开始处理日文
 async def do_process_japanese():
+    # 读取输入文件
+    input_lines, input_names = read_data_file()
+
     # 查找 NER 实体
     words = []
-    words = search_for_entity(read_data_file())
+    words = search_for_entity(input_lines, input_names)
 
     # 等待 语义分析任务 结果
     LogHelper.info("即将开始执行 [语义分析] ...")
@@ -493,7 +508,7 @@ def init():
 
         # 加载配置文件
         try:
-            config_file = "config_dev.json" if LogHelper.is_debug() else "config.json"
+            config_file = "config_dev.json" if os.path.exists("config_dev.json") else "config.json"
 
             with open(config_file, "r", encoding = "utf-8") as file:
                 config = json.load(file)
