@@ -149,6 +149,13 @@ class NER:
             for i in range(0, len(input_lines), self.LINE_SIZE_PER_GROUP)
         ]
 
+        if LogHelper.is_gpu_boost() and torch.cuda.is_available():
+            LogHelper.print()
+            LogHelper.info("启用 [green]GPU[/] 加速成功 ...")
+        if LogHelper.is_gpu_boost() and not torch.cuda.is_available():
+            LogHelper.print()
+            LogHelper.warning("启用 [green]GPU[/] 加速失败 ...")
+
         LogHelper.print()
         with ProgressHelper.get_progress() as progress:
             pid = progress.add_task("查找 NER 实体", total = None)   
@@ -178,7 +185,7 @@ class NER:
                                     seen.add(results[0].surface)
 
                                 words.extend(results)
-                                LogHelper.debug(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 匹配到角色实体 - {results[0].surface}")              
+                                LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 匹配到角色实体 - {results[0].surface}")              
 
                 progress.update(pid, advance = 1, total = len(input_lines_chunked))
 

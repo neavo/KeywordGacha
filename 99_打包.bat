@@ -36,6 +36,7 @@
     copy "01_启动.bat" ".\dist\KeywordGacha\"
     copy "main.py" ".\dist\KeywordGacha\"
     copy "config.json" ".\dist\KeywordGacha\"
+    copy "version.txt" ".\dist\KeywordGacha\"
     copy "blacklist.txt" ".\dist\KeywordGacha\"
     copy "libomp140.x86_64.dll" ".\dist\KeywordGacha\"
 

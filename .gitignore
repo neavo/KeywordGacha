@@ -1,20 +1,16 @@
-/*.log*
-/*_列表*
-/*_日志*
+
 
 /env*
 /dist*
 /build*
+/input*
+/output*
 __pycache__
 
-/all*
-/data*
-/transDic*
-/words_dict*
-/ManualTransFile*
-
+/*log*
 /debug*
 /gpuboost*
+/words_dict*
 /config_dev*
 /resource/kg_ner_ja_cpu*
 /resource/kg_ner_ja_gpu*

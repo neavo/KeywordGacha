@@ -11,7 +11,14 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-                 
+
+      - name: Check Version
+        id: check_version
+        shell: pwsh
+        run: |
+          $version = Get-Content -Path version.txt
+          echo "version=$version" >> $GITHUB_OUTPUT
+
       - name: Create Env
         shell: cmd
         run: |
@@ -48,26 +55,14 @@ jobs:
           copy "01_启动.bat" ".\dist\KeywordGacha\"
           copy "main.py" ".\dist\KeywordGacha\"
           copy "config.json" ".\dist\KeywordGacha\"
+          copy "version.txt" ".\dist\KeywordGacha\"
           copy "blacklist.txt" ".\dist\KeywordGacha\"
           copy "libomp140.x86_64.dll" ".\dist\KeywordGacha\"
-
-      - name: Create Timestamp
-        id: create_timestamp
-        shell: pwsh
-        run: |
-          # 获取当前UTC时间
-          $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-
-          # 调整为东八区时间（北京时间）
-          $timestamp = ([System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::ParseExact($timestamp, "yyyyMMdd_HHmmss", $null), [System.TimeZoneInfo]::Utc.Id, 'China Standard Time')).ToString("yyyyMMdd_HHmmss")
-
-          # 输出 timestamp 变量以供后续步骤使用
-          echo "::set-output name=timestamp::$timestamp"
 
       - name: Compress Archive
         shell: cmd
         run: |
-          .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}.zip .\dist\*
+          .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_${{ steps.check_version.outputs.version }}.zip .\dist\*
 
       - name: Change To NV Version
         shell: cmd
@@ -84,7 +79,7 @@ jobs:
       - name: Compress Archive NV
         shell: cmd
         run: |
-          .\resource\7za.exe a -y -bt -mx5 -slp -v2000M KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip .\dist\*
+          .\resource\7za.exe a -y -bt -mx5 -slp -v2000M KeywordGacha_NV_${{ steps.check_version.outputs.version }}.zip .\dist\*
 
       - name: Create Release
         id: create_release
@@ -92,8 +87,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
-          tag_name: MANAUL_BUILD_${{ steps.create_timestamp.outputs.timestamp }}
-          release_name: KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}
+          tag_name: MANAUL_BUILD_${{ steps.check_version.outputs.version }}
+          release_name: KeywordGacha_${{ steps.check_version.outputs.version }}
           draft: true
           prerelease: false
 
@@ -103,8 +98,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}.zip
-          asset_name: KeywordGacha_${{ steps.create_timestamp.outputs.timestamp }}.zip
+          asset_path: ./KeywordGacha_${{ steps.check_version.outputs.version }}.zip
+          asset_name: KeywordGacha_${{ steps.check_version.outputs.version }}.zip
           asset_content_type: application/zip
 
       - name: Upload Release NV 001
@@ -113,8 +108,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip.001
-          asset_name: KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip.001
+          asset_path: ./KeywordGacha_NV_${{ steps.check_version.outputs.version }}.zip.001
+          asset_name: KeywordGacha_NV_${{ steps.check_version.outputs.version }}.zip.001
           asset_content_type: application/zip
 
       - name: Upload Release NV 002
@@ -123,6 +118,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip.002
-          asset_name: KeywordGacha_NV_${{ steps.create_timestamp.outputs.timestamp }}.zip.002
+          asset_path: ./KeywordGacha_NV_${{ steps.check_version.outputs.version }}.zip.002
+          asset_name: KeywordGacha_NV_${{ steps.check_version.outputs.version }}.zip.002
           asset_content_type: application/zip
