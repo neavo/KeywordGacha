@@ -61,14 +61,14 @@ jobs:
           # 调整为东八区时间（北京时间）
           $timestamp = ([System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::ParseExact($timestamp, "yyyyMMdd_HHmmss", $null), [System.TimeZoneInfo]::Utc.Id, 'China Standard Time')).ToString("yyyyMMdd_HHmmss")
 
-          # 输出 timestamp 变量以供后续步骤使用
-          "TIMESTAMP=$timestamp" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # 将时间戳输出到 GITHUB_ENV 环境变量文件中
+          echo "TIMESTAMP=$timestamp" >> $GITHUB_ENV
 
       - name: Compress Archive
         shell: cmd
         run: |
           # 压缩dist目录下的所有文件，不包括dist目录本身
-          .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_$TIMESTAMP.zip .\dist\*
+          .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_${{ env.TIMESTAMP }}.zip .\dist\*
 
       - name: Change To NV Version
         shell: cmd
@@ -86,7 +86,7 @@ jobs:
         shell: cmd
         run: |
           # 压缩dist目录下的所有文件，不包括dist目录本身
-          .\resource\7za.exe a -y -bt -mx5 -slp -v2000M KeywordGacha_NV_$TIMESTAMP.zip .\dist\*
+          .\resource\7za.exe a -y -bt -mx5 -slp -v2000M KeywordGacha_NV_${{ env.TIMESTAMP }}.zip .\dist\*
 
       - name: Create Release
         id: create_release
@@ -94,8 +94,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
-          tag_name: MANAUL_BUILD_$TIMESTAMP
-          release_name: KeywordGacha_$TIMESTAMP
+          tag_name: MANAUL_BUILD_${{ env.TIMESTAMP }}
+          release_name: KeywordGacha_${{ env.TIMESTAMP }}
           draft: true
           prerelease: false
 
@@ -105,16 +105,26 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_$TIMESTAMP.zip
-          asset_name: KeywordGacha_$TIMESTAMP.zip
-          asset_content_type: application/octet-stream
+          asset_path: ./KeywordGacha_${{ env.TIMESTAMP }}.zip
+          asset_name: KeywordGacha_${{ env.TIMESTAMP }}.zip
+          asset_content_type: application/zip
 
-      - name: Upload Release NV
+      - name: Upload Release NV 001
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_NV_$TIMESTAMP.zip
-          asset_name: KeywordGacha_NV_$TIMESTAMP.zip
-          asset_content_type: application/octet-stream
+          asset_path: ./KeywordGacha_NV_${{ env.TIMESTAMP }}.zip.001
+          asset_name: KeywordGacha_NV_${{ env.TIMESTAMP }}.zip.001
+          asset_content_type: application/zip
+
+      - name: Upload Release NV 002
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./KeywordGacha_NV_${{ env.TIMESTAMP }}.zip.002
+          asset_name: KeywordGacha_NV_${{ env.TIMESTAMP }}.zip.002
+          asset_content_type: application/zip
