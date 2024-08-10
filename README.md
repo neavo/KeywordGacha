@@ -7,8 +7,8 @@
 
 
 ## 概述 📢
-- [KeywordGacha](https://github.com/neavo/KeywordGacha)，简称 KG，使用 AI 技术来自动生成文本中词语表的次世代工具
-- 从长篇文本中一键 `抓取实体词语`、`自动翻译`、`自动总结`
+- [KeywordGacha](https://github.com/neavo/KeywordGacha)，简称 KG，使用 AI 技术来自动生成词语表的次世代工具
+- 从长篇文本中 `一键抓取实体词语`，然后 `自动翻译`、`自动总结`、`自动生成词语表`
 - 相较传统工具，具有高命中、语义化、智能总结角色信息等特色，对文本的兼容性更好
 - 极大的提升 `小说`、`漫画`、`字幕`、`游戏脚本` 等内容译前准备时制作词语表的工作效率
 - 随机选取 [绿站榜单作品](https://books.fishhawk.top) 作为测试样本，与人工校对制作的词表对比，命中率约为 `80%-90%`
@@ -23,26 +23,36 @@
 - 也可以运行 `本地模型` 来获得 `完全免费` 的服务（需要 8G 以上显存的 Nvidia 显卡）
 
 ## 使用流程 🛸
-- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载应用，两个版本任选其一；
-- `KeywordGacha_*.zip` 是基础版本，适用于所有设备；
-- `KeywordGacha_NV_*.zip` 是 GPU 加速版，可以极大幅度提升处理速度，暂时只支持 Nvidia 显卡；
-- 打开配置文件 `config.json`，填入 API 信息，默认为本地接口；
-- 双击 `01_启动.bat` 启动应用，流程技术后，会生成一系列的结果文件；
-- `*_日志.txt` 中包含抓取到的词语的原文、上下文、翻译建议、角色信息总结等信息
-- 在参考日志中的信息对 `*_列表.json` 进行校对确认后，可以直接导入到 [AiNiee](https://github.com/NEKOparapa/AiNiee) 等翻译器中使用
+- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载应用，两个版本任选其一
+  - `KeywordGacha_*.zip` 基础版本，适用于所有设备
+  - `KeywordGacha_NV_*.zip` GPU 加速版本，可以极大幅度提升处理速度，暂时只支持 Nvidia 显卡
+- 打开配置文件 `config.json`，填入 API 信息，默认为使用本地接口
+- 双击 `01_启动.bat` 启动应用，处理流程结束后，结果会保存在 `output` 文件夹内
+- 其中：
+  - `*_日志.txt` - 抓取到的词语的原文、上下文、翻译建议、角色信息总结等详细信息，用于人工确认
+  - `*_列表.json` - 通用词表，可以导入 [AiNiee - 替换词典](https://github.com/NEKOparapa/AiNiee)、[术语表工作区](https://books.fishhawk.top/workspace/katakana) 等处使用
+  - `*_ainiee.json` - [AiNiee - 提示字典](https://github.com/NEKOparapa/AiNiee) 功能专用词语表
+  - `*_galtransl.json` - [GalTransl - GPT字典](https://github.com/xd2333/GalTransl) 功能专用词语表
 
 ## 抓取效果 ⚡
 - `抓取`、`总结` 和 `翻译` 效果取决于模型的能力，使用 💪 ~~更昂贵~~ 更强力  的模型可以显著提升效果
 - 是的，氪金可以变强
-- 各家的旗舰模型的如 [GPT4o](https://chatgpt.com/)、[Claude 3.5 Sonnet](https://claude.ai/) 效果十分好
-- 本地小模型的效果也还不错
-- 总体来说在线接口的效果远好于本地模型，推荐使用在线模型，便宜的就行
-- 在本页后续的 `傻瓜教程 📖` 章节中有使用 `在线模型 `和 `本地模型` 的相关教程
+- 各家的旗舰模型的如 [GPT4o](https://chatgpt.com)、[Claude 3.5 Sonnet](https://claude.ai) 效果十分好
+- 总体来说在线接口的效果远好于本地模型，推荐使用在线模型，比如又快又便宜的 [DeepSeek](https://github.com/neavo/KeywordGacha/wiki/DeepSeek-%E6%8E%A5%E5%8F%A3%E8%AE%BE%E7%BD%AE%E6%95%99%E7%A8%8B)
+- 不过本地模型效果也还不错，如果有 8G+ 显存的 Nvidia 显卡，可以使用 [一键包](https://github.com/neavo/KeywordGachaServer) 来搭建本地接口
+
+## 文本格式 🏷️
+- 支持从 `.txt`、`.csv`、`.json` 三种文件中读取文本
+- 大部分主流的 `小说` 和 `游戏脚本` 数据格式都可以直接或者通过转换被 KG 识别
+- 输入路径是文件夹时，会读取文件夹内所有的 `txt`、`csv` 和 `json` 文件
+- 当应用目录下有 `input` 文件夹时，会自动读取文件夹内所有的 `txt`、`csv` 和 `json` 文件
+- 具体可见 [Wiki - 支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
 
 ## 近期更新 📅
-- 20240810
+- 20240810 v0.1.0
   - 修正 - 一个系统兼容性问题
   - 调整 - 优化了对游戏文本的支持和抓取能力
+  - 新增 - 自动生成 AiNiee 与 GalTransl 格式的词典
 
 - 20240808
   - 新增 - 接口测试 功能
@@ -56,59 +66,6 @@
 - 20240724
   - 调整 - 现在三种格式都可以从文件夹中批量读取了
   - 修正 - 出现次数为 0 导致的除数问题
-
-- 20240720
-  - 调整 - 现在词语翻译会自动填充到列表文件中了
-  - 调整 - 优化 NER 模型 与 校验步骤，继续提升抓取能力
-  - 调整 - 优化后的 增强模式 已经足够快了，所以移除了原本的 快速模式
-
-- 20240716
-  - 新增 - 对组织、物品等其他实体种类的识别
-
-- 20240716
-  - 调整 - 继续优化抓取能力
-  - 调整 - 一些样式和兼容性调整
-  - 新增 - 网络请求频率阈值 设置选项
-
-- 20240712
-  - 调整 - 使用了新的 NER 分词前端，处理速度和命中率有了显著的提升
-    - 随机选取 [绿站榜单作品](https://books.fishhawk.top) 作为测试样本，与人工校对制作的词表对比
-    - 命中率约为 `80%-90%`
-    - 现在 `快速模式` 也可以处理纯汉字词语了
-
-## 文本格式 🏷️
-- 目前支持三种不同的输入文本格式
-- 对文本内容没什么要求，`小说` 、`字幕`、`游戏脚本` 等都可以直接读取
-- 文件中 每一行/每一条 的长度不要超过500字，太长的话请先手动处理一下
-- 输入路径是文件夹时，会读取文件夹内所有的 `txt`、`csv` 和 `json` 文件
-- 当前目录下有 `data 文件夹` 、`all.orig.txt` 或 `ManualTransFile.json` 文件，会自动识别
-
-## 格式示例 📑
-- 当文件后缀名为 .json 时，会将其内容按以下模式处理，这也是 [MTool](https://afdian.net/a/AdventCirno) 导出翻译原文的格式
-
-```json
-  {
-      "原文": "译文",
-      "原文": "译文",
-      "原文": "译文"
-  }
-```
-
-- 当文件后缀名为 .txt 时，会将其内容按以下模式处理，即每行一句的纯文本内容，使用 [SExtractor](https://github.com/satan53x/SExtractor) 可以抓取这样的文本
-  
-```
-      原文<换行符>
-      原文<换行符>
-      原文<换行符>
-```
-
-- 当路径为一个文件夹时，会读取其内所有的 .csv 文件中每一行的第一列，使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 可以抓取这样的文本
-  
-```csv
-      原文,<无视剩下的列>
-      原文,<无视剩下的列>
-      原文,<无视剩下的列>
-```
 
 ## 设置说明 🎚️
 
@@ -159,7 +116,12 @@
 - 如果拥有 8G+ 显存的 Nvidia 显卡，可以使用 [一键包](https://github.com/neavo/KeywordGachaServer) 搭建本地接口实现完全的白嫖
 
 ## 最佳实践 💰
-- 处理 `游戏文本` 时，建议使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的文本，[MTool](https://afdian.net/a/AdventCirno) 导出的文本有时效果较差
+- 处理 `小说` 时
+  - 注意单行不要太长，目前模型能处理的单行最大长度约为500字，过长的句子会被截断 
+- 处理 `游戏文本` 时
+  - 建议使用 [SExtractor](https://github.com/satan53x/SExtractor) 、[Translator++](https://dreamsavior.net/translator-plusplus/) 导出文本
+  - [MTool](https://afdian.net/a/AdventCirno) 导出文本的抓取效果很不稳定
+  - 如果抓取效果不好，可以多试几种导出工具和导出格式，往往会有奇效
 
 ## 开发计划 📈
 - [x] 支持 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出的 CSV 文本
