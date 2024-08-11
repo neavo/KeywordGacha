@@ -170,14 +170,14 @@ class TextHelper:
     def is_valid_japanese_word(surface, blacklist):
         flag = True
 
-        if surface in blacklist:
-            flag = False
-
         if len(surface) == 1:
-            flag = False
+            return False
+
+        if surface in blacklist:
+            return False
 
         if not TextHelper.has_any_japanese(surface):
-            flag = False
+            return False
 
         return flag
 
