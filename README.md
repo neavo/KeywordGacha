@@ -23,22 +23,22 @@
 - 也可以运行 `本地模型` 来获得 `完全免费` 的服务（需要 8G 以上显存的 Nvidia 显卡）
 
 ## 使用流程 🛸
-- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载应用，两个版本任选其一
+- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载应用，两个版本选择其一即可
   - `KeywordGacha_*.zip` 基础版本，适用于所有设备
   - `KeywordGacha_NV_*.zip` GPU 加速版本，可以极大幅度提升处理速度，暂时只支持 Nvidia 显卡
 - 打开配置文件 `config.json`，填入 API 信息，默认为使用本地接口
 - 双击 `01_启动.bat` 启动应用，处理流程结束后，结果会保存在 `output` 文件夹内
 - 其中：
   - `*_日志.txt` - 抓取到的词语的原文、上下文、翻译建议、角色信息总结等详细信息，用于人工确认
-  - `*_列表.json` - 通用词表，可以导入 [AiNiee - 替换词典](https://github.com/NEKOparapa/AiNiee)、[术语表工作区](https://books.fishhawk.top/workspace/katakana) 等处使用
+  - `*_列表.json` - 通用词表，可以导入 [AiNiee - 替换词典](https://github.com/NEKOparapa/AiNiee)、[绿站 - 术语表](https://books.fishhawk.top/workspace/katakana) 等处使用
   - `*_ainiee.json` - [AiNiee - 提示字典](https://github.com/NEKOparapa/AiNiee) 功能专用词语表
-  - `*_galtransl.json` - [GalTransl - GPT字典](https://github.com/xd2333/GalTransl) 功能专用词语表
+  - `*_galtransl.json` - [GalTransl - GPT 字典](https://github.com/xd2333/GalTransl) 功能专用词语表
 
 ## 抓取效果 ⚡
 - `抓取`、`总结` 和 `翻译` 效果取决于模型的能力，使用 💪 ~~更昂贵~~ 更强力  的模型可以显著提升效果
 - 是的，氪金可以变强
 - 各家的旗舰模型的如 [GPT4o](https://chatgpt.com)、[Claude 3.5 Sonnet](https://claude.ai) 效果十分好
-- 总体来说在线接口的效果远好于本地模型，推荐使用在线模型，比如又快又便宜的 [DeepSeek](https://github.com/neavo/KeywordGacha/wiki/DeepSeek-%E6%8E%A5%E5%8F%A3%E8%AE%BE%E7%BD%AE%E6%95%99%E7%A8%8B)
+- 总体来说在线接口的效果远好于本地模型，推荐使用在线模型，比如又快又便宜的 [DeepSeek](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)
 - 不过本地模型效果也还不错，如果有 8G+ 显存的 Nvidia 显卡，可以使用 [一键包](https://github.com/neavo/KeywordGachaServer) 来搭建本地接口
 
 ## 文本格式 🏷️
@@ -110,17 +110,12 @@
     ]
 }
 ```
-
-## 傻瓜教程 📖
-- [推荐 👏] 如果愿意出一点小钱（一本书几毛钱）来获得快速且高质量的抓取结果，请查看 [此教程](doc/deepseek.md)
-- 如果拥有 8G+ 显存的 Nvidia 显卡，可以使用 [一键包](https://github.com/neavo/KeywordGachaServer) 搭建本地接口实现完全的白嫖
-
 ## 最佳实践 💰
 - 处理 `小说` 时
   - 注意单行不要太长，目前模型能处理的单行最大长度约为500字，过长的句子会被截断 
 - 处理 `游戏文本` 时
-  - 建议使用 [SExtractor](https://github.com/satan53x/SExtractor) 、[Translator++](https://dreamsavior.net/translator-plusplus/) 导出文本
-  - [MTool](https://afdian.net/a/AdventCirno) 导出文本的抓取效果很不稳定
+  - 建议使用 [SExtractor](https://github.com/satan53x/SExtractor) 、[Translator++](https://dreamsavior.net/translator-plusplus/) 导出的文本
+  - [MTool](https://afdian.net/a/AdventCirno) 导出的文本抓取效果很不稳定
   - 如果抓取效果不好，可以多试几种导出工具和导出格式，往往会有奇效
 
 ## 开发计划 📈
