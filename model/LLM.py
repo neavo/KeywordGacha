@@ -54,7 +54,7 @@ class LLM:
 
     # 请求参数配置 - 翻译上下文
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TEMPERATURE = 0.99
+    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TEMPERATURE = 0.50
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TOP_P = 1
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].FREQUENCY_PENALTY = 0
@@ -137,38 +137,49 @@ class LLM:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 异步发送请求到OpenAI获取模型回复
-    async def request(self, content, task_type, retry = False):
-        completion = await self.openai_handler.chat.completions.create(
-            model = self.model_name,
-            temperature = self.LLMCONFIG[task_type].TEMPERATURE,
-            top_p = self.LLMCONFIG[task_type].TOP_P,
-            max_tokens = self.LLMCONFIG[task_type].MAX_TOKENS,
-            frequency_penalty = self.LLMCONFIG[task_type].FREQUENCY_PENALTY + 0.2 if retry else self.LLMCONFIG[task_type].FREQUENCY_PENALTY,
-            messages = [
-                {
-                    "role": "user", 
-                    "content": content
-                },
-            ],
-        )
+    async def request(self, content, task_type, retry = False):     
+        try:
+            usage, message, llm_request, llm_response, error = None, None, None, None, None
 
-        llmresponse = completion
-        usage = completion.usage
-        message = completion.choices[0].message
+            llm_request = {
+                "model" : self.model_name,
+                "stream" : False,
+                "temperature" : self.LLMCONFIG[task_type].TEMPERATURE,
+                "top_p" : self.LLMCONFIG[task_type].TOP_P,
+                "max_tokens" : self.LLMCONFIG[task_type].MAX_TOKENS,
+                "frequency_penalty" : self.LLMCONFIG[task_type].FREQUENCY_PENALTY + 0.2 if retry else self.LLMCONFIG[task_type].FREQUENCY_PENALTY,
+                "messages" : [
+                    {
+                        "role": "user", 
+                        "content": content
+                    },
+                ],
+            }
+            
+            completion = await self.openai_handler.chat.completions.create(**llm_request)
 
-        return usage, message, llmresponse
+            llm_response = completion
+            usage = completion.usage
+            message = completion.choices[0].message
+        except Exception as e:
+            error = e
+        finally:
+            return usage, message, llm_request, llm_response, error
 
     # 接口测试任务
     async def api_test(self):
         async with self.semaphore, self.async_limiter:
-            result = True
-
             try:
-                usage, message, _ = await self.request(
+                result = False
+
+                usage, message, llm_request, llm_response, error = await self.request(
                     self.prompt_translate_surface_person.replace("{attribute}", "女性").replace("{surface}", "ダリヤ").replace("{context}", "ダリヤ"),
                     self.TASK_TYPE_API_TEST,
                     True
                 )
+
+                if error:
+                    raise error
 
                 if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_API_TEST].MAX_TOKENS:
                     raise Exception("usage.completion_tokens >= MAX_TOKENS")                
@@ -176,64 +187,63 @@ class LLM:
                 data = json.loads(
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
-                LogHelper.info(f"{data}")
-            except Exception as e:
-                result = False
-                LogHelper.debug(f"{LogHelper.get_trackback(e)}")
-            
-            return result
 
+                result = True
+                LogHelper.info(f"{data}")
+
+                return result
+            except Exception as e:
+                LogHelper.warning(f"{LogHelper.get_trackback(e)}")
+                LogHelper.warning(f"llm_request - {llm_request}")
+                LogHelper.warning(f"llm_response - {llm_response}")
+            
     # 词语翻译任务
     async def translate_surface(self, word, retry):
         async with self.semaphore, self.async_limiter:
-            if word.ner_type != NER.NER_TYPES.get("PER"):
-                prompt = self.prompt_translate_surface_common.replace("{surface}", word.surface)
-                prompt = prompt.replace("{context}", "\n".join(word.clip_context(128)))
-            else:
-                prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
-                prompt = prompt.replace("{surface}", word.surface)
-                prompt = prompt.replace("{context}", "\n".join(word.clip_context(128)))
-
-            usage, message, word.llmresponse_translate_surface = await self.request(
-                prompt,
-                self.TASK_TYPE_TRANSLATE_SURFACE,
-                retry
-            )
-
-            if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS:
-                raise Exception("usage.completion_tokens >= MAX_TOKENS")
-
             try:
+                if word.ner_type != "PER":
+                    prompt = self.prompt_translate_surface_common.replace("{surface}", word.surface)
+                    prompt = prompt.replace("{context}", "\n".join(word.clip_context(128)))
+                else:
+                    prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
+                    prompt = prompt.replace("{surface}", word.surface)
+                    prompt = prompt.replace("{context}", "\n".join(word.clip_context(128)))
+
+                usage, message, llm_request, llm_response, error = await self.request(
+                    prompt,
+                    self.TASK_TYPE_TRANSLATE_SURFACE,
+                    retry
+                )
+
+                if error:
+                    raise error
+
+                if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS:
+                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
+
                 data = json.loads(
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
-            except Exception as error:
-                LogHelper.debug(error)
-                LogHelper.debug(word.surface)
-                LogHelper.debug(message.content.strip())
-                LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
-                raise error
 
-            word.surface_romaji = data["romaji"]
-            word.surface_translation = [data["translation_1"], data["translation_2"]]
-            word.surface_translation_description = data["description"]
-
-            return word
+                word.surface_romaji = data["romaji"]
+                word.surface_translation = [data["translation_1"], data["translation_2"]]
+                word.surface_translation_description = data["description"]
+                word.llmresponse_translate_surface = llm_response                
+            except Exception as e:
+                LogHelper.warning(f"[词语翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
+                LogHelper.debug(f"llm_request - {llm_request}")
+                LogHelper.debug(f"llm_response - {llm_response}")
+                error = e
+            finally:
+                return error if error else word
 
     # 词语翻译任务完成时的回调
     def on_translate_surface_task_done(self, future, words, words_failed, words_successed):
-        try:
-            word = future.result()
-            words_successed.append(word)
-            LogHelper.info(f"[词语翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
-        except Exception as e:
-            LogHelper.warning(f"[词语翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
+        result = future.result()
 
-        # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
-        words_failed.clear()
-        for k, word in enumerate(words):
-            if word not in words_successed:
-                words_failed.append(word)
+        if not isinstance(result, Exception):
+            words_successed.append(result)
+            LogHelper.info(f"[词语翻译] 已完成 {len(words_successed)} / {len(words)} ...")
 
     # 批量执行词语翻译任务的具体实现
     async def do_translate_surface_batch(self, words, words_failed, words_successed):
@@ -249,7 +259,13 @@ class LLM:
             task = asyncio.create_task(self.translate_surface(word, retry))
             task.add_done_callback(lambda future: self.on_translate_surface_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
-        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 等待异步任务完成 
+        await asyncio.gather(*tasks, return_exceptions = True)
+
+        # 获得失败任务的列表
+        successed_word_pairs = {(word.surface, word.ner_type) for word in words_successed}
+        words_failed = [word for word in words if (word.surface, word.ner_type) not in successed_word_pairs]
 
         return words_failed, words_successed
 
@@ -272,38 +288,41 @@ class LLM:
     # 上下文翻译任务
     async def translate_context(self, word, retry):
         async with self.semaphore, self.async_limiter:
-            usage, message, word.llmresponse_translate_context = await self.request(
-                self.prompt_translate_context.replace("{context}", "\n".join(word.context)),
-                self.TASK_TYPE_TRANSLATE_CONTEXT,
-                retry
-            )
+            try:
+                usage, message, llm_request, llm_response, error = await self.request(
+                    self.prompt_translate_context.replace("{context}", "\n".join(word.context)),
+                    self.TASK_TYPE_TRANSLATE_CONTEXT,
+                    retry
+                )
 
-            if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS:
-                raise Exception("usage.completion_tokens >= MAX_TOKENS")
-            
-            context_translation = []
-            for k, line in enumerate(message.content.split("\n")):
-                if len(line) > 0:
-                    context_translation.append(line)
+                if error:
+                    raise error
 
-            word.context_translation = context_translation
+                if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS:
+                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
+                
+                context_translation = []
+                for k, line in enumerate(message.content.split("\n")):
+                    if len(line) > 0:
+                        context_translation.append(line)
 
-            return word
+                word.context_translation = context_translation
+                word.llmresponse_translate_context = llm_response
+            except Exception as e:
+                LogHelper.warning(f"[上下文翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
+                LogHelper.debug(f"llm_request - {llm_request}")
+                LogHelper.debug(f"llm_response - {llm_response}")
+                error = e
+            finally:
+                return error if error else word
 
     # 上下文翻译任务完成时的回调
     def on_translate_context_task_done(self, future, words, words_failed, words_successed):
-        try:
-            word = future.result()
-            words_successed.append(word)
-            LogHelper.info(f"[上下文翻译] 已完成 {len(words_successed)} / {len(words)} ...")       
-        except Exception as e:
-            LogHelper.warning(f"[上下文翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
+        result = future.result()
 
-        # 此处需要直接修改原有的数组，而不能创建新的数组来赋值
-        words_failed.clear()
-        for k, word in enumerate(words):
-            if word not in words_successed:
-                words_failed.append(word)
+        if not isinstance(result, Exception):
+            words_successed.append(result)
+            LogHelper.info(f"[上下文翻译] 已完成 {len(words_successed)} / {len(words)} ...")
 
     # 批量执行上下文翻译任务的具体实现
     async def do_translate_context_batch(self, words, words_failed, words_successed):
@@ -319,7 +338,13 @@ class LLM:
             task = asyncio.create_task(self.translate_context(word, retry))
             task.add_done_callback(lambda future: self.on_translate_context_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
-        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 等待异步任务完成 
+        await asyncio.gather(*tasks, return_exceptions = True)
+
+        # 获得失败任务的列表
+        successed_word_pairs = {(word.surface, word.ner_type) for word in words_successed}
+        words_failed = [word for word in words if (word.surface, word.ner_type) not in successed_word_pairs]
 
         return words_failed, words_successed
 
@@ -340,44 +365,47 @@ class LLM:
     # 语义分析任务 
     async def summarize_context(self, word, retry):
         async with self.semaphore, self.async_limiter:
-            usage, message, word.llmresponse_summarize_context = await self.request(
-                self.prompt_summarize_context.replace("{surface}", word.surface).replace("{context}", "\n".join(word.context)),
-                self.TASK_TYPE_SUMMAIRZE_CONTEXT,
-                retry
-            )
-
-            if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_SUMMAIRZE_CONTEXT].MAX_TOKENS:
-                raise Exception("usage.completion_tokens >= MAX_TOKENS")
-    
             try:
+                usage, message, llm_request, llm_response, error = await self.request(
+                    self.prompt_summarize_context.replace("{surface}", word.surface).replace("{context}", "\n".join(word.context)),
+                    self.TASK_TYPE_SUMMAIRZE_CONTEXT,
+                    retry
+                )
+
+                if error:
+                    raise error
+
+                if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_SUMMAIRZE_CONTEXT].MAX_TOKENS:
+                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
+
                 result = json.loads(
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
+
+                if "否" in result["is_name"]:
+                    word.ner_type = ""
+                    LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
+                else:
+                    LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
+
+                word.attribute = result["sex"]
+                word.context_summary = result
+                word.llmresponse_summarize_context = llm_response
             except Exception as e:
-                LogHelper.debug(f"{LogHelper.get_trackback(e)}")
-                LogHelper.debug(message.content.strip())
-                LogHelper.debug(TextHelper.fix_broken_json_string(message.content.strip()))
-                raise e
-
-            if "否" in result["is_name"]:
-                word.ner_type = ""
-                LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
-            else:
-                LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
-
-            word.attribute = result["sex"]
-            word.context_summary = result
-
-            return word
+                LogHelper.warning(f"[语义分析] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
+                LogHelper.debug(f"llm_request - {llm_request}")
+                LogHelper.debug(f"llm_response - {llm_response}")
+                error = e
+            finally:
+                return error if error else word
 
     # 语义分析任务完成时的回调
     def on_summarize_context_task_done(self, future, words, words_failed, words_successed):
-        try:
-            word = future.result()
-            words_successed.append(word)
-            LogHelper.info(f"[语义分析] 已完成 {len(words_successed)} / {len(words)} ...")       
-        except Exception as e:
-            LogHelper.warning(f"[语义分析] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
+        result = future.result()
+
+        if not isinstance(result, Exception):
+            words_successed.append(result)
+            LogHelper.info(f"[语义分析] 已完成 {len(words_successed)} / {len(words)} ...")
 
     # 批量执行语义分析任务的具体实现
     async def do_summarize_context_batch(self, words, words_failed, words_successed):
@@ -395,10 +423,11 @@ class LLM:
             tasks.append(task)
 
         # 等待异步任务完成 
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*tasks, return_exceptions = True)
 
         # 获得失败任务的列表
-        words_failed = [word_a for word_a in words if not any(word_a.surface == word_b.surface for word_b in words_successed)]
+        successed_word_pairs = {(word.surface, word.ner_type) for word in words_successed}
+        words_failed = [word for word in words if (word.surface, word.ner_type) not in successed_word_pairs]
 
         return words_failed, words_successed
 

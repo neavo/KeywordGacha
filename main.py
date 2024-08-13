@@ -465,8 +465,10 @@ async def do_process_japanese():
 
 async def do_api_test():
     if await G.llm.api_test():
+        LogHelper.print("")
         LogHelper.info("接口测试 [green]执行成功[/] ...")
     else:
+        LogHelper.print("")
         LogHelper.warning("接口测试 [red]执行失败[/], 请检查配置文件 ...")
 
     LogHelper.print("")
