@@ -169,7 +169,7 @@ class NER:
                         surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, token.get("word").replace(" ", ""))
                         for surface in surfaces:
                             score = token.get("score")
-                            entity_group = self.NER_TYPES.get(token.get("entity_group"), "")
+                            entity_group = token.get("entity_group")
                             words.extend(self.generate_words(score, surface, entity_group))
                 
                 # 匹配【】中的字符串
@@ -206,7 +206,7 @@ class NER:
         words_ex = []
         for word in words:
             # 以下步骤只对角色实体进行
-            if not word.ner_type == self.NER_TYPES.get("PER"):
+            if not word.ner_type == "PER":
                 continue
 
             # 前面的步骤中已经移除了首尾的 の，如果还有，那就是 AのB 的形式，跳过
