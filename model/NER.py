@@ -22,7 +22,7 @@ class NER:
     TASK_MODES.ACCURACY = 20
 
     GPU_BOOST = torch.cuda.is_available() and LogHelper.is_gpu_boost()
-    MODEL_PATH = "resource\\kg_ner_ja_gpu" if GPU_BOOST else "resource\\kg_ner_ja_cpu"
+    MODEL_PATH = "resource\\FacebookAI_xlm_roberta_base_best" if GPU_BOOST else "resource\\kg_ner_ja_cpu"
     LINE_SIZE_PER_GROUP = 256
 
     RE_SPLIT_BY_PUNCTUATION = re.compile(
@@ -46,6 +46,11 @@ class NER:
         "PRD": "PRD",       # 表示产品，如"iPhone"、"Windows操作系统"等。
         "EVT": "EVT",       # 表示事件，如"奥运会"、"地震"等。
     }
+
+    LANGUAGE = type("GClass", (), {})()
+    LANGUAGE.ZH = "ZH"
+    LANGUAGE.EN = "EN"
+    LANGUAGE.JP = "JP"
 
     def __init__(self):
         self.blacklist = ""
@@ -87,8 +92,8 @@ class NER:
 
     # 释放资源
     def release(self):
-        LogHelper.debug(f"显存保留量 - {torch.cuda.memory_reserved()/1024/1024} MB")
-        LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024} MB")
+        LogHelper.debug(f"显存保留量 - {torch.cuda.memory_reserved()/1024/1024:>8.2f} MB")
+        LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024:>8.2f} MB")
 
         if self.classifier:
             del self.classifier
@@ -99,8 +104,8 @@ class NER:
 
         gc.collect()
         torch.cuda.empty_cache()
-        LogHelper.debug(f"显存保留量 - {torch.cuda.memory_reserved()/1024/1024} MB")
-        LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024} MB")
+        LogHelper.debug(f"显存保留量 - {torch.cuda.memory_reserved()/1024/1024:>8.2f} MB")
+        LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024:>8.2f} MB")
 
     # 从指定路径加载黑名单文件内容
     def load_blacklist(self, filepath):
@@ -115,33 +120,44 @@ class NER:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 生成词语 
-    def generate_words(self, score, surface, ner_type):
-        surface = TextHelper.strip_not_japanese(surface)
-        surface = surface.strip("の")
+    def generate_words(self, text, score, ner_type, language, unique_words):
+        words = []
 
-        # 有效性检查
-        if not TextHelper.is_valid_japanese_word(surface, self.blacklist):
-            return []
+        for surface in re.split(self.RE_SPLIT_BY_PUNCTUATION, text):
+            # 过滤非实体
+            if ner_type not in self.NER_TYPES:
+                continue
 
-        # 过滤纯汉字词
-        # if TextHelper.is_all_cjk(surface):
-        #     return []
+            # 中文词语判断
+            if language == NER.LANGUAGE.ZH:
+                surface = TextHelper.strip_not_cjk(surface)
+                if not TextHelper.is_valid_cjk_word(surface, self.blacklist):
+                    continue
 
-        # 过滤非实体
-        if ner_type not in self.NER_TYPES:
-            return []
+            # 英文词语判断
+            if language == NER.LANGUAGE.EN:
+                surface = TextHelper.strip_not_latin(surface)
+                if not TextHelper.is_valid_latin_word(surface, self.blacklist, unique_words):
+                    continue
 
-        words = [Word()]
-        words[0] = Word()
-        words[0].count = 1
-        words[0].score = score
-        words[0].surface = surface
-        words[0].ner_type = ner_type
+            # 日文词语判断
+            if language == NER.LANGUAGE.JP:
+                surface = TextHelper.strip_not_japanese(surface)
+                surface = surface.strip("の")
+                if not TextHelper.is_valid_japanese_word(surface, self.blacklist):
+                    continue
+
+            word = Word()
+            word.count = 1
+            word.score = score
+            word.surface = surface
+            word.ner_type = ner_type
+            words.append(word)
 
         return words
 
     # 查找 NER 实体
-    def search_for_entity(self, input_lines, input_names):
+    def search_for_entity(self, input_lines, input_names, language):
         words = []     
 
         input_lines_chunked = [
@@ -150,55 +166,58 @@ class NER:
         ]
 
         if LogHelper.is_gpu_boost() and torch.cuda.is_available():
-            LogHelper.print()
             LogHelper.info("启用 [green]GPU[/] 加速成功 ...")
         if LogHelper.is_gpu_boost() and not torch.cuda.is_available():
-            LogHelper.print()
             LogHelper.warning("启用 [green]GPU[/] 加速失败 ...")
 
-        LogHelper.print()
+        LogHelper.print(f"")
         with ProgressHelper.get_progress() as progress:
             pid = progress.add_task("查找 NER 实体", total = None)   
 
             seen = set()
             for k, lines in enumerate(input_lines_chunked):
-                # 使用 NER 模型抓取实体
                 self.classifier.call_count = 0 # 防止出现应使用 dateset 的提示
+
+                # 使用 NER 模型抓取实体
+                unique_words = set(re.findall(r"\b\w+\b", "\n".join(lines)))
                 for i, doc in enumerate(self.classifier(lines)):
                     for token in doc:
-                        surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, token.get("word").replace(" ", ""))
-                        for surface in surfaces:
-                            score = token.get("score")
-                            entity_group = token.get("entity_group")
-                            words.extend(self.generate_words(score, surface, entity_group))
+                        text = token.get("word")
+                        score = token.get("score")
+                        entity_group = token.get("entity_group")
+                        words.extend(self.generate_words(text, score, entity_group, language, unique_words))
                 
                 # 匹配【】中的字符串
                 for name in re.findall(r"【(.*?)】", "\n".join(lines)):
                     if len(name) <= 12:
-                        surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, name.replace(" ", ""))
-                        for surface in surfaces:
-                            results = self.generate_words(0.95, surface, "PER")
-                            if len(results) > 0:
-                                if results[0].surface in seen:
-                                    continue
-                                else:
-                                    seen.add(results[0].surface)
+                        text = name
+                        score = 0.95
+                        entity_group = "PER"
 
-                                words.extend(results)
-                                LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 匹配到角色实体 - {results[0].surface}")              
+                        for word in self.generate_words(text, score, entity_group, language, unique_words):
+                            if word.surface in seen:
+                                continue
+                            else:
+                                words.append(word)
+                                seen.add(word.surface)                            
 
+                # 进行英文和中文任务时显存保留量会暴涨，原因不明，先手动释放显存来处理
+                torch.cuda.empty_cache()
                 progress.update(pid, advance = 1, total = len(input_lines_chunked))
+
+        # 打印通过模式匹配抓取的角色实体
+        LogHelper.print()
+        LogHelper.info(f"[查找 NER 实体] 已完成 ...")
+        if len(seen) > 0:
+            LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}")        
 
         # 添加输入文件中读取到的角色名
         for name in input_names:
-            surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, name.replace(" ", ""))
+            surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, name)
             for surface in surfaces:
                 words.extend(self.generate_words(0.95, surface, "PER"))
 
         self.release()
-        LogHelper.print()
-        LogHelper.info(f"[查找 NER 实体] 已完成 ...")
-
         return words
 
     # 通过 词语形态 校验词语
