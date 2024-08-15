@@ -22,8 +22,8 @@ class NER:
     TASK_MODES.ACCURACY = 20
 
     GPU_BOOST = torch.cuda.is_available() and LogHelper.is_gpu_boost()
-    MODEL_PATH = "resource\\FacebookAI_xlm_roberta_base_best" if GPU_BOOST else "resource\\kg_ner_ja_cpu"
-    LINE_SIZE_PER_GROUP = 256
+    MODEL_PATH = "resource\\kg_ner_ja_gpu" if GPU_BOOST else "resource\\kg_ner_ja_cpu"
+    LINE_SIZE_PER_GROUP = 128
 
     RE_SPLIT_BY_PUNCTUATION = re.compile(
         rf"[" +
@@ -53,8 +53,6 @@ class NER:
     LANGUAGE.JP = "JP"
 
     def __init__(self):
-        self.blacklist = ""
-
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.MODEL_PATH,
             padding = "max_length",
@@ -86,7 +84,7 @@ class NER:
             model = self.model,
             device = "cuda" if self.GPU_BOOST else "cpu",
             tokenizer = self.tokenizer,
-            batch_size = 128 if self.GPU_BOOST else min(10, os.cpu_count()),
+            batch_size = 64 if self.GPU_BOOST else min(10, os.cpu_count()),
             aggregation_strategy = "simple",
         )
 
@@ -119,11 +117,62 @@ class NER:
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
+    # 判断是否是有意义的汉字词语
+    def is_valid_cjk_word(self, surface, blacklist):
+        flag = True
+
+        if len(surface) <= 1:
+            return False
+
+        if surface in blacklist:
+            return False
+
+        if not TextHelper.has_any_cjk(surface):
+            return False
+
+        return flag
+
+    # 判断是否是有意义的英文词语
+    def is_valid_english_word(self, surface, blacklist):
+        flag = True
+
+        if len(surface) <= 2:
+            return False
+
+        if surface in blacklist:
+            return False
+
+        if not TextHelper.has_any_latin(surface):
+            return False
+
+        return flag
+
+    # 判断是否是有意义的日文词语
+    def is_valid_japanese_word(self, surface, blacklist):
+        flag = True
+
+        if len(surface) <= 1:
+            return False
+
+        if surface in blacklist:
+            return False
+
+        if not TextHelper.has_any_japanese(surface):
+            return False
+
+        return flag
+
     # 生成词语 
-    def generate_words(self, text, score, ner_type, language, unique_words):
+    def generate_words(self, text, score, ner_type, language):
         words = []
 
-        for surface in re.split(self.RE_SPLIT_BY_PUNCTUATION, text):
+        # 词语构成中存在空格的不拆分
+        if language == NER.LANGUAGE.EN:
+            surfaces = [text]
+        else:
+            surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, text)
+
+        for surface in surfaces:
             # 过滤非实体
             if ner_type not in self.NER_TYPES:
                 continue
@@ -131,20 +180,19 @@ class NER:
             # 中文词语判断
             if language == NER.LANGUAGE.ZH:
                 surface = TextHelper.strip_not_cjk(surface)
-                if not TextHelper.is_valid_cjk_word(surface, self.blacklist):
+                if not self.is_valid_cjk_word(surface, self.blacklist):
                     continue
 
             # 英文词语判断
             if language == NER.LANGUAGE.EN:
                 surface = TextHelper.strip_not_latin(surface)
-                if not TextHelper.is_valid_latin_word(surface, self.blacklist, unique_words):
+                if not self.is_valid_english_word(surface, self.blacklist):
                     continue
 
             # 日文词语判断
             if language == NER.LANGUAGE.JP:
-                surface = TextHelper.strip_not_japanese(surface)
-                surface = surface.strip("の")
-                if not TextHelper.is_valid_japanese_word(surface, self.blacklist):
+                surface = TextHelper.strip_not_japanese(surface).strip("の")
+                if not self.is_valid_japanese_word(surface, self.blacklist):
                     continue
 
             word = Word()
@@ -158,7 +206,7 @@ class NER:
 
     # 查找 NER 实体
     def search_for_entity(self, input_lines, input_names, language):
-        words = []     
+        words = []
 
         input_lines_chunked = [
             input_lines[i : i + self.LINE_SIZE_PER_GROUP]
@@ -179,13 +227,12 @@ class NER:
                 self.classifier.call_count = 0 # 防止出现应使用 dateset 的提示
 
                 # 使用 NER 模型抓取实体
-                unique_words = set(re.findall(r"\b\w+\b", "\n".join(lines)))
                 for i, doc in enumerate(self.classifier(lines)):
                     for token in doc:
                         text = token.get("word")
                         score = token.get("score")
                         entity_group = token.get("entity_group")
-                        words.extend(self.generate_words(text, score, entity_group, language, unique_words))
+                        words.extend(self.generate_words(text, score, entity_group, language))
                 
                 # 匹配【】中的字符串
                 for name in re.findall(r"【(.*?)】", "\n".join(lines)):
@@ -194,15 +241,15 @@ class NER:
                         score = 0.95
                         entity_group = "PER"
 
-                        for word in self.generate_words(text, score, entity_group, language, unique_words):
+                        for word in self.generate_words(text, score, entity_group, language):
                             if word.surface in seen:
                                 continue
                             else:
                                 words.append(word)
                                 seen.add(word.surface)                            
 
-                # 进行英文和中文任务时显存保留量会暴涨，原因不明，先手动释放显存来处理
-                torch.cuda.empty_cache()
+                # 进行英文和中文任务时显存保留量会暴涨，原因不明，暂时按照超过 2G 时手动释放显存进行处理
+                torch.cuda.empty_cache() if torch.cuda.memory_reserved() > 2 * 1024 * 1024 * 1024 else None
                 progress.update(pid, advance = 1, total = len(input_lines_chunked))
 
         # 打印通过模式匹配抓取的角色实体
@@ -246,7 +293,7 @@ class NER:
             # 获取词根，获取成功则更新词语
             roots = []
             for k, v in enumerate(tokens):
-                if TextHelper.is_valid_japanese_word(v, self.blacklist):
+                if self.is_valid_japanese_word(v, self.blacklist):
                     word_ex = Word()
                     word_ex.count = word.count
                     word_ex.score = word.score

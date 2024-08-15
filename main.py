@@ -167,6 +167,9 @@ def read_input_file(language):
         # 干掉除了空格以外的行内空白符（包括换行符、制表符、回车符、换页符等）
         line = re.sub(r"[^\S ]+", "", line)
 
+        # 合并连续的空格为一个空格
+        line = re.sub(r" +", " ", line)
+
         if len(line) == 0:
             continue
 
@@ -185,12 +188,18 @@ def read_input_file(language):
     return input_lines_filtered, input_names
 
 # 合并、计数并按置信度过滤
-def merge_and_count(words, full_lines, per_score_threshold = 0.60, other_score_threshold = 0.75):
+def merge_and_count(words, full_lines, language):
     words_unique = {}
     for v in words:
         if (v.surface, v.ner_type) not in words_unique:
             words_unique[(v.surface, v.ner_type)] = [] # 只有文字和类型都一样才视为相同条目，避免跨类词条目合并
         words_unique[(v.surface, v.ner_type)].append(v)
+
+    threshold = {
+        NER.LANGUAGE.JP : (0.70, 0.80),
+        NER.LANGUAGE.ZH : (0.70, 0.80),
+        NER.LANGUAGE.EN : (0.70, 0.80),
+    }
 
     words_merged = []
     for k, v in words_unique.items():
@@ -198,8 +207,8 @@ def merge_and_count(words, full_lines, per_score_threshold = 0.60, other_score_t
         word.score = sum(w.score for w in v) / len(v) # 求平均分
 
         if (
-            word.ner_type == "PER" and word.score > per_score_threshold or
-            word.ner_type != "PER" and word.score > other_score_threshold
+            word.ner_type == "PER" and word.score > threshold[language][0] or
+            word.ner_type != "PER" and word.score > threshold[language][1]
         ):
             words_merged.append(word)
 
@@ -387,14 +396,14 @@ def search_for_entity(input_lines, input_names, language):
 
     if LogHelper.is_debug():
         with LogHelper.status(f"正在将实体字典写入文件 ..."):
-            words = merge_and_count(words, input_lines)
+            words = merge_and_count(words, input_lines, language)
             write_words_dict_to_file(words, "words_dict.json")
 
     # 查找上下文
     LogHelper.info("即将开始执行 [查找上下文] ...")
 
     LogHelper.print(f"")
-    words = merge_and_count(words, input_lines)
+    words = merge_and_count(words, input_lines, language)
     with ProgressHelper.get_progress() as progress:
         pid = progress.add_task("查找上下文", total = None)
         for k, word in enumerate(words):
@@ -411,13 +420,13 @@ def search_for_entity(input_lines, input_names, language):
     if language == NER.LANGUAGE.JP:
         words = G.ner.lemmatize_words_by_morphology(words, input_lines)
         words = remove_words_by_ner_type(words, "")
-        words = merge_and_count(words, input_lines)
+        words = merge_and_count(words, input_lines, language)
 
     # 只对 日文、中文 启用 出现次数 还原词根
     if language == NER.LANGUAGE.JP or language == NER.LANGUAGE.ZH:
         words = G.ner.lemmatize_words_by_count(words, input_lines)
         words = remove_words_by_ner_type(words, "")
-        words = merge_and_count(words, input_lines)
+        words = merge_and_count(words, input_lines, language)
 
     LogHelper.info(f"[还原词根] 已完成 ...")
 
@@ -562,10 +571,9 @@ def print_menu_main():
     LogHelper.print(f"\t--> 2. 开始处理 [green]中文文本（测试版）[/]")
     LogHelper.print(f"\t--> 3. 开始处理 [green]英文文本（测试版）[/]")
     LogHelper.print(f"\t--> 4. 开始执行 [green]接口测试[/]")
-    LogHelper.print(f"\t--> 5. 查看常见问题")
     LogHelper.print(f"")
     choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的功能，默认为 [green][1][/] ", 
-        choices = ["1", "2", "3", "4", "5"],
+        choices = ["1", "2", "3", "4"],
         default = "1",
         show_choices = False,
         show_default = False
@@ -573,39 +581,6 @@ def print_menu_main():
     LogHelper.print(f"")
 
     return choice
-
-# 打印常见问题
-def print_menu_qa():
-    os.system("cls")
-    LogHelper.print(f"Q：KeywordGacha 支持读取哪些格式的文本文件？", highlight = True)
-    LogHelper.print(f"A：目前支持三种不同的输入文本格式。", highlight = True)
-    LogHelper.print(f"\t• .txt 纯文本格式，会将文件内的每一行当作一个句子来处理；", highlight = True)
-    LogHelper.print(f"\t• .json 格式，会将文件内的每一条数据的 Key 的值当作一个句子来处理；", highlight = True)
-    LogHelper.print(f"\t• .csv 表格，会将文件内的每一行的第一列当作一个句子来处理；", highlight = True)
-    LogHelper.print(f"\t• 如果输入路径是一个文件夹，那则会读取这个文件夹内所有的 .txt .csv .json 文件；", highlight = True)
-    LogHelper.print(f"", highlight = True)
-
-    LogHelper.print(f"Q：我该如何获得这些格式的文本文件？", highlight = True)
-    LogHelper.print(f"A：小说：", highlight = True)
-    LogHelper.print(f"\t• 一般都是 .txt 纯文本文件，可直接使用；", highlight = True)
-    LogHelper.print(f"A：游戏文本：", highlight = True)
-    LogHelper.print(f"\t• 可通过 [blue]MTool[/] 、 [blue]SExtractor[/] 、[blue]Translator++[/] 等工具导出可用的游戏文本；", highlight = True)
-    LogHelper.print(f"\t• 注意，虽然 KG 支持对 [blue]MTool[/] 导出文本的分析，但是因 [blue]MTool[/] 文本分割的特殊性，其分析效果较差；", highlight = True)
-    LogHelper.print(f"", highlight = True)
-
-    LogHelper.print(f"Q：处理过程中频繁报错错误提示怎么办？", highlight = True)
-    LogHelper.print(f"A：少量报错：", highlight = True)
-    LogHelper.print(f"\t• 一般不影响结果，不是强迫症可以无视。", highlight = True)
-    LogHelper.print(f"A：全部报错：", highlight = True)
-    LogHelper.print(f"\t• 一般是 接口信息填写错误 或者 本地服务器配置错误，请检查 [blue]config.cfg[/]。", highlight = True)
-    LogHelper.print(f"A：请求频率限制：", highlight = True)
-    LogHelper.print(f"\t• 如果报错信息中有错误码 [orange_red1]Error 429[/] 或者类似于 [orange_red1]请求过于频繁[/] 的错误信息，则为接口平台的请求频率限制。", highlight = True)
-    LogHelper.print(f"\t• 请在 [blue]config.cfg[/] 中逐步调小 [blue]request_frequency_threshold[/] 的值，一直到不报错为止，这个值可以小于 1。", highlight = True)
-    LogHelper.print(f"", highlight = True)
-
-    LogHelper.print(f"")
-    os.system("pause")
-    os.system("cls")
 
 # 主函数
 async def begin():
@@ -622,8 +597,6 @@ async def begin():
             await process_text(NER.LANGUAGE.EN)
         elif choice == 4:
             await test_api()
-        elif choice == 5:
-            print_menu_qa()
 
 # 一些初始化步骤
 def init():

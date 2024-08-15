@@ -172,22 +172,6 @@ class TextHelper:
 
         return text
 
-    # 判断是否是一个有意义的日文词语
-    @staticmethod
-    def is_valid_japanese_word(surface, blacklist):
-        flag = True
-
-        if len(surface) == 1:
-            return False
-
-        if surface in blacklist:
-            return False
-
-        if not TextHelper.has_any_japanese(surface):
-            return False
-
-        return flag
-
     # 修复不合规的JSON字符串
     @staticmethod
     def fix_broken_json_string(jsonstring):
@@ -231,22 +215,6 @@ class TextHelper:
 
         return text.strip()
 
-    # 判断是否是一个有意义的汉字词语
-    @staticmethod
-    def is_valid_cjk_word(surface, blacklist):
-        flag = True
-
-        if len(surface) == 1:
-            return False
-
-        if surface in blacklist:
-            return False
-
-        if not TextHelper.has_any_cjk(surface):
-            return False
-
-        return flag
-
     # 判断字符是否为拉丁字符
     @staticmethod
     def is_latin(ch):
@@ -280,25 +248,3 @@ class TextHelper:
             text = text[:-1]
 
         return text.strip()
-
-    # 判断是否是一个有意义的拉丁词语
-    @staticmethod
-    def is_valid_latin_word(surface, blacklist, unique_words):
-        flag = True
-
-        if len(surface) <= 2:
-            return False
-
-        if surface in blacklist:
-            return False
-
-        if not surface[0].isupper():
-            return False
-
-        if surface not in unique_words:
-            return False
-
-        if not TextHelper.has_any_latin(surface):
-            return False
-
-        return flag
