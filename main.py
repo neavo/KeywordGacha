@@ -432,7 +432,7 @@ def search_for_entity(input_lines, input_names, language):
 
     # 按出现次数阈值进行筛选
     LogHelper.info(f"即将开始执行 [阈值筛选] ... 当前出现次数的筛选阈值设置为 {G.config.count_threshold} ...")
-    words = [word for word in words if word.count >= G.config.count_threshold]
+    words = [word for word in words if word.count >= max(1, G.config.count_threshold)]
     LogHelper.info(f"[阈值筛选] 已完成 ... 出现次数 < {G.config.count_threshold} 的条目已剔除 ...")
 
     return words
