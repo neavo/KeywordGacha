@@ -432,7 +432,7 @@ def search_for_entity(input_lines, input_names, language):
 
     # 按出现次数阈值进行筛选
     LogHelper.info(f"即将开始执行 [阈值筛选] ... 当前出现次数的筛选阈值设置为 {G.config.count_threshold} ...")
-    words = [word for word in words if word.count >= G.config.count_threshold]
+    words = [word for word in words if word.count >= max(1, G.config.count_threshold)]
     LogHelper.info(f"[阈值筛选] 已完成 ... 出现次数 < {G.config.count_threshold} 的条目已剔除 ...")
 
     return words
@@ -498,14 +498,15 @@ async def process_text(language):
     for k, v in ner_type.items():
         words_ner_type = get_words_by_ner_type(words, k)
         os.remove(f".\\output\\{file_name}_{v}_日志.txt") if os.path.exists(f".\\output\\{file_name}_{v}_日志.txt") else None
-        os.remove(f".\\output\\{file_name}_{v}_列表.txt") if os.path.exists(f".\\output\\{file_name}_{v}_列表.txt") else None
-        os.remove(f".\\output\\{file_name}_{v}_ainiee.txt") if os.path.exists(f".\\output\\{file_name}_{v}_ainiee.txt") else None
+        os.remove(f".\\output\\{file_name}_{v}_列表.json") if os.path.exists(f".\\output\\{file_name}_{v}_列表.json") else None
+        os.remove(f".\\output\\{file_name}_{v}_ainiee.json") if os.path.exists(f".\\output\\{file_name}_{v}_ainiee.json") else None
         os.remove(f".\\output\\{file_name}_{v}_galtransl.txt") if os.path.exists(f".\\output\\{file_name}_{v}_galtransl.txt") else None
 
-        write_words_log_to_file(words_ner_type, f".\\output\\{file_name}_{v}_日志.txt")
-        write_words_list_to_file(words_ner_type, f".\\output\\{file_name}_{v}_列表.json")
-        write_ainiee_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_ainiee.json")
-        write_galtransl_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_galtransl.txt")
+        if len(words_ner_type) > 0:
+            write_words_log_to_file(words_ner_type, f".\\output\\{file_name}_{v}_日志.txt")
+            write_words_list_to_file(words_ner_type, f".\\output\\{file_name}_{v}_列表.json")
+            write_ainiee_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_ainiee.json")
+            write_galtransl_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_galtransl.txt")
 
     # 等待用户退出
     LogHelper.info("")
