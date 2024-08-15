@@ -5,6 +5,7 @@ import json
 
 import torch
 import onnxruntime
+from lemminflect import getLemma
 from transformers import pipeline
 from transformers import AutoTokenizer
 from transformers import AutoModelForTokenClassification
@@ -133,7 +134,7 @@ class NER:
         return flag
 
     # 判断是否是有意义的英文词语
-    def is_valid_english_word(self, surface, blacklist):
+    def is_valid_english_word(self, surface, blacklist, ner_type, unique_words):
         flag = True
 
         if len(surface) <= 2:
@@ -144,6 +145,16 @@ class NER:
 
         if not TextHelper.has_any_latin(surface):
             return False
+
+        # 排除类型为角色首字母没有大写的词语
+        if ner_type == "PER" and not surface[0].isupper():
+            return False
+
+        # 排除不是完整单词的词语
+        if unique_words != None:
+            chunks = re.findall(r"\b\w+\b", surface)
+            if len(chunks) > 0 and not all(chunk in unique_words for chunk in chunks):
+                return False
 
         return flag
 
@@ -163,7 +174,7 @@ class NER:
         return flag
 
     # 生成词语 
-    def generate_words(self, text, score, ner_type, language):
+    def generate_words(self, text, score, ner_type, language, unique_words):
         words = []
 
         # 词语构成中存在空格的不拆分
@@ -186,7 +197,7 @@ class NER:
             # 英文词语判断
             if language == NER.LANGUAGE.EN:
                 surface = TextHelper.strip_not_latin(surface)
-                if not self.is_valid_english_word(surface, self.blacklist):
+                if not self.is_valid_english_word(surface, self.blacklist, ner_type, unique_words):
                     continue
 
             # 日文词语判断
@@ -203,6 +214,18 @@ class NER:
             words.append(word)
 
         return words
+
+    # 获取英语词根
+    def get_english_lemma(self, surface):      
+        lemma_noun = getLemma(surface, upos = "NOUN")[0]
+        lemma_propn = getLemma(surface, upos = "PROPN")[0]
+
+        if lemma_propn != surface:
+            return lemma_propn
+        elif lemma_noun != surface:
+            return lemma_noun
+        else:
+            return surface
 
     # 查找 NER 实体
     def search_for_entity(self, input_lines, input_names, language):
@@ -223,8 +246,17 @@ class NER:
             pid = progress.add_task("查找 NER 实体", total = None)   
 
             seen = set()
+            unique_words = None
             for k, lines in enumerate(input_lines_chunked):
                 self.classifier.call_count = 0 # 防止出现应使用 dateset 的提示
+
+                # 拼接文本
+                line_joined = "\n".join(lines)
+
+                # 如果是英文，则抓取去重词表，再计算并添加所有词根到词表
+                if language == NER.LANGUAGE.EN: 
+                    unique_words = set(re.findall(r"\b\w+\b", line_joined))
+                    unique_words.update(set(self.get_english_lemma(v) for v in unique_words))
 
                 # 使用 NER 模型抓取实体
                 for i, doc in enumerate(self.classifier(lines)):
@@ -232,16 +264,16 @@ class NER:
                         text = token.get("word")
                         score = token.get("score")
                         entity_group = token.get("entity_group")
-                        words.extend(self.generate_words(text, score, entity_group, language))
+                        words.extend(self.generate_words(text, score, entity_group, language, unique_words))
                 
                 # 匹配【】中的字符串
-                for name in re.findall(r"【(.*?)】", "\n".join(lines)):
+                for name in re.findall(r"【(.*?)】", line_joined):
                     if len(name) <= 12:
                         text = name
                         score = 0.95
                         entity_group = "PER"
 
-                        for word in self.generate_words(text, score, entity_group, language):
+                        for word in self.generate_words(text, score, entity_group, language, unique_words):
                             if word.surface in seen:
                                 continue
                             else:
@@ -262,7 +294,7 @@ class NER:
         for name in input_names:
             surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, name)
             for surface in surfaces:
-                words.extend(self.generate_words(0.95, surface, "PER"))
+                words.extend(self.generate_words(surface, 0.95, "PER", language, unique_words))
 
         self.release()
         return words
