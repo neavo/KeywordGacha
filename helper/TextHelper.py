@@ -3,29 +3,36 @@ import re
 class TextHelper:
 
     # 平假名
-    HIRAGANA = ["\u3040", "\u309F"]
+    HIRAGANA = ("\u3040", "\u309F")
 
     # 片假名
-    KATAKANA = ["\u30A0", "\u30FF"]
+    KATAKANA = ("\u30A0", "\u30FF")
 
     # 片假名语音扩展
-    KATAKANA_PHONETIC_EXTENSIONS = ["\u31F0", "\u31FF"]
+    KATAKANA_PHONETIC_EXTENSIONS = ("\u31F0", "\u31FF")
 
     # 濁音和半浊音符号
-    VOICED_SOUND_MARKS = ["\u309B", "\u309C"]
+    VOICED_SOUND_MARKS = ("\u309B", "\u309C")
 
     # 中日韩统一表意文字
-    CJK = ["\u4E00", "\u9FFF"]
+    CJK = ("\u4E00", "\u9FFF")
 
     # 中日韩通用标点符号
-    GENERAL_PUNCTUATION = ["\u2000", "\u206F"]
-    CJK_SYMBOLS_AND_PUNCTUATION = ["\u3000", "\u303F"]
-    HALFWIDTH_AND_FULLWIDTH_FORMS = ["\uFF00", "\uFFEF"]
-    OTHER_CJK_PUNCTUATION = [
+    GENERAL_PUNCTUATION = ("\u2000", "\u206F")
+    CJK_SYMBOLS_AND_PUNCTUATION = ("\u3000", "\u303F")
+    HALFWIDTH_AND_FULLWIDTH_FORMS = ("\uFF00", "\uFFEF")
+    OTHER_CJK_PUNCTUATION = (
         "\u30FB"    # ・ 在片假名 ["\u30A0", "\u30FF"] 范围内
-    ]
+    )
 
-    # 英文标点符号
+    # 拉丁字符
+    LATIN_1 = ("\u0041", "\u005A") # 大写字母 A-Z
+    LATIN_2 = ("\u0061", "\u007A") # 小写字母 a-z
+    LATIN_EXTENDED_A = ("\u0100", "\u017F")
+    LATIN_EXTENDED_B = ("\u0180", "\u024F")
+    LATIN_SUPPLEMENTAL = ("\u00A0", "\u00FF")
+    
+    # 拉丁标点符号
     LATIN_PUNCTUATION_BASIC_1 = ("\u0020", "\u002F")
     LATIN_PUNCTUATION_BASIC_2 = ("\u003A", "\u0040")
     LATIN_PUNCTUATION_BASIC_3 = ("\u005B", "\u0060")
@@ -165,22 +172,6 @@ class TextHelper:
 
         return text
 
-    # 判断是否是一个有意义的日文词语
-    @staticmethod
-    def is_valid_japanese_word(surface, blacklist):
-        flag = True
-
-        if surface in blacklist:
-            flag = False
-
-        if len(surface) == 1:
-            flag = False
-
-        if not TextHelper.has_any_japanese(surface):
-            flag = False
-
-        return flag
-
     # 修复不合规的JSON字符串
     @staticmethod
     def fix_broken_json_string(jsonstring):
@@ -210,3 +201,50 @@ class TextHelper:
             ), 
             text
         )
+
+    # 移除开头结尾的非汉字字符
+    @staticmethod
+    def strip_not_cjk(text):
+        text = text.strip()
+
+        while text and not TextHelper.is_cjk(text[0]):
+            text = text[1:]
+
+        while text and not TextHelper.is_cjk(text[-1]):
+            text = text[:-1]
+
+        return text.strip()
+
+    # 判断字符是否为拉丁字符
+    @staticmethod
+    def is_latin(ch):
+        return (
+            TextHelper.LATIN_1[0] <= ch <= TextHelper.LATIN_1[1] or
+            TextHelper.LATIN_2[0] <= ch <= TextHelper.LATIN_2[1] or
+            TextHelper.LATIN_EXTENDED_A[0] <= ch <= TextHelper.LATIN_EXTENDED_A[1] or
+            TextHelper.LATIN_EXTENDED_B[0] <= ch <= TextHelper.LATIN_EXTENDED_B[1] or
+            TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0] <= ch <= TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]
+        )
+
+    # 判断输入的字符串是否全部由拉丁字符组成
+    @staticmethod
+    def is_all_latin(text):
+        return all(TextHelper.is_latin(ch) for ch in text)
+
+    # 检查字符串是否包含至少一个拉丁字符组成
+    @staticmethod
+    def has_any_latin(text):
+        return any(TextHelper.is_latin(ch) for ch in text)
+
+    # 移除开头结尾的非拉丁字符
+    @staticmethod
+    def strip_not_latin(text):
+        text = text.strip()
+
+        while text and not TextHelper.is_latin(text[0]):
+            text = text[1:]
+
+        while text and not TextHelper.is_latin(text[-1]):
+            text = text[:-1]
+
+        return text.strip()
