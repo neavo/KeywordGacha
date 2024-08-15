@@ -498,14 +498,15 @@ async def process_text(language):
     for k, v in ner_type.items():
         words_ner_type = get_words_by_ner_type(words, k)
         os.remove(f".\\output\\{file_name}_{v}_日志.txt") if os.path.exists(f".\\output\\{file_name}_{v}_日志.txt") else None
-        os.remove(f".\\output\\{file_name}_{v}_列表.txt") if os.path.exists(f".\\output\\{file_name}_{v}_列表.txt") else None
-        os.remove(f".\\output\\{file_name}_{v}_ainiee.txt") if os.path.exists(f".\\output\\{file_name}_{v}_ainiee.txt") else None
+        os.remove(f".\\output\\{file_name}_{v}_列表.json") if os.path.exists(f".\\output\\{file_name}_{v}_列表.json") else None
+        os.remove(f".\\output\\{file_name}_{v}_ainiee.json") if os.path.exists(f".\\output\\{file_name}_{v}_ainiee.json") else None
         os.remove(f".\\output\\{file_name}_{v}_galtransl.txt") if os.path.exists(f".\\output\\{file_name}_{v}_galtransl.txt") else None
 
-        write_words_log_to_file(words_ner_type, f".\\output\\{file_name}_{v}_日志.txt")
-        write_words_list_to_file(words_ner_type, f".\\output\\{file_name}_{v}_列表.json")
-        write_ainiee_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_ainiee.json")
-        write_galtransl_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_galtransl.txt")
+        if len(words_ner_type) > 0:
+            write_words_log_to_file(words_ner_type, f".\\output\\{file_name}_{v}_日志.txt")
+            write_words_list_to_file(words_ner_type, f".\\output\\{file_name}_{v}_列表.json")
+            write_ainiee_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_ainiee.json")
+            write_galtransl_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_galtransl.txt")
 
     # 等待用户退出
     LogHelper.info("")
