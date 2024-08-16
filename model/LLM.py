@@ -26,36 +26,36 @@ class LLM:
 
     # 请求参数配置 - 接口测试
     LLMCONFIG[TASK_TYPE_API_TEST] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_API_TEST].TEMPERATURE = 0.01
-    LLMCONFIG[TASK_TYPE_API_TEST].TOP_P = 1
+    LLMCONFIG[TASK_TYPE_API_TEST].TEMPERATURE = 0.05
+    LLMCONFIG[TASK_TYPE_API_TEST].TOP_P = 0.95
     LLMCONFIG[TASK_TYPE_API_TEST].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_API_TEST].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 实体分类
     LLMCONFIG[TASK_TYPE_CLASSIFY_NER] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TEMPERATURE = 0.01
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TOP_P = 1
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TEMPERATURE = 0.05
+    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TOP_P = 0.95
     LLMCONFIG[TASK_TYPE_CLASSIFY_NER].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_CLASSIFY_NER].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 语义分析
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].TEMPERATURE = 0.01
-    LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].TOP_P = 1
+    LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].TEMPERATURE = 0.05
+    LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].TOP_P = 0.95
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 翻译词语
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].TEMPERATURE = 0.01
-    LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].TOP_P = 1
+    LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].TEMPERATURE = 0.05
+    LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].TOP_P = 0.95
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 翻译上下文
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TEMPERATURE = 0.50
-    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TOP_P = 1
+    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TEMPERATURE = 0.25
+    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TOP_P = 0.95
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS = 1024
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].FREQUENCY_PENALTY = 0
     
@@ -64,6 +64,7 @@ class LLM:
         self.api_key = config.api_key
         self.base_url = config.base_url
         self.model_name = config.model_name
+        self.request_timeout = config.request_timeout
         
         # 请求限制器
         if config.request_frequency_threshold > 1:
@@ -78,9 +79,9 @@ class LLM:
 
         # 初始化OpenAI客户端
         self.openai_handler = AsyncOpenAI(
+            timeout = self.request_timeout,
             api_key = self.api_key,
             base_url = self.base_url,
-            timeout = config.request_timeout,
             max_retries = 0
         )
 
@@ -196,7 +197,7 @@ class LLM:
                 LogHelper.warning(f"{LogHelper.get_trackback(e)}")
                 LogHelper.warning(f"llm_request - {llm_request}")
                 LogHelper.warning(f"llm_response - {llm_response}")
-            
+
     # 词语翻译任务
     async def translate_surface(self, word, retry):
         async with self.semaphore, self.async_limiter:
@@ -225,7 +226,7 @@ class LLM:
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
 
-                word.surface_romaji = data["romaji"]
+                word.surface_romaji = data["romaji"] if data["romaji"] != word.surface else ""
                 word.surface_translation = [data["translation_1"], data["translation_2"]]
                 word.surface_translation_description = data["description"]
                 word.llmresponse_translate_surface = llm_response                
