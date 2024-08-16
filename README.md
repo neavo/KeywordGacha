@@ -38,8 +38,8 @@
 - `抓取`、`分析` 和 `翻译` 效果取决于模型的能力，使用 💪 ~~更昂贵~~ 更强力  的模型可以显著提升效果
 - 是的，氪金可以变强
 - 各家的旗舰模型的如 [GPT4o](https://chatgpt.com)、[Claude 3.5 Sonnet](https://claude.ai) 效果十分好
-- 总体来说在线接口的效果远好于本地模型，推荐使用在线模型，比如又快又便宜的 [DeepSeek](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)
-- 不过本地模型效果也还不错，如果有 8G+ 显存的 Nvidia 显卡，可以使用 [一键包](https://github.com/neavo/KeywordGachaServer) 来搭建本地接口
+- 总体来说在线接口的效果远好于本地模型，推荐使用在线模型，比如又快又便宜的 [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)
+- 不过本地模型效果也还不错，如果有 8G+ 显存的 Nvidia 显卡，可以使用 [一键包 - 点击查看教程](https://github.com/neavo/KeywordGachaServer) 来搭建本地接口
 
 ## 文本格式 🏷️
 - 支持从 `.txt`、`.csv`、`.json` 三种文件中读取文本
@@ -49,6 +49,9 @@
 - 具体可见 [Wiki - 支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
 
 ## 近期更新 📅
+- 20240815 v0.2.1
+  - 修正 - 不能正常读取 name - message 格式 .json 数据的问题
+
 - 20240815 v0.2.0
   - 修正 - 当实体名称相互包含时，统计短词出现次数时会计入长词出现次数的问题
   - 新增 - `中文文本`、`英文文本` 分析处理功能
@@ -67,10 +70,6 @@
   - 调整 - 处理速度优化
     - 优化了 `语义分析` 的流程，用更少的步骤达到了更好的效果，速度 +100%
     - 在 Nvidia 显卡上可以启用 GPU 加速了，`NER 实体识别` 步骤，速度 +500%
-
-- 20240724
-  - 调整 - 现在三种格式都可以从文件夹中批量读取了
-  - 修正 - 出现次数为 0 导致的除数问题
 
 ## 设置说明 🎚️
 
