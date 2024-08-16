@@ -79,7 +79,7 @@ class LLM:
         # 初始化OpenAI客户端
         self.openai_handler = AsyncOpenAI(
             api_key = self.api_key,
-            base_url = self.base_url if self.base_url.endswith("/v1") else self.base_url + "/v1",
+            base_url = self.base_url,
             timeout = config.request_timeout,
             max_retries = 0
         )
