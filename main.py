@@ -152,13 +152,16 @@ def read_input_file(language):
     for line in input_lines:
         # 【\N[123]】 这种形式是代指角色名字的变量
         # 直接抹掉就没办法判断角色了，只把 \N 部分抹掉，保留 ID 部分
-        line = line.strip().replace(r"\\N", "")
+        line = line.strip().replace("\\N", "")
 
         # 放大或者缩小字体的代码，干掉
         # \{\{ゴゴゴゴゴゴゴゴゴッ・・・\r\n（大地の揺れる音）
         line = re.sub(r"(\\\{)|(\\\})", "", line) 
 
-        # \\C[4] 这种形式的代码，干掉
+        # /C[4] 这种形式的代码，干掉
+        line = re.sub(r"/[A-Z]{1,3}\[\d+\]", "", line, flags = re.IGNORECASE)
+
+        # \FS[29] 这种形式的代码，干掉
         line = re.sub(r"\\[A-Z]{1,3}\[\d+\]", "", line, flags = re.IGNORECASE)
 
         # 由于上面的代码移除，可能会产生空人名框的情况，干掉
