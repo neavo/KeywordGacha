@@ -13,8 +13,6 @@ from helper.TextHelper import TextHelper
 
 class Word:
 
-    CONTEXT_CACHE = {}
-    CONTEXT_CACHE_LOCK = Lock()
     CONTEXT_TOKEN_THRESHOLD = 768
 
     MATCH_LENGTHS_CACHE = {}
@@ -56,58 +54,68 @@ class Word:
             f"llmresponse_translate_surface={self.llmresponse_translate_surface})"
         )
 
-    # 从原文中提取上下文，至少取一条与阈值最接近的
-    def search_context(self, original):
-        if self.surface in Word.CONTEXT_CACHE:
-            with Word.CONTEXT_CACHE_LOCK:
-                return Word.CONTEXT_CACHE.get(self.surface)
-        else:
-            match_lengths = {}
+    # 从原文中提取上下文，排除母串对子串的影响，并至少取一条与阈值最接近的
+    def search_context(self, original, words):        
+        # 从 words 中找出 self.surface 的母串
+        replacements = {
+            word.surface
+            for word in words
+            if self.surface in word.surface and self.surface != word.surface
+        }
 
-            # 第一次遍历: 计算并缓存所有匹配句子的长度
-            with Word.MATCH_LENGTHS_CACHE_LOCK:
-                for line in original:
-                    if self.surface in line:
-                        if line not in Word.MATCH_LENGTHS_CACHE:
-                            Word.MATCH_LENGTHS_CACHE[line] = len(self.tiktoken_encoding.encode(line))
-                        match_lengths[line] = Word.MATCH_LENGTHS_CACHE[line]
+        # 第一次遍历: 计算并缓存所有匹配句子的长度
+        match_lengths = {}
+        with Word.MATCH_LENGTHS_CACHE_LOCK:
+            for line in original:
+                # 如果 line 中有母串，则替换为 #
+                for key in replacements:
+                    if key in line:
+                        line = line.replace(key, "#" * len(key))
 
-            # 按长度降序排序
-            sorted_matches = sorted(match_lengths.items(), key=lambda item: (-item[1], item[0]))
+                # 在替换后的 line 中匹配 self.surface
+                if self.surface in line:
+                    if line not in Word.MATCH_LENGTHS_CACHE:
+                        Word.MATCH_LENGTHS_CACHE[line] = len(self.tiktoken_encoding.encode(line))
+                    match_lengths[line] = Word.MATCH_LENGTHS_CACHE[line]
 
-            context = []
-            context_length = 0
-            closest_match = None
-            closest_difference = float('inf')
+        # 按长度降序排序
+        sorted_matches = sorted(match_lengths.items(), key = lambda item: (-item[1], item[0]))
 
-            # 第二次遍历: 构建上下文，尽可能接近阈值
-            for line, length in sorted_matches:
-                if length > self.CONTEXT_TOKEN_THRESHOLD:
-                    # 找到最接近阈值的句子
-                    difference = length - self.CONTEXT_TOKEN_THRESHOLD
-                    if difference < closest_difference:
-                        closest_difference = difference
-                        closest_match = line
-                    continue
+        context = []
+        context_length = 0
+        closest_match = None
+        closest_difference = float("inf")
 
-                if context_length + length > self.CONTEXT_TOKEN_THRESHOLD:
-                    break
+        # 第二次遍历: 构建上下文，尽可能接近阈值
+        for line, length in sorted_matches:
+            if length > self.CONTEXT_TOKEN_THRESHOLD:
+                # 找到最接近阈值的句子
+                difference = length - self.CONTEXT_TOKEN_THRESHOLD
+                if difference < closest_difference:
+                    closest_difference = difference
+                    closest_match = line
+                continue
 
-                context.append(line)
-                context_length += length
+            if context_length + length > self.CONTEXT_TOKEN_THRESHOLD:
+                break
 
-            # 如果没有合适的上下文，并且有一个接近阈值的句子
-            if not context and closest_match:
-                context.append(closest_match)
+            context.append(line)
+            context_length += length
 
-            # 将结果保存到缓存中
-            with Word.CONTEXT_CACHE_LOCK:
-                Word.CONTEXT_CACHE[self.surface] = context
+        # 如果没有合适的上下文，并且有一个接近阈值的句子
+        if not context and closest_match:
+            context.append(closest_match)
 
-            return context
+        return context
 
     # 按长度截取上下文并返回，至少取一条与阈值最接近的
     def clip_context(self, threshold):
+        # 理论上不应该有上下文为空的情况
+        # TODO : FIX
+        if not self.context:
+            LogHelper.debug(f"{self.surface} - {self.ner_type} - {self.count} - {self.context} ...")
+            return []
+
         context = []
         context_length = 0
 
@@ -125,7 +133,7 @@ class Word:
 
         # 如果没有找到合适的句子，取最接近阈值的一条
         if not context:
-            closest_line = min(self.context, key=lambda line: abs(len(self.tiktoken_encoding.encode(line)) - threshold))
+            closest_line = min(self.context, key = lambda line: abs(len(self.tiktoken_encoding.encode(line)) - threshold))
             context.append(closest_line)
 
         return context
