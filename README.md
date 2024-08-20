@@ -38,8 +38,9 @@
 - `抓取`、`分析` 和 `翻译` 效果取决于模型的能力，使用 💪 ~~更昂贵~~ 更强力  的模型可以显著提升效果
 - 是的，氪金可以变强
 - 各家的旗舰模型的如 [GPT4o](https://chatgpt.com)、[Claude 3.5 Sonnet](https://claude.ai) 效果十分好
-- 总体来说在线接口的效果远好于本地模型，推荐使用在线模型，比如又快又便宜的 [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)
-- 不过本地模型效果也还不错，如果有 8G+ 显存的 Nvidia 显卡，可以使用 [一键包 - 点击查看教程](https://github.com/neavo/KeywordGachaServer) 来搭建本地接口
+- 推荐使用 `在线接口`，比如又快又便宜的 [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)
+- 如果有 8G+ 显存的 Nvidia 显卡，也可以使用 [一键包 - 点击查看教程](https://github.com/neavo/KeywordGachaServer) 来搭建 `本地接口`
+- 总体来说 `在线接口` 的效果和速度都远好于 `本地接口`，但是 `本地接口` 也可以满足基本需求
 
 ## 文本格式 🏷️
 - 支持从 `.txt`、`.csv`、`.json` 三种文件中读取文本
@@ -49,6 +50,11 @@
 - 具体可见 [Wiki - 支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
 
 ## 近期更新 📅
+- 20240820 v0.3.0
+  - 调整 - NER 模型更新至 20240819
+  - 调整 - 移除了一些不再需要的步骤以节约处理时间
+  - 调整 - 不再自动为 API 地址补齐 /v1 以兼容更多模型
+
 - 20240815 v0.2.1
   - 修正 - 不能正常读取 name - message 格式 .json 数据的问题
 
@@ -61,15 +67,6 @@
   - 修正 - 一个系统兼容性问题
   - 调整 - 优化了对游戏文本的支持和抓取能力
   - 新增 - 自动生成 AiNiee 与 GalTransl 格式的词典
-
-- 20240808
-  - 新增 - 接口测试 功能
-  - 新增 - 非人名实体上下文翻译 功能，默认关闭
-  - 调整 - NER 模型更新，抓取能力显著强化
-    - 特别是对非角色实体的抓取能力
-  - 调整 - 处理速度优化
-    - 优化了 `语义分析` 的流程，用更少的步骤达到了更好的效果，速度 +100%
-    - 在 Nvidia 显卡上可以启用 GPU 加速了，`NER 实体识别` 步骤，速度 +500%
 
 ## 设置说明 🎚️
 
@@ -98,8 +95,8 @@
     "request_frequency_threshold": [
         4,
         "网络请求频率阈值，单位为 次/秒，值可以小于 1，如果频繁出现 429 代码的网络错误，可以调小这个值。",
-        "使用 DeepSeek 等不限制并发数的接口可以调大，可以极大的加快处理的速度。",
-        "使用本地接口时，可以设置为与本地接口的 NP 值一样。"
+        "使用 DeepSeek 等不限制并发数的接口时可以调大，以获得超快的处理的速度。",
+        "使用本地接口时，建议设置为本地接口的 NP 值。"
     ],
     "translate_surface": [
         1,
@@ -117,7 +114,8 @@
 ```
 ## 常见问题 📥
 - 处理 `小说` 时
-  - 注意单行不要太长，目前模型能处理的单行最大长度约为500字，过长的句子会被截断 
+  - 注意单行不要太长
+  - 目前模型能处理的单行最大长度约为500字，过长的句子会被截断 
 - 处理 `游戏文本` 时
   - 建议使用 [SExtractor](https://github.com/satan53x/SExtractor) 、[Translator++](https://dreamsavior.net/translator-plusplus/) 导出的文本
   - [MTool](https://afdian.net/a/AdventCirno) 导出的文本抓取效果很不稳定
