@@ -257,21 +257,13 @@ def replace_words_by_ner_type(words, in_words, ner_type):
     return words
 
 # 将 词语字典 写入文件
-def write_words_dict_to_file(words, path):
-    words_dict = {}
-    for k, word in enumerate(words):
-        if word.ner_type not in words_dict:
-            words_dict[word.ner_type] = []
-
-        t = {}
-        t["score"] = float(word.score)
-        t["count"] = word.count
-        t["surface"] = word.surface
-        t["ner_type"] = word.ner_type
-        words_dict[word.ner_type].append(t)
-
-    with open(path, "w", encoding = "utf-8") as file:
-        file.write(json.dumps(words_dict, indent = 4, ensure_ascii = False))
+def write_words_all_to_file(words, path):
+    with LogHelper.status(f"正在将实体列表写入文件 ..."):
+        with open(path, "w", newline = "", encoding = "utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(["surface", "score", "ner_type"])
+            for word in words:
+                writer.writerow([word.surface, word.score, word.ner_type])
 
 # 将 词语日志 写入文件
 def write_words_log_to_file(words, path):
@@ -405,10 +397,9 @@ async def process_text(language):
     words = []
     words = G.ner.search_for_entity(input_lines, input_names, language)
 
+    # 调试模式下，将实体列表写入本地
     if LogHelper.is_debug():
-        with LogHelper.status(f"正在将实体字典写入文件 ..."):
-            words = merge_and_count(words, input_lines, language)
-            write_words_dict_to_file(words, "words_dict.json")
+        write_words_all_to_file(words, "words_all.csv")
 
     # 查找上下文
     LogHelper.info("即将开始执行 [查找上下文] ...")
