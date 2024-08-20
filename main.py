@@ -101,8 +101,8 @@ def read_input_file(language):
     file_path = ""
 
     num = 0
-    if os.path.exists(".\\input") and os.path.isdir(".\\input"):
-        for entry in os.scandir(".\\input"):
+    if os.path.exists("input") and os.path.isdir("input"):
+        for entry in os.scandir("input"):
             if entry.is_file() and entry.name.endswith(".txt"):
                 num = num + 1
             elif entry.is_file() and entry.name.endswith(".csv"):
@@ -111,8 +111,8 @@ def read_input_file(language):
                 num = num + 1
 
     if num > 0:
-        user_input = LogHelper.input(f"已在 [green].\\input[/] 路径下找到数据文件 {num} 个，按回车直接使用或输入其他文件路径：").strip('"')
-        file_path = user_input if user_input else ".\\input"
+        user_input = LogHelper.input(f"已在 [green]input[/] 路径下找到数据文件 {num} 个，按回车直接使用或输入其他文件路径：").strip('"')
+        file_path = user_input if user_input else "input"
     
     if file_path == "":
         file_path = LogHelper.input(f"请输入数据文件的路径: ").strip('"')
@@ -159,10 +159,13 @@ def read_input_file(language):
         line = re.sub(r"(\\\{)|(\\\})", "", line) 
 
         # /C[4] 这种形式的代码，干掉
-        line = re.sub(r"/[A-Z]{1,3}\[\d+\]", "", line, flags = re.IGNORECASE)
+        line = re.sub(r"/[A-Z]{1,5}\[\d+\]", "", line, flags = re.IGNORECASE)
 
         # \FS[29] 这种形式的代码，干掉
-        line = re.sub(r"\\[A-Z]{1,3}\[\d+\]", "", line, flags = re.IGNORECASE)
+        line = re.sub(r"\\[A-Z]{1,5}\[\d+\]", "", line, flags = re.IGNORECASE)
+
+        # \nw[隊員Ｃ] 这种形式的代码，干掉 [ 前的部分
+        line = re.sub(r"\\[A-Z]{1,5}\[", "[", line, flags = re.IGNORECASE)
 
         # 由于上面的代码移除，可能会产生空人名框的情况，干掉
         line = line.replace("【】", "") 
@@ -199,15 +202,15 @@ def merge_and_count(words, full_lines, language):
         words_unique[(v.surface, v.ner_type)].append(v)
 
     threshold = {
-        NER.LANGUAGE.JP : (0.70, 0.80),
-        NER.LANGUAGE.ZH : (0.70, 0.80),
-        NER.LANGUAGE.EN : (0.70, 0.80),
+        NER.LANGUAGE.JP : (0.75, 0.80),
+        NER.LANGUAGE.ZH : (0.75, 0.80),
+        NER.LANGUAGE.EN : (0.75, 0.80),
     }
 
     words_merged = []
     for k, v in words_unique.items():
         word = v[0]
-        word.score = sum(w.score for w in v) / len(v) # 求平均分
+        word.score = min(1.00, sum(w.score for w in v) / len(v)) # 求平均分
 
         if (
             word.ner_type == "PER" and word.score > threshold[language][0] or
@@ -392,9 +395,14 @@ def write_galtransl_dict_to_file(words, path):
             file.write(f"{line}\n")
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
-# 查找 NER 实体
-def search_for_entity(input_lines, input_names, language):
+# 开始处理文本
+async def process_text(language):
+    # 读取输入文件
+    input_lines, input_names = read_input_file(language)
+
+    # 查找 NER 实体
     LogHelper.info("即将开始执行 [查找 NER 实体] ...")
+    words = []
     words = G.ner.search_for_entity(input_lines, input_names, language)
 
     if LogHelper.is_debug():
@@ -404,50 +412,34 @@ def search_for_entity(input_lines, input_names, language):
 
     # 查找上下文
     LogHelper.info("即将开始执行 [查找上下文] ...")
-
     LogHelper.print(f"")
+
     words = merge_and_count(words, input_lines, language)
     with ProgressHelper.get_progress() as progress:
         pid = progress.add_task("查找上下文", total = None)
         for k, word in enumerate(words):
-            word.context = word.search_context(input_lines)
+            word.context = word.search_context(input_lines, words)
             progress.update(pid, advance = 1, total = len(words))
 
     LogHelper.print(f"")
     LogHelper.info("[查找上下文] 已完成 ...")
 
-    # 有了上下文以后，开始执行还原词根
-    LogHelper.info("即将开始执行 [还原词根] ...")
-
-    # 只对日文启用 词语形态 还原词根
+    # 有了上下文以后，开始执行还原词根，只对日文启用
     if language == NER.LANGUAGE.JP:
+        LogHelper.info("即将开始执行 [还原词根] ...")
         words = G.ner.lemmatize_words_by_morphology(words, input_lines)
         words = remove_words_by_ner_type(words, "")
         words = merge_and_count(words, input_lines, language)
+        LogHelper.info(f"[还原词根] 已完成 ...")
 
-    # 只对 日文、中文 启用 出现次数 还原词根
-    if language == NER.LANGUAGE.JP or language == NER.LANGUAGE.ZH:
-        words = G.ner.lemmatize_words_by_count(words, input_lines)
-        words = remove_words_by_ner_type(words, "")
-        words = merge_and_count(words, input_lines, language)
-
-    LogHelper.info(f"[还原词根] 已完成 ...")
+        with LogHelper.status(f"正在更新上下文 ..."):
+            for k, word in enumerate(words):
+                word.context = word.search_context(input_lines, words)
 
     # 按出现次数阈值进行筛选
     LogHelper.info(f"即将开始执行 [阈值筛选] ... 当前出现次数的筛选阈值设置为 {G.config.count_threshold} ...")
     words = [word for word in words if word.count >= max(1, G.config.count_threshold)]
     LogHelper.info(f"[阈值筛选] 已完成 ... 出现次数 < {G.config.count_threshold} 的条目已剔除 ...")
-
-    return words
-
-# 开始处理日文文本
-async def process_text(language):
-    # 读取输入文件
-    input_lines, input_names = read_input_file(language)
-
-    # 查找 NER 实体
-    words = []
-    words = search_for_entity(input_lines, input_names, language)
 
     # 等待 语义分析任务 结果
     LogHelper.info("即将开始执行 [语义分析] ...")
@@ -460,13 +452,6 @@ async def process_text(language):
     LogHelper.info("即将开始执行 [重复性校验] ...")
     words = G.ner.validate_words_by_duplication(words)
     words = remove_words_by_ner_type(words, "")
-
-    # 等待 实体分类任务 结果
-    # LogHelper.info("即将开始执行 [实体分类] ...")
-    # words_prd = get_words_by_ner_type(words, "PRD")
-    # words_prd = await G.llm.classify_ner_bacth(words_prd)
-    # words_prd = remove_words_by_ner_type(words_prd, "")
-    # words = replace_words_by_ner_type(words, words_prd, "PRD")
 
     # 等待翻译词语任务结果
     if language != NER.LANGUAGE.ZH and G.config.translate_surface == 1:
@@ -497,19 +482,19 @@ async def process_text(language):
     file_name, extension = os.path.splitext(file_name_with_extension)
 
     LogHelper.info("")
-    os.makedirs(".\\output", exist_ok = True)
+    os.makedirs("output", exist_ok = True)
     for k, v in ner_type.items():
         words_ner_type = get_words_by_ner_type(words, k)
-        os.remove(f".\\output\\{file_name}_{v}_日志.txt") if os.path.exists(f".\\output\\{file_name}_{v}_日志.txt") else None
-        os.remove(f".\\output\\{file_name}_{v}_列表.json") if os.path.exists(f".\\output\\{file_name}_{v}_列表.json") else None
-        os.remove(f".\\output\\{file_name}_{v}_ainiee.json") if os.path.exists(f".\\output\\{file_name}_{v}_ainiee.json") else None
-        os.remove(f".\\output\\{file_name}_{v}_galtransl.txt") if os.path.exists(f".\\output\\{file_name}_{v}_galtransl.txt") else None
+        os.remove(f"output/{file_name}_{v}_日志.txt") if os.path.exists(f"output/{file_name}_{v}_日志.txt") else None
+        os.remove(f"output/{file_name}_{v}_列表.json") if os.path.exists(f"output/{file_name}_{v}_列表.json") else None
+        os.remove(f"output/{file_name}_{v}_ainiee.json") if os.path.exists(f"output/{file_name}_{v}_ainiee.json") else None
+        os.remove(f"output/{file_name}_{v}_galtransl.txt") if os.path.exists(f"output/{file_name}_{v}_galtransl.txt") else None
 
         if len(words_ner_type) > 0:
-            write_words_log_to_file(words_ner_type, f".\\output\\{file_name}_{v}_日志.txt")
-            write_words_list_to_file(words_ner_type, f".\\output\\{file_name}_{v}_列表.json")
-            write_ainiee_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_ainiee.json")
-            write_galtransl_dict_to_file(words_ner_type, f".\\output\\{file_name}_{v}_galtransl.txt")
+            write_words_log_to_file(words_ner_type, f"output/{file_name}_{v}_日志.txt")
+            write_words_list_to_file(words_ner_type, f"output/{file_name}_{v}_列表.json")
+            write_ainiee_dict_to_file(words_ner_type, f"output/{file_name}_{v}_ainiee.json")
+            write_galtransl_dict_to_file(words_ner_type, f"output/{file_name}_{v}_galtransl.txt")
 
     # 等待用户退出
     LogHelper.info("")
@@ -629,11 +614,11 @@ def init():
         # 初始化 LLM 对象
         G.llm = LLM(G.config)
         G.llm.load_blacklist("blacklist.txt")
-        G.llm.load_prompt_classify_ner("prompt\\prompt_classify_ner.txt")
-        G.llm.load_prompt_summarize_context("prompt\\prompt_summarize_context.txt")
-        G.llm.load_prompt_translate_context("prompt\\prompt_translate_context.txt")
-        G.llm.load_prompt_translate_surface_common("prompt\\prompt_translate_surface_common.txt")
-        G.llm.load_prompt_translate_surface_person("prompt\\prompt_translate_surface_person.txt")
+        G.llm.load_prompt_classify_ner("prompt/prompt_classify_ner.txt")
+        G.llm.load_prompt_summarize_context("prompt/prompt_summarize_context.txt")
+        G.llm.load_prompt_translate_context("prompt/prompt_translate_context.txt")
+        G.llm.load_prompt_translate_surface_common("prompt/prompt_translate_surface_common.txt")
+        G.llm.load_prompt_translate_surface_person("prompt/prompt_translate_surface_person.txt")
 
         # 初始化 NER 对象
         G.ner = NER()

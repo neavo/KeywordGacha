@@ -16,10 +16,9 @@ class LLM:
     MAX_RETRY = 2 # 最大重试次数
 
     TASK_TYPE_API_TEST = 10             # 语义分析
-    TASK_TYPE_CLASSIFY_NER = 20         # 实体分类
-    TASK_TYPE_SUMMAIRZE_CONTEXT = 30    # 语义分析
-    TASK_TYPE_TRANSLATE_SURFACE = 40    # 翻译词语
-    TASK_TYPE_TRANSLATE_CONTEXT = 50    # 翻译上下文
+    TASK_TYPE_SUMMAIRZE_CONTEXT = 20    # 语义分析
+    TASK_TYPE_TRANSLATE_SURFACE = 30    # 翻译词语
+    TASK_TYPE_TRANSLATE_CONTEXT = 40    # 翻译上下文
 
     # 初始化请求配置参数
     LLMCONFIG = {}
@@ -30,13 +29,6 @@ class LLM:
     LLMCONFIG[TASK_TYPE_API_TEST].TOP_P = 0.95
     LLMCONFIG[TASK_TYPE_API_TEST].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_API_TEST].FREQUENCY_PENALTY = 0
-
-    # 请求参数配置 - 实体分类
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER] = type("GClass", (), {})()
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TEMPERATURE = 0.05
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].TOP_P = 0.95
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].MAX_TOKENS = 768
-    LLMCONFIG[TASK_TYPE_CLASSIFY_NER].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 语义分析
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT] = type("GClass", (), {})()
@@ -174,7 +166,7 @@ class LLM:
                 result = False
 
                 usage, message, llm_request, llm_response, error = await self.request(
-                    self.prompt_translate_surface_person.replace("{attribute}", "女性").replace("{surface}", "ダリヤ").replace("{context}", "ダリヤ"),
+                    self.prompt_translate_surface_person.replace("{attribute}", "女性").replace("{surface}", "ダリヤ"),
                     self.TASK_TYPE_API_TEST,
                     True
                 )
@@ -204,11 +196,9 @@ class LLM:
             try:
                 if word.ner_type != "PER":
                     prompt = self.prompt_translate_surface_common.replace("{surface}", word.surface)
-                    prompt = prompt.replace("{context}", "\n".join(word.clip_context(128)))
                 else:
                     prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
                     prompt = prompt.replace("{surface}", word.surface)
-                    prompt = prompt.replace("{context}", "\n".join(word.clip_context(128)))
 
                 usage, message, llm_request, llm_response, error = await self.request(
                     prompt,
@@ -447,95 +437,3 @@ class LLM:
                 words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed)
 
         return words
-
-    # 实体分类任务 
-    async def classify_ner(self, chunk, retry):
-        async with self.semaphore, self.async_limiter:
-            surface = [word.surface for word in chunk]
-            context = ["".join(word.clip_context(128)) for word in chunk]
-
-            usage, message, _ = await self.request(
-                self.prompt_classify_ner.replace("{surface}", "\n".join(surface)).replace("{context}", "\n".join(context)),
-                self.TASK_TYPE_CLASSIFY_NER,
-                retry
-            )
-
-            if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_CLASSIFY_NER].MAX_TOKENS:
-                raise Exception("usage.completion_tokens >= MAX_TOKENS")
-
-            try:
-                result = json.loads(
-                    message.content.strip().replace("```json", "").replace("```", "")
-                )
-            except Exception as e:
-                LogHelper.debug(f"{LogHelper.get_trackback(e)}")
-                LogHelper.debug(message.content.strip())
-                raise e
-
-            result_dict = {v["name"]: v["ner_type"] for v in result}
-            for word in chunk:
-                if (
-                    word.surface not in result_dict
-                    or
-                    (word.surface in result_dict and result_dict[word.surface] != word.ner_type)
-                ):
-                    LogHelper.info(f"[实体分类] 已剔除 - {word.ner_type} - {word.surface}")
-                    word.ner_type = ""
-
-            # for word in chunk:
-            #     for v in result:
-            #         if word.surface == v["name"]:
-            #             word.ner_type = v["ner_type"]
-            #             LogHelper.info(f"[实体分类] 已识别 - {word.ner_type} - {word.surface}")
-            #             break  # 找到匹配后立即退出内层循环
-
-            return chunk
-
-    # 实体分类任务 完成时的回调
-    def on_classify_ner_task_done(self, future, chunks, chunks_failed, chunks_successed):
-        try:
-            chunk = future.result()
-            chunks_successed.append(chunk)
-            LogHelper.info(f"[实体分类] 已完成 {len(chunks_successed)} / {len(chunks)} ...")       
-        except Exception as e:
-            LogHelper.warning(f"[实体分类] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
-
-    # 批量执行 实体分类任务 的具体实现
-    async def do_classify_ner_bacth(self, chunks, chunks_failed, chunks_successed):
-        if len(chunks_failed) == 0:
-            retry = False
-            chunks_this_round = chunks
-        else:
-            retry = True
-            chunks_this_round = chunks_failed       
-
-        tasks = []
-        for chunk in chunks_this_round:
-            task = asyncio.create_task(self.classify_ner(chunk, retry))
-            task.add_done_callback(lambda future: self.on_classify_ner_task_done(future, chunks, chunks_failed, chunks_successed))
-            tasks.append(task)
-
-        # 等待异步任务完成 
-        await asyncio.gather(*tasks, return_exceptions = True)
-
-        # 获得失败任务的列表
-        chunks_failed = [chunk for chunk in chunks if chunk not in chunks_successed]
-
-        return chunks_failed, chunks_successed
-
-    # 批量执行 实体分类任务 
-    async def classify_ner_bacth(self, words):
-        chunks_failed = []
-        chunks_successed = []
-        chunks = [words[i:(i + 5)] for i in range(0, len(words), 5)]
-
-        # 第一次请求
-        chunks_failed, chunks_successed = await self.do_classify_ner_bacth(chunks, chunks_failed, chunks_successed)
-
-        # 开始重试流程
-        for i in range(self.MAX_RETRY):
-            if len(chunks_failed) > 0:
-                LogHelper.warning( f"[实体分类] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
-                chunks_failed, chunks_successed = await self.do_classify_ner_bacth(chunks, chunks_failed, chunks_successed)
-
-        return words        

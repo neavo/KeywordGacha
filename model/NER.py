@@ -23,7 +23,7 @@ class NER:
     TASK_MODES.ACCURACY = 20
 
     GPU_BOOST = torch.cuda.is_available() and LogHelper.is_gpu_boost()
-    MODEL_PATH = "resource\\kg_ner_ja_gpu" if GPU_BOOST else "resource\\kg_ner_ja_cpu"
+    MODEL_PATH = "resource/kg_ner_gpu" if GPU_BOOST else "resource/kg_ner_cpu"
     LINE_SIZE_PER_GROUP = 128
 
     RE_SPLIT_BY_PUNCTUATION = re.compile(
@@ -270,7 +270,7 @@ class NER:
                 for name in re.findall(r"【(.*?)】", line_joined):
                     if len(name) <= 12:
                         text = name
-                        score = 0.95
+                        score = 65535
                         entity_group = "PER"
 
                         for word in self.generate_words(text, score, entity_group, language, unique_words):
@@ -294,7 +294,7 @@ class NER:
         for name in input_names:
             surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, name)
             for surface in surfaces:
-                words.extend(self.generate_words(surface, 0.95, "PER", language, unique_words))
+                words.extend(self.generate_words(surface, 65535, "PER", language, unique_words))
 
         self.release()
         return words
@@ -330,7 +330,6 @@ class NER:
                     word_ex.count = word.count
                     word_ex.score = word.score
                     word_ex.surface = v
-                    word_ex.context = word_ex.search_context(full_lines)
                     word_ex.ner_type = word.ner_type
 
                     roots.append(v)
@@ -343,40 +342,6 @@ class NER:
         # 合并拆分出来的词语
         words.extend(words_ex)
         return words
-
-    # 通过 出现次数 还原词根
-    def lemmatize_words_by_count(self, words, full_lines):
-        words_map = {}
-        for word in words:
-            key = (word.ner_type, "".join(word.context))
-
-            if key not in words_map:
-                words_map[key] = word
-                continue
-            else:
-                ex_word = words_map[key]
-
-            if word.count != ex_word.count and abs(word.count - ex_word.count) / max(word.count, ex_word.count, 1) > 0.05:
-                continue
-
-            if (word.surface in ex_word.surface or ex_word.surface in word.surface) and word.surface != ex_word.surface:
-                if len(word.surface) > len(ex_word.surface):
-                    LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.ner_type} - {ex_word.surface} [green]->[/] {word.surface}")
-                    words_map[key] = word
-                else:
-                    LogHelper.info(f"通过 [green]出现次数[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {ex_word.surface}")
-                    words_map[key] = ex_word
-
-        # 根据 word_map 更新 words
-        updated_words = []
-        for word in words:
-            updated_words.append(words_map[(word.ner_type, "".join(word.context))])
-
-        # 更新上下文
-        for word in updated_words:
-            word.context = word.search_context(full_lines)
-
-        return updated_words
 
     # 通过 重复性 校验词语
     def validate_words_by_duplication(self, words):
