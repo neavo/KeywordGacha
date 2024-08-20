@@ -23,7 +23,7 @@
 - 也可以运行 `本地模型` 来获得 `完全免费` 的服务（需要 8G 以上显存的 Nvidia 显卡）
 
 ## 使用流程 🛸
-- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 下载应用，两个版本选择其一即可
+- 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 或 [百度网盘](https://pan.baidu.com/s/1_JXmKvnar6PGHlIbl0Mi2Q?pwd=9e54) 下载应用，目前提供两个版本，选择其一即可：
   - `KeywordGacha_*.zip` 基础版本，适用于所有设备
   - `KeywordGacha_NV_*.zip` GPU 加速版本，可以极大幅度提升处理速度，暂时只支持 Nvidia 显卡
 - 打开配置文件 `config.json`，填入 API 信息，默认为使用本地接口
