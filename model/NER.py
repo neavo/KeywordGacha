@@ -23,8 +23,8 @@ class NER:
     TASK_MODES.ACCURACY = 20
 
     GPU_BOOST = torch.cuda.is_available() and LogHelper.is_gpu_boost()
+    BATCH_SIZE = 32 if GPU_BOOST else 1
     MODEL_PATH = "resource/kg_ner_gpu" if GPU_BOOST else "resource/kg_ner_cpu"
-    LINE_SIZE_PER_GROUP = 128
 
     RE_SPLIT_BY_PUNCTUATION = re.compile(
         rf"[" +
@@ -85,7 +85,6 @@ class NER:
             model = self.model,
             device = "cuda" if self.GPU_BOOST else "cpu",
             tokenizer = self.tokenizer,
-            batch_size = 64 if self.GPU_BOOST else min(10, os.cpu_count()),
             aggregation_strategy = "simple",
         )
 
@@ -105,6 +104,11 @@ class NER:
         torch.cuda.empty_cache()
         LogHelper.debug(f"显存保留量 - {torch.cuda.memory_reserved()/1024/1024:>8.2f} MB")
         LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024:>8.2f} MB")
+
+    # 生成器 
+    def generator(self, data):
+        for v in data:
+            yield v
 
     # 从指定路径加载黑名单文件内容
     def load_blacklist(self, filepath):
@@ -173,6 +177,35 @@ class NER:
 
         return flag
 
+    # 生成片段
+    def generate_chunks(self, input_lines, chunk_size):
+        chunks = []
+
+        chunk = ""
+        chunk_length = 0
+        for line in input_lines:
+            encoding = self.tokenizer(
+                line,
+                padding = False,
+                truncation = True,
+                max_length = chunk_size - 3,
+            )
+            length = len(encoding.input_ids)
+
+            if chunk_length + length > chunk_size - 3:
+                chunks.append(chunk)
+                chunk = ""
+                chunk_length = 0
+
+            chunk = chunk + "\n" + line
+            chunk_length = chunk_length + length + 1
+
+        # 循环结束后添加最后一段
+        if len(chunk) > 0:
+            chunks.append(chunk)
+
+        return chunks
+
     # 生成词语 
     def generate_words(self, text, score, ner_type, language, unique_words):
         words = []
@@ -231,43 +264,41 @@ class NER:
     def search_for_entity(self, input_lines, input_names, language):
         words = []
 
-        input_lines_chunked = [
-            input_lines[i : i + self.LINE_SIZE_PER_GROUP]
-            for i in range(0, len(input_lines), self.LINE_SIZE_PER_GROUP)
-        ]
-
         if LogHelper.is_gpu_boost() and torch.cuda.is_available():
             LogHelper.info("启用 [green]GPU[/] 加速成功 ...")
         if LogHelper.is_gpu_boost() and not torch.cuda.is_available():
             LogHelper.warning("启用 [green]GPU[/] 加速失败 ...")
 
         LogHelper.print(f"")
+        with LogHelper.status("正在对文本进行预处理 ..."):
+            chunks = self.generate_chunks(input_lines, 512)
+            
         with ProgressHelper.get_progress() as progress:
             pid = progress.add_task("查找 NER 实体", total = None)   
 
+            i = 0
             seen = set()
             unique_words = None
-            for k, lines in enumerate(input_lines_chunked):
-                self.classifier.call_count = 0 # 防止出现应使用 dateset 的提示
+            for result in self.classifier(
+                self.generator(chunks),
+                batch_size = self.BATCH_SIZE,
+            ):
+                # 获取当前文本
+                line = chunks[i]
 
-                # 拼接文本
-                line_joined = "\n".join(lines)
-
-                # 如果是英文，则抓取去重词表，再计算并添加所有词根到词表
+                # 如果是英文，则抓取去重词表，再计算并添加所有词根到词表，以供后续筛选词语
                 if language == NER.LANGUAGE.EN: 
-                    unique_words = set(re.findall(r"\b\w+\b", line_joined))
+                    unique_words = set(re.findall(r"\b\w+\b", line))
                     unique_words.update(set(self.get_english_lemma(v) for v in unique_words))
 
-                # 使用 NER 模型抓取实体
-                for i, doc in enumerate(self.classifier(lines)):
-                    for token in doc:
-                        text = token.get("word")
-                        score = token.get("score")
-                        entity_group = token.get("entity_group")
-                        words.extend(self.generate_words(text, score, entity_group, language, unique_words))
-                
+                for token in result:
+                    text = token.get("word")
+                    score = token.get("score")
+                    entity_group = token.get("entity_group")
+                    words.extend(self.generate_words(text, score, entity_group, language, unique_words))
+
                 # 匹配【】中的字符串
-                for name in re.findall(r"【(.*?)】", line_joined):
+                for name in re.findall(r"【(.*?)】", line):
                     if len(name) <= 12:
                         text = name
                         score = 65535
@@ -278,14 +309,13 @@ class NER:
                                 continue
                             else:
                                 words.append(word)
-                                seen.add(word.surface)                            
+                                seen.add(word.surface)
 
-                # 进行英文和中文任务时显存保留量会暴涨，原因不明，暂时按照超过 2G 时手动释放显存进行处理
-                torch.cuda.empty_cache() if torch.cuda.memory_reserved() > 2 * 1024 * 1024 * 1024 else None
-                progress.update(pid, advance = 1, total = len(input_lines_chunked))
+                i = i + 1
+                progress.update(pid, advance = 1, total = len(chunks))
 
         # 打印通过模式匹配抓取的角色实体
-        LogHelper.print()
+        LogHelper.print(f"")
         LogHelper.info(f"[查找 NER 实体] 已完成 ...")
         if len(seen) > 0:
             LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}")        
