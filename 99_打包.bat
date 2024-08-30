@@ -23,7 +23,7 @@
     .\env\python.exe -m pip cache purge
 
     @REM 部署模型
-    .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20240819/kg_ner_cpu.zip -o kg_ner_cpu.zip
+    .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20240826/kg_ner_cpu.zip -o kg_ner_cpu.zip
     powershell -Command "Expand-Archive -Path 'kg_ner_cpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_cpu'"
     powershell -Command "Remove-Item -Path 'kg_ner_cpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
 
@@ -48,7 +48,7 @@
     @REM .\dist\KeywordGacha\env\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu121
     @REM .\dist\KeywordGacha\env\python.exe -m pip cache purge
 
-    @REM .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20240819/kg_ner_gpu.zip -o kg_ner_gpu.zip
+    @REM .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20240826/kg_ner_gpu.zip -o kg_ner_gpu.zip
     @REM powershell -Command "Expand-Archive -Path 'kg_ner_gpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_gpu'"
     @REM powershell -Command "Remove-Item -Path 'kg_ner_gpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
     @REM echo > .\dist\KeywordGacha\gpuboost.txt
