@@ -1,17 +1,17 @@
 from helper.LogHelper import LogHelper
 from helper.TextHelper import TextHelper
 
+
 class TestHelper:
 
-    @staticmethod
-    def check_duplicates(*args):
-        a = {
-            "ブルースライム": "蓝史莱姆",
-            "ワイバーン": "双足飞龙",
-            "ミスリル": "秘银",
-            "ポーション": "药水",
-            "ハイポーション": "高级药水",
-            "魔付き": "魔附者",
+    x = set(
+        {
+            # "ブルースライム": "蓝史莱姆",
+            # "ワイバーン": "双足飞龙",
+            # "ミスリル": "秘银",
+            # "ポーション": "药水",
+            # "ハイポーション": "高级药水",
+            # "魔付き": "魔附者",
             "オルディネ": "奥迪涅",
             "イシュラナ": "伊修拉纳",
             "エリルキア": "艾利尔齐亚",
@@ -155,23 +155,51 @@ class TestHelper:
             "ノワルスール": "诺瓦尔苏尔",
             "ヴェントルジェント": "文特尔金特",
         }
+    )
 
-        b = {}
+    @staticmethod
+    def check_score_threshold(words, path):
+        thresholds = [
+            0.50,
+            0.55,
+            0.60,
+            0.65,
+            0.70,
+            0.75,
+            0.80,
+            0.85,
+            0.90,
+            0.95,
+        ]
 
-        if len(a) == 0 or len(b) == 0:
-            return
+        with open(path, "w", encoding="utf-8") as writer:
+            for threshold in thresholds:
+                y = {
+                    word.surface
+                    for word in words
+                    if word.ner_type == "PER" and word.score > threshold
+                }
 
-        keys_a = set(a.keys())
-        keys_b = set(b.keys())
+                writer.write(f"当置信度阈值设置为 {threshold:.4f} 时：\n")
+                writer.write(f"第一个词典独有的键 - {len(TestHelper.x - y)}\n")
+                writer.write(f"{TestHelper.x - y}\n")
+                writer.write(f"第二个词典独有的键 - {len(y - TestHelper.x)}\n")
+                writer.write(f"{y - TestHelper.x}\n")
+                writer.write(f"两个字典共有的键 - {len(TestHelper.x & y)}\n")
+                writer.write(f"{TestHelper.x & y}\n")
+                writer.write(f"\n")
+                writer.write(f"\n")
 
-        LogHelper.print(f"第一个词典独有的键 - {len(keys_a - keys_b)}")
-        LogHelper.print(f"{keys_a - keys_b}")
-        LogHelper.print(f"")
+    @staticmethod
+    def check_result_duplication(words, path):
+        with open(path, "w", encoding="utf-8") as writer:
+            y = {word.surface for word in words if word.ner_type == "PER"}
 
-        LogHelper.print(f"第二个词典独有的键 - {len(keys_b - keys_a)}")
-        LogHelper.print(f"{keys_b - keys_a}")
-        LogHelper.print(f"")
-
-        LogHelper.print(f"两个字典共有的键 - {len(keys_a & keys_b)}")
-        LogHelper.print(f"{keys_a & keys_b}")
-        LogHelper.print(f"")
+            writer.write(f"第一个词典独有的键 - {len(TestHelper.x - y)}\n")
+            writer.write(f"{TestHelper.x - y}\n")
+            writer.write(f"第二个词典独有的键 - {len(y - TestHelper.x)}\n")
+            writer.write(f"{y - TestHelper.x}\n")
+            writer.write(f"两个字典共有的键 - {len(TestHelper.x & y)}\n")
+            writer.write(f"{TestHelper.x & y}\n")
+            writer.write(f"\n")
+            writer.write(f"\n")

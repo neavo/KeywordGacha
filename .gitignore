@@ -11,4 +11,4 @@ __pycache__
 /gpuboost*
 /words_all*
 /config_dev*
-/resource/kg_ner_*
+/resource/*ner_*

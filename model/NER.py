@@ -52,6 +52,7 @@ class NER:
     LANGUAGE.ZH = "ZH"
     LANGUAGE.EN = "EN"
     LANGUAGE.JP = "JP"
+    LANGUAGE.KR = "KR"
 
     def __init__(self):
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -177,6 +178,21 @@ class NER:
 
         return flag
 
+    # 判断是否是有意义的韩文词语
+    def is_valid_korean_word(self, surface, blacklist):
+        flag = True
+
+        if len(surface) <= 1:
+            return False
+
+        if surface in blacklist:
+            return False
+
+        if not TextHelper.has_any_korean(surface):
+            return False
+
+        return flag
+
     # 生成片段
     def generate_chunks(self, input_lines, chunk_size):
         chunks = []
@@ -239,6 +255,12 @@ class NER:
                 if not self.is_valid_japanese_word(surface, self.blacklist):
                     continue
 
+            # 韩文词语判断
+            if language == NER.LANGUAGE.KR:
+                surface = TextHelper.strip_not_korean(surface)
+                if not self.is_valid_korean_word(surface, self.blacklist):
+                    continue
+
             word = Word()
             word.count = 1
             word.score = score
@@ -291,6 +313,7 @@ class NER:
                     unique_words = set(re.findall(r"\b\w+\b", line))
                     unique_words.update(set(self.get_english_lemma(v) for v in unique_words))
 
+                # 处理 NER模型 识别结果
                 for token in result:
                     text = token.get("word")
                     score = token.get("score")

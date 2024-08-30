@@ -14,6 +14,21 @@ class TextHelper:
     # 濁音和半浊音符号
     VOICED_SOUND_MARKS = ("\u309B", "\u309C")
 
+    # 韩文字母 (Hangul Jamo)
+    HANGUL_JAMO = ("\u1100", "\u11FF")
+
+    # 韩文字母扩展-A (Hangul Jamo Extended-A)
+    HANGUL_JAMO_EXTENDED_A = ("\uA960", "\uA97F")
+
+    # 韩文字母扩展-B (Hangul Jamo Extended-B)
+    HANGUL_JAMO_EXTENDED_B = ("\uD7B0", "\uD7FF")
+
+    # 韩文音节块 (Hangul Syllables)
+    HANGUL_SYLLABLES = ("\uAC00", "\uD7AF")
+
+    # 韩文兼容字母 (Hangul Compatibility Jamo)
+    HANGUL_COMPATIBILITY_JAMO = ("\u3130", "\u318F")
+
     # 中日韩统一表意文字
     CJK = ("\u4E00", "\u9FFF")
 
@@ -245,6 +260,41 @@ class TextHelper:
             text = text[1:]
 
         while text and not TextHelper.is_latin(text[-1]):
+            text = text[:-1]
+
+        return text.strip()
+
+    # 判断字符是否为韩文字符
+    @staticmethod
+    def is_korean(ch):
+        return (
+            TextHelper.CJK[0] <= ch <= TextHelper.CJK[1] 
+            or TextHelper.HANGUL_JAMO[0] <= ch <= TextHelper.HANGUL_JAMO[1]
+            or TextHelper.HANGUL_JAMO_EXTENDED_A[0] <= ch <= TextHelper.HANGUL_JAMO_EXTENDED_A[1]
+            or TextHelper.HANGUL_JAMO_EXTENDED_B[0] <= ch <= TextHelper.HANGUL_JAMO_EXTENDED_B[1]
+            or TextHelper.HANGUL_SYLLABLES[0] <= ch <= TextHelper.HANGUL_SYLLABLES[1]
+            or TextHelper.HANGUL_COMPATIBILITY_JAMO[0] <= ch <= TextHelper.HANGUL_COMPATIBILITY_JAMO[1]
+        )
+
+    # 判断输入的字符串是否全部由韩文字符组成
+    @staticmethod
+    def is_all_korean(text):
+        return all(TextHelper.is_korean(ch) for ch in text)
+
+    # 检查字符串是否包含至少一个韩文字符组成
+    @staticmethod
+    def has_any_korean(text):
+        return any(TextHelper.is_korean(ch) for ch in text)
+
+    # 移除开头结尾的非韩文字符
+    @staticmethod
+    def strip_not_korean(text):
+        text = text.strip()
+
+        while text and not TextHelper.is_korean(text[0]):
+            text = text[1:]
+
+        while text and not TextHelper.is_korean(text[-1]):
             text = text[:-1]
 
         return text.strip()

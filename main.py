@@ -188,13 +188,16 @@ def read_input_file(language):
         if language == NER.LANGUAGE.JP and not TextHelper.has_any_japanese(line):
             continue
 
+        if language == NER.LANGUAGE.KR and not TextHelper.has_any_korean(line):
+            continue
+
         input_lines_filtered.append(line.strip())
 
     LogHelper.info(f"已读取到文本 {len(input_lines)} 行，其中有效文本 {len(input_lines_filtered)} 行, 角色名 {len(input_names)} 个...")
     return input_lines_filtered, input_names
 
 # 合并、计数并按置信度过滤
-def merge_and_count(words, full_lines, language):
+def merge_and_count(words, full_lines, language, x = None, y = None):
     words_unique = {}
     for v in words:
         if (v.surface, v.ner_type) not in words_unique:
@@ -202,19 +205,22 @@ def merge_and_count(words, full_lines, language):
         words_unique[(v.surface, v.ner_type)].append(v)
 
     threshold = {
-        NER.LANGUAGE.JP : (0.75, 0.80),
-        NER.LANGUAGE.ZH : (0.75, 0.80),
-        NER.LANGUAGE.EN : (0.75, 0.80),
+        NER.LANGUAGE.ZH : (0.80, 0.80),
+        NER.LANGUAGE.EN : (0.80, 0.80),
+        NER.LANGUAGE.JP : (0.80, 0.80),
+        NER.LANGUAGE.KR : (0.80, 0.80),
     }
+    threshold_x = x if x != None else threshold[language][0]
+    threshold_y = y if y != None else threshold[language][1]
 
     words_merged = []
     for k, v in words_unique.items():
         word = v[0]
-        word.score = min(1.00, sum(w.score for w in v) / len(v)) # 求平均分
+        word.score = min(0.9999, sum(w.score for w in v) / len(v)) # 求平均分
 
         if (
-            word.ner_type == "PER" and word.score > threshold[language][0] or
-            word.ner_type != "PER" and word.score > threshold[language][1]
+            (word.ner_type == "PER" and word.score > threshold_x)
+            or (word.ner_type != "PER" and word.score > threshold_y)
         ):
             words_merged.append(word)
 
@@ -256,17 +262,8 @@ def replace_words_by_ner_type(words, in_words, ner_type):
     words.extend(in_words)
     return words
 
-# 将 词语字典 写入文件
-def write_words_all_to_file(words, path):
-    with LogHelper.status(f"正在将实体列表写入文件 ..."):
-        with open(path, "w", newline = "", encoding = "utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(["surface", "score", "ner_type"])
-            for word in words:
-                writer.writerow([word.surface, word.score, word.ner_type])
-
 # 将 词语日志 写入文件
-def write_words_log_to_file(words, path):
+def write_words_log_to_file(words, path, language):
     with open(path, "w", encoding = "utf-8") as file:
         for k, word in enumerate(words):
             if getattr(word, "surface", "") != "":
@@ -276,7 +273,8 @@ def write_words_log_to_file(words, path):
                 file.write(f"置信度 : {word.score:.4f}\n")
 
             if getattr(word, "surface_romaji", "") != "":
-                file.write(f"罗马音 : {word.surface_romaji}\n")
+                if language == NER.LANGUAGE.JP:
+                    file.write(f"罗马音 : {word.surface_romaji}\n")
 
             if getattr(word, "count", int(-1)) >= 0:
                 file.write(f"出现次数 : {word.count}\n")
@@ -312,7 +310,7 @@ def write_words_log_to_file(words, path):
     LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
 # 将 词语列表 写入文件
-def write_words_list_to_file(words, path):
+def write_words_list_to_file(words, path, language):
     with open(path, "w", encoding = "utf-8") as file:
         data = {}
         for k, word in enumerate(words):
@@ -325,7 +323,7 @@ def write_words_list_to_file(words, path):
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
 # 将 AiNiee 词典写入文件
-def write_ainiee_dict_to_file(words, path):
+def write_ainiee_dict_to_file(words, path, language):
     type_map = {
         "PER": "角色",      # 表示人名，如"张三"、"约翰·多伊"等。
         "ORG": "组织",      # 表示组织，如"联合国"、"苹果公司"等。
@@ -359,7 +357,7 @@ def write_ainiee_dict_to_file(words, path):
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
 # 将 GalTransl 词典写入文件
-def write_galtransl_dict_to_file(words, path):
+def write_galtransl_dict_to_file(words, path, language):
     type_map = {
         "PER": "角色",      # 表示人名，如"张三"、"约翰·多伊"等。
         "ORG": "组织",      # 表示组织，如"联合国"、"苹果公司"等。
@@ -397,9 +395,11 @@ async def process_text(language):
     words = []
     words = G.ner.search_for_entity(input_lines, input_names, language)
 
-    # 调试模式下，将实体列表写入本地
+    # 调试模式时，检查置信度阈值
     if LogHelper.is_debug():
-        write_words_all_to_file(words, "words_all.csv")
+        with LogHelper.status(f"正在检查置信度阈值 ..."):
+            words = merge_and_count(words, input_lines, language, 0.00, 0.00)
+            TestHelper.check_score_threshold(words, "check_score_threshold.log")
 
     # 查找上下文
     LogHelper.info("即将开始执行 [查找上下文] ...")
@@ -439,13 +439,21 @@ async def process_text(language):
     words_person = remove_words_by_ner_type(words_person, "")
     words = replace_words_by_ner_type(words, words_person, "PER")
 
+    # 调试模式时，检查结果重复度
+    if LogHelper.is_debug():
+        with LogHelper.status(f"正在检查结果重复度..."):
+            TestHelper.check_result_duplication(words, "check_result_duplication.log")
+
     # 等待 重复性校验任务 结果
     LogHelper.info("即将开始执行 [重复性校验] ...")
     words = G.ner.validate_words_by_duplication(words)
     words = remove_words_by_ner_type(words, "")
 
     # 等待翻译词语任务结果
-    if language != NER.LANGUAGE.ZH and G.config.translate_surface == 1:
+    if (
+        G.config.translate_surface == 1
+        and (language == NER.LANGUAGE.EN or language == NER.LANGUAGE.JP or language == NER.LANGUAGE.KR)
+    ):
         LogHelper.info("即将开始执行 [词语翻译] ...")
         words = await G.llm.translate_surface_batch(words)
 
@@ -458,17 +466,18 @@ async def process_text(language):
     }
 
     # 等待 上下文翻译 任务结果
-    for k, v in ner_type.items():
-        if (
-            (language != NER.LANGUAGE.ZH and k == "PER" and G.config.translate_context_per == 1)
-            or
-            (language != NER.LANGUAGE.ZH and k != "PER" and G.config.translate_context_other == 1)
-        ):
-            LogHelper.info(f"即将开始执行 [上下文翻译 - {v}] ...")
-            word_type = get_words_by_ner_type(words, k)
-            word_type = await G.llm.translate_context_batch(word_type)
-            words = replace_words_by_ner_type(words, word_type, k)
+    if language == NER.LANGUAGE.EN or language == NER.LANGUAGE.JP or language == NER.LANGUAGE.KR:
+        for k, v in ner_type.items():
+            if (
+                (k == "PER" and G.config.translate_context_per == 1)
+                or (k != "PER" and G.config.translate_context_other == 1)
+            ):
+                LogHelper.info(f"即将开始执行 [上下文翻译 - {v}] ...")
+                word_type = get_words_by_ner_type(words, k)
+                word_type = await G.llm.translate_context_batch(word_type)
+                words = replace_words_by_ner_type(words, word_type, k)
 
+    # 将结果写入文件
     dir_name, file_name_with_extension = os.path.split(G.config.input_file_path)
     file_name, extension = os.path.splitext(file_name_with_extension)
 
@@ -482,10 +491,10 @@ async def process_text(language):
         os.remove(f"output/{file_name}_{v}_galtransl.txt") if os.path.exists(f"output/{file_name}_{v}_galtransl.txt") else None
 
         if len(words_ner_type) > 0:
-            write_words_log_to_file(words_ner_type, f"output/{file_name}_{v}_日志.txt")
-            write_words_list_to_file(words_ner_type, f"output/{file_name}_{v}_列表.json")
-            write_ainiee_dict_to_file(words_ner_type, f"output/{file_name}_{v}_ainiee.json")
-            write_galtransl_dict_to_file(words_ner_type, f"output/{file_name}_{v}_galtransl.txt")
+            write_words_log_to_file(words_ner_type, f"output/{file_name}_{v}_日志.txt", language)
+            write_words_list_to_file(words_ner_type, f"output/{file_name}_{v}_列表.json", language)
+            write_ainiee_dict_to_file(words_ner_type, f"output/{file_name}_{v}_ainiee.json", language)
+            write_galtransl_dict_to_file(words_ner_type, f"output/{file_name}_{v}_galtransl.txt", language)
 
     # 等待用户退出
     LogHelper.info("")
@@ -494,6 +503,7 @@ async def process_text(language):
     LogHelper.info("")
     os.system("pause")
 
+# 接口测试
 async def test_api():
     if await G.llm.api_test():
         LogHelper.print("")
@@ -547,14 +557,15 @@ def print_app_info():
 def print_menu_main():
     LogHelper.print(f"请选择：")
     LogHelper.print(f"")
-    LogHelper.print(f"\t--> 1. 开始处理 [green]日文文本[/]")
-    LogHelper.print(f"\t--> 2. 开始处理 [green]中文文本（测试版）[/]")
-    LogHelper.print(f"\t--> 3. 开始处理 [green]英文文本（测试版）[/]")
-    LogHelper.print(f"\t--> 4. 开始执行 [green]接口测试[/]")
+    LogHelper.print(f"\t--> 1. 开始处理 [green]中文文本[/]")
+    LogHelper.print(f"\t--> 2. 开始处理 [green]英文文本[/]")
+    LogHelper.print(f"\t--> 3. 开始处理 [green]日文文本[/]")
+    LogHelper.print(f"\t--> 4. 开始处理 [green]韩文文本（初步支持）[/]")
+    LogHelper.print(f"\t--> 5. 开始执行 [green]接口测试[/]")
     LogHelper.print(f"")
-    choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的功能，默认为 [green][1][/] ", 
-        choices = ["1", "2", "3", "4"],
-        default = "1",
+    choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的功能，默认为 [green][3][/] ", 
+        choices = ["1", "2", "3", "4", "5"],
+        default = "3",
         show_choices = False,
         show_default = False
     ))
@@ -565,25 +576,24 @@ def print_menu_main():
 # 主函数
 async def begin():
     choice = -1
-    while choice not in [1, 2, 3]:
+    while choice not in [1, 2, 3, 4]:
         print_app_info()
 
         choice = print_menu_main()
         if choice == 1:
-            await process_text(NER.LANGUAGE.JP)
-        elif choice == 2:
             await process_text(NER.LANGUAGE.ZH)
-        elif choice == 3:
+        elif choice == 2:
             await process_text(NER.LANGUAGE.EN)
+        elif choice == 3:
+            await process_text(NER.LANGUAGE.JP)
         elif choice == 4:
+            await process_text(NER.LANGUAGE.KR)
+        elif choice == 5:
             await test_api()
 
 # 一些初始化步骤
 def init():
     with LogHelper.status(f"正在初始化 [green]KG[/] 引擎 ..."):
-        if LogHelper.is_debug():
-            TestHelper.check_duplicates()
-
         # 注册全局异常追踪器
         rich.traceback.install()
 
