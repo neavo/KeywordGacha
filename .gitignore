@@ -1,13 +1,14 @@
+__pycache__
+
 /env*
 /dist*
 /build*
 /input*
 /output*
-__pycache__
 
 /*log*
 /debug*
 /gpuboost*
-/words_dict*
+/words_all*
 /config_dev*
-/resource/kg_ner_*
+/resource/*ner_*
