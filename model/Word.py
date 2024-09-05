@@ -14,7 +14,7 @@ class Word:
         self.score = 0
         self.count = 0
         self.context = []
-        self.context_summary = {}
+        self.context_summary = ""
         self.context_translation = []
         self.surface = ""
         self.surface_romaji = ""

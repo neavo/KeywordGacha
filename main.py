@@ -280,7 +280,7 @@ def write_words_log_to_file(words, path, language):
             if getattr(word, "attribute", "") != "":
                 file.write(f"角色性别 : {word.attribute}\n")
 
-            if getattr(word, "context_summary", {}) != "":
+            if getattr(word, "context_summary", "") != "":
                 file.write(f"语义分析 : {word.context_summary}\n")
 
             if len(getattr(word, "context", [])) > 0:
