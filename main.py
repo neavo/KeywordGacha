@@ -409,7 +409,10 @@ async def process_text(language):
     LogHelper.info(f"即将开始执行 [阈值过滤] ... 当前出现次数的阈值设置为 {G.config.count_threshold} ...")
     words = filter_words_by_score(words, 0.80)
     words = filter_words_by_count(words, G.config.count_threshold)
-    words = truncate_context_by_length(words, 768)
+    words = truncate_context_by_length(
+        words, 
+        512 if language == NER.LANGUAGE.EN else 768, # 根据语言调整保留的上下文长度
+    )
     LogHelper.info(f"[阈值过滤] 已完成 ...")
 
     # 等待 语义分析任务 结果
