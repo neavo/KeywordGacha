@@ -3,6 +3,7 @@ import json
 import random
 import asyncio
 
+import pykakasi
 from openai import AsyncOpenAI
 from aiolimiter import AsyncLimiter
 
@@ -52,7 +53,6 @@ class LLM:
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].FREQUENCY_PENALTY = 0
     
     def __init__(self, config):
-        # 初始化OpenAI API密钥、基础URL和模型名称
         self.api_key = config.api_key
         self.base_url = config.base_url
         self.model_name = config.model_name
@@ -68,6 +68,9 @@ class LLM:
         else:
             self.semaphore = asyncio.Semaphore(1)
             self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
+
+        # 初始化 pykakasi
+        self.kakasi = pykakasi.kakasi()
 
         # 初始化OpenAI客户端
         self.openai_handler = AsyncOpenAI(
@@ -194,32 +197,40 @@ class LLM:
     async def translate_surface(self, word, retry):
         async with self.semaphore, self.async_limiter:
             try:
-                if word.ner_type != "PER":
-                    prompt = self.prompt_translate_surface_common.replace("{surface}", word.surface)
+                error = None
+
+                if TextHelper.is_all_cjk(word.surface):
+                    word.surface_translation = [word.surface, word.surface]
                 else:
-                    prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
-                    prompt = prompt.replace("{surface}", word.surface)
+                    if word.ner_type != "PER":
+                        prompt = self.prompt_translate_surface_common.replace("{surface}", word.surface)
+                    else:
+                        prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
+                        prompt = prompt.replace("{surface}", word.surface)
 
-                usage, message, llm_request, llm_response, error = await self.request(
-                    prompt,
-                    self.TASK_TYPE_TRANSLATE_SURFACE,
-                    retry
-                )
+                    usage, message, llm_request, llm_response, error = await self.request(
+                        prompt,
+                        self.TASK_TYPE_TRANSLATE_SURFACE,
+                        retry
+                    )
 
-                if error:
-                    raise error
+                    if error:
+                        raise error
 
-                if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS:
-                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
+                    if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS:
+                        raise Exception("usage.completion_tokens >= MAX_TOKENS")
 
-                data = json.loads(
-                    TextHelper.fix_broken_json_string(message.content.strip())
-                )
+                    data = json.loads(
+                        TextHelper.fix_broken_json_string(message.content.strip())
+                    )
 
-                word.surface_romaji = data["romaji"] if data["romaji"] != word.surface else ""
-                word.surface_translation = [data["translation_1"], data["translation_2"]]
-                word.surface_translation_description = data["description"]
-                word.llmresponse_translate_surface = llm_response                
+                    word.surface_translation = [data["translation_1"], data["translation_2"]]
+                    word.surface_translation_description = data["description"]
+                    word.llmresponse_translate_surface = llm_response
+
+                # 生成罗马音，汉字有时候会生成重复的罗马音，所以需要去重
+                results = list(set([item.get("hepburn", "") for item in self.kakasi.convert(word.surface)]))
+                word.surface_romaji = (" ".join(results)).strip()
             except Exception as e:
                 LogHelper.warning(f"[词语翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
                 LogHelper.debug(f"llm_request - {llm_request}")
@@ -436,4 +447,4 @@ class LLM:
                 LogHelper.warning( f"[语义分析] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
                 words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed)
 
-        return words
+        return words 
