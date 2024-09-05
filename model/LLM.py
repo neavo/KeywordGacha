@@ -14,7 +14,7 @@ from helper.TextHelper import TextHelper
 
 class LLM:
 
-    MAX_RETRY = 2 # 最大重试次数
+    MAX_RETRY = 3 # 最大重试次数
 
     TASK_TYPE_API_TEST = 10             # 语义分析
     TASK_TYPE_SUMMAIRZE_CONTEXT = 20    # 语义分析
