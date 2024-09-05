@@ -224,7 +224,7 @@ class LLM:
                         TextHelper.fix_broken_json_string(message.content.strip())
                     )
 
-                    word.surface_translation = [data["translation_1"], data["translation_2"]]
+                    word.surface_translation = [translation.strip() for translation in data.get("translation", ",").split(",")]
                     word.surface_translation_description = data["description"]
                     word.llmresponse_translate_surface = llm_response
 
