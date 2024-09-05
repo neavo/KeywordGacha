@@ -52,7 +52,7 @@ class NER:
     LANGUAGE.ZH = "ZH"
     LANGUAGE.EN = "EN"
     LANGUAGE.JP = "JP"
-    LANGUAGE.KR = "KR"
+    LANGUAGE.KO = "KO"
 
     def __init__(self):
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -223,7 +223,7 @@ class NER:
         return chunks
 
     # 生成词语 
-    def generate_words(self, text, score, ner_type, language, unique_words):
+    def generate_words(self, text, line, score, ner_type, language, unique_words):
         words = []
 
         # 词语构成中存在空格的不拆分
@@ -256,7 +256,7 @@ class NER:
                     continue
 
             # 韩文词语判断
-            if language == NER.LANGUAGE.KR:
+            if language == NER.LANGUAGE.KO:
                 surface = TextHelper.strip_not_korean(surface)
                 if not self.is_valid_korean_word(surface, self.blacklist):
                     continue
@@ -266,6 +266,7 @@ class NER:
             word.score = score
             word.surface = surface
             word.ner_type = ner_type
+            word.context.append(line)
             words.append(word)
 
         return words
@@ -282,12 +283,28 @@ class NER:
         else:
             return surface
 
+    # 查找 Token 所在的行
+    def get_line_by_offset(self, text, lines, offsets, start, end):
+        result = ""
+
+        # 当实体词语位于行的末尾时，会将换行符的长度也计入起止位置，所以要 end 要 -1
+        if text != "" and text[-1] == " ":
+            end = end - 1
+
+        for line, offset in zip(lines, offsets):
+            if start >= offset[0] and end <= offset[1]:
+                result = line
+                break
+
+        return result
+
     # 查找 NER 实体
     def search_for_entity(self, input_lines, input_names, language):
         words = []
 
         if LogHelper.is_gpu_boost() and torch.cuda.is_available():
             LogHelper.info("启用 [green]GPU[/] 加速成功 ...")
+
         if LogHelper.is_gpu_boost() and not torch.cuda.is_available():
             LogHelper.warning("启用 [green]GPU[/] 加速失败 ...")
 
@@ -299,61 +316,71 @@ class NER:
             pid = progress.add_task("查找 NER 实体", total = None)   
 
             i = 0
-            seen = set()
             unique_words = None
             for result in self.classifier(
                 self.generator(chunks),
                 batch_size = self.BATCH_SIZE,
             ):
                 # 获取当前文本
-                line = chunks[i]
+                chunk = chunks[i]
+
+                # 计算各行的起止位置
+                chunk_lines = chunk.splitlines()
+                chunk_offsets = []
+                for line in chunk_lines:
+                    if len(chunk_offsets) == 0:
+                        start = 0
+                    else:
+                        start = chunk_offsets[-1][1]
+
+                    end = start + len(line) + 1 
+                    chunk_offsets.append((start, start + len(line) + 1)) # 字符数加上换行符的长度
 
                 # 如果是英文，则抓取去重词表，再计算并添加所有词根到词表，以供后续筛选词语
                 if language == NER.LANGUAGE.EN: 
-                    unique_words = set(re.findall(r"\b\w+\b", line))
+                    unique_words = set(re.findall(r"\b\w+\b", chunk))
                     unique_words.update(set(self.get_english_lemma(v) for v in unique_words))
 
                 # 处理 NER模型 识别结果
                 for token in result:
                     text = token.get("word")
+                    line = self.get_line_by_offset(text, chunk_lines, chunk_offsets, token.get("start"), token.get("end"))
                     score = token.get("score")
                     entity_group = token.get("entity_group")
-                    words.extend(self.generate_words(text, score, entity_group, language, unique_words))
-
-                # 匹配【】中的字符串
-                for name in re.findall(r"【(.*?)】", line):
-                    if len(name) <= 12:
-                        text = name
-                        score = 65535
-                        entity_group = "PER"
-
-                        for word in self.generate_words(text, score, entity_group, language, unique_words):
-                            if word.surface in seen:
-                                continue
-                            else:
-                                words.append(word)
-                                seen.add(word.surface)
+                    words.extend(self.generate_words(text, line, score, entity_group, language, unique_words))
 
                 i = i + 1
                 progress.update(pid, advance = 1, total = len(chunks))
+
+        # 后处理步骤
+        with LogHelper.status("正在对文本进行后处理 ..."):
+            # 添加输入文件中读取到的角色名
+            for text, line in input_names:
+                words.extend(self.generate_words(text, line, 65535, "PER", language, None))
+
+            # 匹配【】中的字符串
+            seen = set()
+            for line in input_lines:
+                for name in re.findall(r"【(.*?)】", line):
+                    if len(name) <= 12:
+                        for word in self.generate_words(name, line, 65535, "PER", language, None):
+                            if word.surface not in seen:
+                                seen.add(word.surface)
+                            words.append(word)
 
         # 打印通过模式匹配抓取的角色实体
         LogHelper.print(f"")
         LogHelper.info(f"[查找 NER 实体] 已完成 ...")
         if len(seen) > 0:
-            LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}")        
+            LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}")
 
-        # 添加输入文件中读取到的角色名
-        for name in input_names:
-            surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, name)
-            for surface in surfaces:
-                words.extend(self.generate_words(surface, 65535, "PER", language, unique_words))
-
+        # 释放显存
         self.release()
         return words
 
     # 通过 词语形态 校验词语
     def lemmatize_words_by_morphology(self, words, full_lines):
+        seen = set()
         words_ex = []
         for word in words:
             # 以下步骤只对角色实体进行
@@ -380,16 +407,22 @@ class NER:
             for k, v in enumerate(tokens):
                 if self.is_valid_japanese_word(v, self.blacklist):
                     word_ex = Word()
+                    word_ex.surface = v
                     word_ex.count = word.count
                     word_ex.score = word.score
-                    word_ex.surface = v
+                    word_ex.context = word.context
                     word_ex.ner_type = word.ner_type
 
                     roots.append(v)
                     words_ex.append(word_ex)
 
             if len(roots) > 0:
-                LogHelper.info(f"通过 [green]词语形态[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {" / ".join(roots)}")               
+                key = (word.ner_type, word.surface)
+
+                if key not in seen:
+                    LogHelper.info(f"通过 [green]词语形态[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {" / ".join(roots)}")
+
+                seen.add(key)
                 word.ner_type = ""
 
         # 合并拆分出来的词语

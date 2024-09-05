@@ -23,6 +23,36 @@ from helper.ProgressHelper import ProgressHelper
 # 丑陋，但是有效，不服你咬我啊
 G = type("GClass", (), {})()
 
+# 清理文本
+def cleanup(line):
+    # 【\N[123]】 这种形式是代指角色名字的变量
+    # 直接抹掉就没办法判断角色了，只把 \N 部分抹掉，保留 ID 部分
+    line = line.strip().replace("\\N", "")
+
+    # 放大或者缩小字体的代码，干掉
+    # \{\{ゴゴゴゴゴゴゴゴゴッ・・・\r\n（大地の揺れる音）
+    line = re.sub(r"(\\\{)|(\\\})", "", line) 
+
+    # /C[4] 这种形式的代码，干掉
+    line = re.sub(r"/[A-Z]{1,5}\[\d+\]", "", line, flags = re.IGNORECASE)
+
+    # \FS[29] 这种形式的代码，干掉
+    line = re.sub(r"\\[A-Z]{1,5}\[\d+\]", "", line, flags = re.IGNORECASE)
+
+    # \nw[隊員Ｃ] 这种形式的代码，干掉 [ 前的部分
+    line = re.sub(r"\\[A-Z]{1,5}\[", "[", line, flags = re.IGNORECASE)
+
+    # 由于上面的代码移除，可能会产生空人名框的情况，干掉
+    line = line.replace("【】", "") 
+
+    # 干掉除了空格以外的行内空白符（包括换行符、制表符、回车符、换页符等）
+    line = re.sub(r"[^\S ]+", "", line)
+
+    # 合并连续的空格为一个空格
+    line = re.sub(r" +", " ", line)
+
+    return line
+
 # 读取 .txt 文件
 def read_txt_file(file_path):
     lines = []
@@ -84,11 +114,16 @@ def read_json_file(file_path):
             if isinstance(datas, list):
                 for data in datas:
                     name = data.get("name", "").strip()
-                    if isinstance(name, str) and name != "":
-                        names.append(name)
-                    
                     message = data.get("message", "").strip()
-                    if isinstance(message, str) and message != "":
+
+                    if message == "":
+                        continue
+
+                    if name == "":
+                        lines.append(f"{message}")
+                    else:
+                        message = f"【{name}】{message}"
+                        names.append((name, cleanup(message))) # 这部分上下文会直接进入实体识别程序，所以在这里提前进行清理
                         lines.append(message)
     except Exception as e:
         LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
@@ -150,31 +185,7 @@ def read_input_file(language):
 
     input_lines_filtered = []
     for line in input_lines:
-        # 【\N[123]】 这种形式是代指角色名字的变量
-        # 直接抹掉就没办法判断角色了，只把 \N 部分抹掉，保留 ID 部分
-        line = line.strip().replace("\\N", "")
-
-        # 放大或者缩小字体的代码，干掉
-        # \{\{ゴゴゴゴゴゴゴゴゴッ・・・\r\n（大地の揺れる音）
-        line = re.sub(r"(\\\{)|(\\\})", "", line) 
-
-        # /C[4] 这种形式的代码，干掉
-        line = re.sub(r"/[A-Z]{1,5}\[\d+\]", "", line, flags = re.IGNORECASE)
-
-        # \FS[29] 这种形式的代码，干掉
-        line = re.sub(r"\\[A-Z]{1,5}\[\d+\]", "", line, flags = re.IGNORECASE)
-
-        # \nw[隊員Ｃ] 这种形式的代码，干掉 [ 前的部分
-        line = re.sub(r"\\[A-Z]{1,5}\[", "[", line, flags = re.IGNORECASE)
-
-        # 由于上面的代码移除，可能会产生空人名框的情况，干掉
-        line = line.replace("【】", "") 
-
-        # 干掉除了空格以外的行内空白符（包括换行符、制表符、回车符、换页符等）
-        line = re.sub(r"[^\S ]+", "", line)
-
-        # 合并连续的空格为一个空格
-        line = re.sub(r" +", " ", line)
+        line = cleanup(line)
 
         if len(line) == 0:
             continue
@@ -188,7 +199,7 @@ def read_input_file(language):
         if language == NER.LANGUAGE.JP and not TextHelper.has_any_japanese(line):
             continue
 
-        if language == NER.LANGUAGE.KR and not TextHelper.has_any_korean(line):
+        if language == NER.LANGUAGE.KO and not TextHelper.has_any_korean(line):
             continue
 
         input_lines_filtered.append(line.strip())
@@ -196,56 +207,40 @@ def read_input_file(language):
     LogHelper.info(f"已读取到文本 {len(input_lines)} 行，其中有效文本 {len(input_lines_filtered)} 行, 角色名 {len(input_names)} 个...")
     return input_lines_filtered, input_names
 
-# 合并、计数并按置信度过滤
-def merge_and_count(words, full_lines, language, x = None, y = None):
+# 合并词语，并按出现次数排序
+def merge_words(words):
     words_unique = {}
-    for v in words:
-        if (v.surface, v.ner_type) not in words_unique:
-            words_unique[(v.surface, v.ner_type)] = [] # 只有文字和类型都一样才视为相同条目，避免跨类词条目合并
-        words_unique[(v.surface, v.ner_type)].append(v)
-
-    threshold = {
-        NER.LANGUAGE.ZH : (0.80, 0.80),
-        NER.LANGUAGE.EN : (0.80, 0.80),
-        NER.LANGUAGE.JP : (0.80, 0.80),
-        NER.LANGUAGE.KR : (0.80, 0.80),
-    }
-    threshold_x = x if x != None else threshold[language][0]
-    threshold_y = y if y != None else threshold[language][1]
+    for word in words:
+        key = (word.surface, word.ner_type) # 只有文字和类型都一样才视为相同条目，避免跨类词条目合并
+        if key not in words_unique:
+            words_unique[key] = []
+        words_unique[key].append(word)
 
     words_merged = []
-    for k, v in words_unique.items():
+    for v in words_unique.values():
         word = v[0]
-        word.score = min(0.9999, sum(w.score for w in v) / len(v)) # 求平均分
+        word.context = list(set([word.context[0] for word in v if word.context[0] != ""]))
+        word.context.sort(key = lambda x: len(x), reverse = True)
+        word.count = len(word.context)
+        word.score = min(0.9999, sum(w.score for w in v) / len(v))
+        words_merged.append(word)
 
-        if (
-            (word.ner_type == "PER" and word.score > threshold_x)
-            or (word.ner_type != "PER" and word.score > threshold_y)
-        ):
-            words_merged.append(word)
+    return sorted(words_merged, key = lambda x: x.count, reverse = True)
 
-    words_categorized = {}
-    for word in words_merged:
-        if word.ner_type not in words_categorized:
-            words_categorized[word.ner_type] = []
-        words_categorized[word.ner_type].append(word)
+# 按置信度过滤词语
+def filter_words_by_score(words, threshold):
+    return [word for word in words if word.score >= threshold]
 
-    words_counted = []
-    for words_in_category in words_categorized.values():
-        # 按词语长度从长到短排序，优先统计较长的词语
-        words_in_category.sort(key = lambda x: len(x.surface), reverse = True)
-        
-        # 统计每个词语的出现次数
-        lines_joined = "".join(full_lines)
-        for word in words_in_category:
-            matches = re.findall(re.escape(word.surface), lines_joined)
-            word.count = len(matches)
-            words_counted.append(word)
-            
-            # 用特殊标记替换已统计的词语，防止子串重复计数
-            lines_joined = lines_joined.replace(word.surface, "#" * len(word.surface))
+# 按出现次数过滤词语
+def filter_words_by_count(words, threshold):
+    return [word for word in words if word.count >= max(1, threshold)]
 
-    return sorted(words_counted, key = lambda x: x.count, reverse = True)
+# 按长度截断上下文
+def truncate_context_by_length(words, threshold):
+    for word in words:
+        word.context = word.clip_context(threshold)
+
+    return words
 
 # 获取指定类型的词
 def get_words_by_ner_type(words, ner_type):
@@ -285,8 +280,8 @@ def write_words_log_to_file(words, path, language):
             if getattr(word, "attribute", "") != "":
                 file.write(f"角色性别 : {word.attribute}\n")
 
-            if getattr(word, "context_summary", {}) != {}:
-                file.write(f"语义分析 : {word.context_summary.get("summary", "")}\n")
+            if getattr(word, "context_summary", {}) != "":
+                file.write(f"语义分析 : {word.context_summary}\n")
 
             if len(getattr(word, "context", [])) > 0:
                 file.write(f"上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
@@ -395,42 +390,27 @@ async def process_text(language):
     words = []
     words = G.ner.search_for_entity(input_lines, input_names, language)
 
-    # 调试模式时，检查置信度阈值
-    if LogHelper.is_debug():
-        with LogHelper.status(f"正在检查置信度阈值 ..."):
-            words = merge_and_count(words, input_lines, language, 0.00, 0.00)
-            TestHelper.check_score_threshold(words, "check_score_threshold.log")
-
-    # 查找上下文
-    LogHelper.info("即将开始执行 [查找上下文] ...")
-    LogHelper.print(f"")
-
-    words = merge_and_count(words, input_lines, language)
-    with ProgressHelper.get_progress() as progress:
-        pid = progress.add_task("查找上下文", total = None)
-        for k, word in enumerate(words):
-            word.context = word.search_context(input_lines, words)
-            progress.update(pid, advance = 1, total = len(words))
-
-    LogHelper.print(f"")
-    LogHelper.info("[查找上下文] 已完成 ...")
-
-    # 有了上下文以后，开始执行还原词根，只对日文启用
+    # 等待 还原词根任务 结果，只对日文启用
     if language == NER.LANGUAGE.JP:
         LogHelper.info("即将开始执行 [还原词根] ...")
         words = G.ner.lemmatize_words_by_morphology(words, input_lines)
         words = remove_words_by_ner_type(words, "")
-        words = merge_and_count(words, input_lines, language)
         LogHelper.info(f"[还原词根] 已完成 ...")
 
-        with LogHelper.status(f"正在更新上下文 ..."):
-            for k, word in enumerate(words):
-                word.context = word.search_context(input_lines, words)
+    # 合并相同词条
+    words = merge_words(words)    
+
+    # 调试模式时，检查置信度阈值
+    if LogHelper.is_debug():
+        with LogHelper.status(f"正在检查置信度阈值 ..."):
+            TestHelper.check_score_threshold(words, "check_score_threshold.log")
 
     # 按出现次数阈值进行筛选
-    LogHelper.info(f"即将开始执行 [阈值筛选] ... 当前出现次数的筛选阈值设置为 {G.config.count_threshold} ...")
-    words = [word for word in words if word.count >= max(1, G.config.count_threshold)]
-    LogHelper.info(f"[阈值筛选] 已完成 ... 出现次数 < {G.config.count_threshold} 的条目已剔除 ...")
+    LogHelper.info(f"即将开始执行 [阈值过滤] ... 当前出现次数的阈值设置为 {G.config.count_threshold} ...")
+    words = filter_words_by_score(words, 0.80)
+    words = filter_words_by_count(words, G.config.count_threshold)
+    words = truncate_context_by_length(words, 768)
+    LogHelper.info(f"[阈值过滤] 已完成 ...")
 
     # 等待 语义分析任务 结果
     LogHelper.info("即将开始执行 [语义分析] ...")
@@ -445,14 +425,14 @@ async def process_text(language):
             TestHelper.check_result_duplication(words, "check_result_duplication.log")
 
     # 等待 重复性校验任务 结果
-    LogHelper.info("即将开始执行 [重复性校验] ...")
-    words = G.ner.validate_words_by_duplication(words)
-    words = remove_words_by_ner_type(words, "")
+    # LogHelper.info("即将开始执行 [重复性校验] ...")
+    # words = G.ner.validate_words_by_duplication(words)
+    # words = remove_words_by_ner_type(words, "")
 
     # 等待翻译词语任务结果
     if (
         G.config.translate_surface == 1
-        and (language == NER.LANGUAGE.EN or language == NER.LANGUAGE.JP or language == NER.LANGUAGE.KR)
+        and (language == NER.LANGUAGE.EN or language == NER.LANGUAGE.JP or language == NER.LANGUAGE.KO)
     ):
         LogHelper.info("即将开始执行 [词语翻译] ...")
         words = await G.llm.translate_surface_batch(words)
@@ -466,7 +446,7 @@ async def process_text(language):
     }
 
     # 等待 上下文翻译 任务结果
-    if language == NER.LANGUAGE.EN or language == NER.LANGUAGE.JP or language == NER.LANGUAGE.KR:
+    if language == NER.LANGUAGE.EN or language == NER.LANGUAGE.JP or language == NER.LANGUAGE.KO:
         for k, v in ner_type.items():
             if (
                 (k == "PER" and G.config.translate_context_per == 1)
@@ -587,7 +567,7 @@ async def begin():
         elif choice == 3:
             await process_text(NER.LANGUAGE.JP)
         elif choice == 4:
-            await process_text(NER.LANGUAGE.KR)
+            await process_text(NER.LANGUAGE.KO)
         elif choice == 5:
             await test_api()
 

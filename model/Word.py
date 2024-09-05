@@ -1,8 +1,5 @@
 import re
 import json
-from threading import Lock
-from collections import Counter
-from collections import OrderedDict
 
 import tiktoken
 import tiktoken_ext
@@ -12,11 +9,6 @@ from helper.LogHelper import LogHelper
 from helper.TextHelper import TextHelper
 
 class Word:
-
-    CONTEXT_TOKEN_THRESHOLD = 768
-
-    MATCH_LENGTHS_CACHE = {}
-    MATCH_LENGTHS_CACHE_LOCK = Lock()
 
     def __init__(self):
         self.score = 0
@@ -53,60 +45,6 @@ class Word:
             f"llmresponse_translate_context={self.llmresponse_translate_context},"
             f"llmresponse_translate_surface={self.llmresponse_translate_surface})"
         )
-
-    # 从原文中提取上下文，排除母串对子串的影响，并至少取一条与阈值最接近的
-    def search_context(self, original, words):        
-        # 从 words 中找出 self.surface 的母串
-        replacements = {
-            word.surface
-            for word in words
-            if self.surface in word.surface and self.surface != word.surface
-        }
-
-        # 第一次遍历: 计算并缓存所有匹配句子的长度
-        match_lengths = {}
-        with Word.MATCH_LENGTHS_CACHE_LOCK:
-            for line in original:
-                # 如果 line 中有母串，则替换为 #
-                for key in replacements:
-                    if key in line:
-                        line = line.replace(key, "#" * len(key))
-
-                # 在替换后的 line 中匹配 self.surface
-                if self.surface in line:
-                    if line not in Word.MATCH_LENGTHS_CACHE:
-                        Word.MATCH_LENGTHS_CACHE[line] = len(self.tiktoken_encoding.encode(line))
-                    match_lengths[line] = Word.MATCH_LENGTHS_CACHE[line]
-
-        # 按长度降序排序
-        sorted_matches = sorted(match_lengths.items(), key = lambda item: (-item[1], item[0]))
-
-        context = []
-        context_length = 0
-        closest_match = None
-        closest_difference = float("inf")
-
-        # 第二次遍历: 构建上下文，尽可能接近阈值
-        for line, length in sorted_matches:
-            if length > self.CONTEXT_TOKEN_THRESHOLD:
-                # 找到最接近阈值的句子
-                difference = length - self.CONTEXT_TOKEN_THRESHOLD
-                if difference < closest_difference:
-                    closest_difference = difference
-                    closest_match = line
-                continue
-
-            if context_length + length > self.CONTEXT_TOKEN_THRESHOLD:
-                break
-
-            context.append(line)
-            context_length += length
-
-        # 如果没有合适的上下文，并且有一个接近阈值的句子
-        if not context and closest_match:
-            context.append(closest_match)
-
-        return context
 
     # 按长度截取上下文并返回，至少取一条与阈值最接近的
     def clip_context(self, threshold):

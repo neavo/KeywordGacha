@@ -373,14 +373,14 @@ class LLM:
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
 
-                if "否" in result["is_name"]:
+                if "否" in result.get("is_specific_name") or "未知" in result.get("is_specific_name"):
                     word.ner_type = ""
                     LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
                 else:
                     LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
 
-                word.attribute = result["sex"]
-                word.context_summary = result
+                word.attribute = result.get("sex")
+                word.context_summary = result.get("summary")
                 word.llmresponse_summarize_context = llm_response
             except Exception as e:
                 LogHelper.warning(f"[语义分析] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
