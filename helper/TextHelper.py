@@ -190,18 +190,37 @@ class TextHelper:
     # 修复不合规的JSON字符串
     @staticmethod
     def fix_broken_json_string(jsonstring):
-        # 在 Qwen2 7B 回复中发现
+        # 移除首尾空白符（含空格、制表符、换行符）
+        jsonstring = jsonstring.strip()
+
+        # 移除代码标识
+        jsonstring = jsonstring.replace("```json", "").replace("```", "").strip()
+
+        # 补上缺失的 }
+        jsonstring = jsonstring if jsonstring.endswith("}") else jsonstring + "}"
+
+        # 移除多余的 ,
+        jsonstring = jsonstring if not jsonstring.endswith(",}") else jsonstring.replace(",}", "}")
+        jsonstring = jsonstring if not jsonstring.endswith(",\n}") else jsonstring.replace(",\n}", "}")
+
+        # 移除单行注释
         jsonstring = re.sub(
-            r'(?<=: ").+(?=")', # 匹配Json字符中的值不包括双引号的部分
-            lambda matches: matches.group(0).replace('\\"', '"').replace('"', '\\"'), 
+            r"//.*(?=,|\s|\}|\n)",
+            "",
             jsonstring,
         ).strip()
 
-        # 在 GLM4-9B 回复中发现
-        jsonstring = jsonstring.replace("```json", "").replace("```", "").strip()
-        jsonstring = jsonstring.replace('“', '\\"').replace('”', '\\"').strip()
-        jsonstring = jsonstring + "}" if not jsonstring.endswith("}") else jsonstring
-        jsonstring = jsonstring.replace(",\n}", "\n}") if not jsonstring.endswith(",\n}") else jsonstring
+        # 修正值中错误的引号
+        jsonstring = re.sub(
+            r"(?<=:').+?(?=',|'\\n)",
+            lambda matches: matches.group(0).replace("\\'", "'").replace("'", "\\'"), 
+            jsonstring,
+        ).strip()
+        jsonstring = re.sub(
+            r'(?<=:").+?(?=",|"\\n)',
+            lambda matches: matches.group(0).replace('\\"', '"').replace('"', '\\"'), 
+            jsonstring,
+        ).strip()
 
         return jsonstring
 
