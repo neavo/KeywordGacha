@@ -93,14 +93,6 @@ class LLM:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 根据类型加载不同的prompt模板文件
-    def load_prompt_classify_ner(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_classify_ner = file.read()
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
-
-    # 根据类型加载不同的prompt模板文件
     def load_prompt_summarize_context(self, filepath):
         try:
             with open(filepath, "r", encoding="utf-8") as file:

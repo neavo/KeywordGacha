@@ -427,17 +427,3 @@ class NER:
         # 合并拆分出来的词语
         words.extend(words_ex)
         return words
-
-    # 通过 重复性 校验词语
-    def validate_words_by_duplication(self, words):
-        person_set = set(word.surface for word in words if word.ner_type == "PER")
-
-        for word in words:
-            if word.ner_type == "PER":
-                continue
-
-            if any(v in word.surface for v in person_set):
-                LogHelper.info(f"通过 [green]重复性校验[/] 剔除词语 - {word.ner_type} - {word.surface}")
-                word.ner_type = ""
-
-        return words

@@ -427,11 +427,6 @@ async def process_text(language):
         with LogHelper.status(f"正在检查结果重复度..."):
             TestHelper.check_result_duplication(words, "check_result_duplication.log")
 
-    # 等待 重复性校验任务 结果
-    # LogHelper.info("即将开始执行 [重复性校验] ...")
-    # words = G.ner.validate_words_by_duplication(words)
-    # words = remove_words_by_ner_type(words, "")
-
     # 等待翻译词语任务结果
     if (
         G.config.translate_surface == 1
@@ -598,7 +593,6 @@ def init():
         # 初始化 LLM 对象
         G.llm = LLM(G.config)
         G.llm.load_blacklist("blacklist.txt")
-        G.llm.load_prompt_classify_ner("prompt/prompt_classify_ner.txt")
         G.llm.load_prompt_summarize_context("prompt/prompt_summarize_context.txt")
         G.llm.load_prompt_translate_context("prompt/prompt_translate_context.txt")
         G.llm.load_prompt_translate_surface_common("prompt/prompt_translate_surface_common.txt")
