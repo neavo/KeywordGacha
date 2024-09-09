@@ -2,8 +2,8 @@ rich
 loguru
 openai
 tiktoken
+pykakasi
 aiolimiter
-
 lemminflect
 
 onnx==1.16.1
