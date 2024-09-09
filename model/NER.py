@@ -226,8 +226,7 @@ class NER:
     def generate_words(self, text, line, score, ner_type, language, unique_words):
         words = []
 
-        # 词语构成中存在空格的不拆分
-        if language == NER.LANGUAGE.EN:
+        if ner_type != "PER":
             surfaces = [text]
         else:
             surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, text)
