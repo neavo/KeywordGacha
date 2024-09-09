@@ -1,6 +1,6 @@
 <h1><p align='center' >KeywordGacha</p></h1>
 <div align=center><img src="https://img.shields.io/github/v/release/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/license/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/stars/neavo/KeywordGacha"/></div>
-<p align='center' >使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等任意文本中的词语表的翻译辅助工具</p>
+<p align='center' >使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等内容文本中实体词语表的翻译辅助工具</p>
 
 &ensp;
 &ensp;
@@ -50,30 +50,20 @@
 - 具体可见 [Wiki - 支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
 
 ## 近期更新 📅
+- 20240909 v0.4.1
+  - 调整 - 优化规则以尝试减少结果中的杂质
+    - 更严格的 `Prompt`
+    - 更严格的 `上下文` 与 `出现次数` 的匹配规则
+    - 在不同测试用例中，减少了 `20%-40%` 不等的角色实体杂质
+  - 修正 - 一些常见的 JSON 解析错误
+  - 修正 - 汉字词语翻译时偶尔翻译成拼音的问题
+
 - 20240826 v0.4.0
   - 新增 - 初步完成对 `韩文` 的支持
     - 完全不懂 `韩文`，所以无法评估表现水平
     - 寻求懂 `韩文` 的用户协助测试
   - 调整 - 优化了 NER 实体识别步骤的执行速度
     - `CPU` 和 `GPU` 版本都提速了一倍左右
-
-- 20240820 v0.3.0
-  - 调整 - NER 模型更新至 20240819
-  - 调整 - 移除了一些不再需要的步骤以节约处理时间
-  - 调整 - 不再自动为 API 地址补齐 /v1 以兼容更多模型
-
-- 20240815 v0.2.1
-  - 修正 - 不能正常读取 name - message 格式 .json 数据的问题
-
-- 20240815 v0.2.0
-  - 修正 - 当实体名称相互包含时，统计短词出现次数时会计入长词出现次数的问题
-  - 新增 - `中文文本`、`英文文本` 分析处理功能
-    - 因评估数据匮乏，不太确定中英文实际的表现情况，欢迎提 `issue` 反馈
-
-- 20240810 v0.1.0
-  - 修正 - 一个系统兼容性问题
-  - 调整 - 优化了对游戏文本的支持和抓取能力
-  - 新增 - 自动生成 AiNiee 与 GalTransl 格式的词典
 
 ## 设置说明 🎚️
 
