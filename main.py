@@ -595,8 +595,7 @@ def init():
         G.llm.load_blacklist("blacklist.txt")
         G.llm.load_prompt_summarize_context("prompt/prompt_summarize_context.txt")
         G.llm.load_prompt_translate_context("prompt/prompt_translate_context.txt")
-        G.llm.load_prompt_translate_surface_common("prompt/prompt_translate_surface_common.txt")
-        G.llm.load_prompt_translate_surface_person("prompt/prompt_translate_surface_person.txt")
+        G.llm.load_prompt_translate_surface("prompt/prompt_translate_surface.txt")
 
         # 初始化 NER 对象
         G.ner = NER()

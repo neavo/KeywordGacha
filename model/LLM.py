@@ -109,18 +109,10 @@ class LLM:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 根据类型加载不同的prompt模板文件
-    def load_prompt_translate_surface_common(self, filepath):
+    def load_prompt_translate_surface(self, filepath):
         try:
             with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_translate_surface_common = file.read()
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
-
-    # 根据类型加载不同的prompt模板文件
-    def load_prompt_translate_surface_person(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_translate_surface_person = file.read()
+                self.prompt_translate_surface = file.read()
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
@@ -194,11 +186,8 @@ class LLM:
                 if TextHelper.is_all_cjk(word.surface):
                     word.surface_translation = [word.surface, word.surface]
                 else:
-                    if word.ner_type != "PER":
-                        prompt = self.prompt_translate_surface_common.replace("{surface}", word.surface)
-                    else:
-                        prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
-                        prompt = prompt.replace("{surface}", word.surface)
+                    prompt = self.prompt_translate_surface.replace("{surface}", word.surface)
+                    prompt = prompt.replace("{context}", "\n".join(word.clip_context(256)))
 
                     usage, message, llm_request, llm_response, error = await self.request(
                         prompt,

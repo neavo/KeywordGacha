@@ -210,14 +210,16 @@ class TextHelper:
             jsonstring,
         ).strip()
 
-        # 修正值中错误的引号
+        # 修正值中错误的单引号
         jsonstring = re.sub(
-            r"(?<=:').+?(?=',|'\\n)",
+            r"(?<=\{'|\s'|:').*?(?=':|',|'\s|'\})",
             lambda matches: matches.group(0).replace("\\'", "'").replace("'", "\\'"), 
             jsonstring,
         ).strip()
+
+        # 修正值中错误的双引号
         jsonstring = re.sub(
-            r'(?<=:").+?(?=",|"\\n)',
+            r'(?<=\{"|\s"|:").*?(?=":|",|"\s|"\})',
             lambda matches: matches.group(0).replace('\\"', '"').replace('"', '\\"'), 
             jsonstring,
         ).strip()
