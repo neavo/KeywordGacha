@@ -153,7 +153,7 @@ class LLM:
                 result = False
 
                 usage, message, llm_request, llm_response, error = await self.request(
-                    self.prompt_translate_surface_person.replace("{attribute}", "女性").replace("{surface}", "ダリヤ"),
+                    self.prompt_translate_surface.replace("{surface}", "ダリヤ").replace("{context}", "魔導具師ダリヤはうつむかない"),
                     self.TASK_TYPE_API_TEST,
                     True
                 )
@@ -184,7 +184,7 @@ class LLM:
                 error = None
 
                 if TextHelper.is_all_cjk(word.surface):
-                    word.surface_translation = [word.surface, word.surface]
+                    word.surface_translation = word.surface
                 else:
                     prompt = self.prompt_translate_surface.replace("{surface}", word.surface)
                     prompt = prompt.replace("{context}", "\n".join(word.clip_context(256)))
@@ -205,8 +205,9 @@ class LLM:
                         TextHelper.fix_broken_json_string(message.content.strip())
                     )
 
-                    word.surface_translation = [translation.strip() for translation in data.get("translation", ",").split(",")]
-                    word.surface_translation_description = data["description"]
+                    # 获取结果
+                    word.surface_translation = data.get("translation", "")
+                    word.surface_translation_description = data.get("description", "")
                     word.llmresponse_translate_surface = llm_response
 
                 # 生成罗马音，汉字有时候会生成重复的罗马音，所以需要去重

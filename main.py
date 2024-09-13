@@ -274,9 +274,12 @@ def write_words_log_to_file(words, path, language):
             if getattr(word, "count", int(-1)) >= 0:
                 file.write(f"出现次数 : {word.count}\n")
 
-            if len(getattr(word, "surface_translation", [])) > 0:
-                file.write(f"词语翻译 : {", ".join(word.surface_translation)}, {word.surface_translation_description}\n")
-                
+            if len(getattr(word, "surface_translation", "")) > 0:
+                if word.surface_translation_description == "":
+                    file.write(f"词语翻译 : {word.surface_translation}\n")
+                else:
+                    file.write(f"词语翻译 : {word.surface_translation}, {word.surface_translation_description}\n")
+ 
             if getattr(word, "attribute", "") != "":
                 file.write(f"角色性别 : {word.attribute}\n")
 
@@ -309,10 +312,7 @@ def write_words_list_to_file(words, path, language):
     with open(path, "w", encoding = "utf-8") as file:
         data = {}
         for k, word in enumerate(words):
-            if word.surface_translation and len(word.surface_translation) > 0:
-                data[word.surface] = word.surface_translation[0]
-            else:
-                data[word.surface] = ""
+            data[word.surface] = word.surface_translation if word.surface_translation != "" else ""
 
         file.write(json.dumps(data, indent = 4, ensure_ascii = False))
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
