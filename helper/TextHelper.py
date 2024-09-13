@@ -224,6 +224,9 @@ class TextHelper:
             jsonstring,
         ).strip()
 
+        # 修正错误的全角引号
+        jsonstring = jsonstring.replace('”,\n', '",\n').replace('”\n}', '"\n}').strip()
+
         return jsonstring
 
     # 按汉字、平假名、片假名拆开日文短语
