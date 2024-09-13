@@ -407,7 +407,7 @@ async def process_text(language):
 
     # 按出现次数阈值进行筛选
     LogHelper.info(f"即将开始执行 [阈值过滤] ... 当前出现次数的阈值设置为 {G.config.count_threshold} ...")
-    words = filter_words_by_score(words, 0.80)
+    words = filter_words_by_score(words, 0.85)
     words = filter_words_by_count(words, G.config.count_threshold)
     words = truncate_context_by_length(
         words, 
