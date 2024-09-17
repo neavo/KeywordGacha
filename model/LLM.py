@@ -116,6 +116,10 @@ class LLM:
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
+    # 检查词语的描述是否包含特定关键词
+    def check_keyword_in_description(self, word: Word, keywords: list[str] = ["人名", "名字", "姓氏", "姓名", "名称"]):
+        return any(keyword in word.surface_translation_description for keyword in keywords)
+
     # 异步发送请求到OpenAI获取模型回复
     async def request(self, content, task_type, retry = False):     
         try:
@@ -178,37 +182,41 @@ class LLM:
                 LogHelper.warning(f"llm_response - {llm_response}")
 
     # 词语翻译任务
-    async def translate_surface(self, word, retry):
+    async def translate_surface(self, word: Word, retry: bool):
         async with self.semaphore, self.async_limiter:
             try:
-                error = None
+                prompt = self.prompt_translate_surface.replace("{surface}", word.surface)
+                prompt = prompt.replace("{context}", "\n".join(word.clip_context(256)))
 
-                if TextHelper.is_all_cjk(word.surface):
-                    word.surface_translation = word.surface
-                else:
-                    prompt = self.prompt_translate_surface.replace("{surface}", word.surface)
-                    prompt = prompt.replace("{context}", "\n".join(word.clip_context(256)))
+                usage, message, llm_request, llm_response, error = await self.request(
+                    prompt,
+                    self.TASK_TYPE_TRANSLATE_SURFACE,
+                    retry
+                )
 
-                    usage, message, llm_request, llm_response, error = await self.request(
-                        prompt,
-                        self.TASK_TYPE_TRANSLATE_SURFACE,
-                        retry
-                    )
+                if error:
+                    raise error
 
-                    if error:
-                        raise error
+                if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS:
+                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
 
-                    if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS:
-                        raise Exception("usage.completion_tokens >= MAX_TOKENS")
+                data = json.loads(
+                    TextHelper.fix_broken_json_string(message.content.strip())
+                )
 
-                    data = json.loads(
-                        TextHelper.fix_broken_json_string(message.content.strip())
-                    )
+                # 获取结果
+                word.surface_translation = data.get("translation", "").strip()
+                word.surface_translation_description = data.get("description", "").strip()
+                word.llmresponse_translate_surface = llm_response
 
-                    # 获取结果
-                    word.surface_translation = data.get("translation", "")
-                    word.surface_translation_description = data.get("description", "")
-                    word.llmresponse_translate_surface = llm_response
+                # 检查词语描述种是否包含不应包含的关键字，如果包含则移除，只检查描述不为空的非角色实体
+                if (
+                    word.ner_type != "PER"
+                    and word.surface_translation_description != ""
+                    and self.check_keyword_in_description(word, ["语气词", "拟声词", "感叹词", "形容词"])
+                ):
+                    word.ner_type = ""
+                    LogHelper.debug(f"[词语翻译] 已剔除 - {word.surface} - {word.surface_translation_description}")
 
                 # 生成罗马音，汉字有时候会生成重复的罗马音，所以需要去重
                 results = list(set([item.get("hepburn", "") for item in self.kakasi.convert(word.surface)]))
@@ -347,7 +355,7 @@ class LLM:
         return words
 
     # 语义分析任务 
-    async def summarize_context(self, word, retry):
+    async def summarize_context(self, word: Word, retry: bool):
         async with self.semaphore, self.async_limiter:
             try:
                 usage, message, llm_request, llm_response, error = await self.request(
@@ -366,14 +374,14 @@ class LLM:
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
 
-                if ("否" in result.get("is_name") or "未知" in result.get("is_name")):
+                if "否" not in result.get("is_name", ""):
+                    LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
+                else:
                     word.ner_type = ""
                     LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
-                else:
-                    LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
 
-                word.attribute = result.get("sex")
-                word.context_summary = result.get("summary")
+                word.attribute = result.get("sex", "").strip()
+                word.context_summary = result.get("summary", "").strip()
                 word.llmresponse_summarize_context = llm_response
             except Exception as e:
                 LogHelper.warning(f"[语义分析] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")

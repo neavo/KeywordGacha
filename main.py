@@ -23,6 +23,11 @@ from helper.ProgressHelper import ProgressHelper
 # 丑陋，但是有效，不服你咬我啊
 G = type("GClass", (), {})()
 
+# 定义常量
+SCORE_THRESHOLD = 0.85
+CONTEXT_LENGHT_THRESHOLD = 768
+CONTEXT_LENGHT_THRESHOLD_EN = 512
+
 # 清理文本
 def cleanup(line):
     # 【\N[123]】 这种形式是代指角色名字的变量
@@ -312,7 +317,7 @@ def write_words_list_to_file(words, path, language):
     with open(path, "w", encoding = "utf-8") as file:
         data = {}
         for k, word in enumerate(words):
-            data[word.surface] = word.surface_translation if word.surface_translation != "" else ""
+            data[word.surface] = word.surface_translation
 
         file.write(json.dumps(data, indent = 4, ensure_ascii = False))
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
@@ -330,12 +335,12 @@ def write_ainiee_dict_to_file(words, path, language):
     with open(path, "w", encoding = "utf-8") as file:
         datas = []
         for word in words:
-            if not (word.surface_translation and len(word.surface_translation) > 0):
+            if word.surface_translation == "":
                 continue
 
             data = {}
             data["srt"] = word.surface
-            data["dst"] = word.surface_translation[0]
+            data["dst"] = word.surface_translation
 
             if word.ner_type == "PER" and "男" in word.attribute:
                 data["info"] = f"男性角色的名字"
@@ -363,10 +368,10 @@ def write_galtransl_dict_to_file(words, path, language):
 
     with open(path, "w", encoding = "utf-8") as file:
         for word in words:
-            if not (word.surface_translation and len(word.surface_translation) > 0):
+            if word.surface_translation == "":
                 continue
 
-            line = f"{word.surface}\t{word.surface_translation[0]}"
+            line = f"{word.surface}\t{word.surface_translation}"
 
             if word.ner_type == "PER" and "男" in word.attribute:
                 line = line + f"\t男性角色的名字"
@@ -407,33 +412,38 @@ async def process_text(language):
 
     # 按出现次数阈值进行筛选
     LogHelper.info(f"即将开始执行 [阈值过滤] ... 当前出现次数的阈值设置为 {G.config.count_threshold} ...")
-    words = filter_words_by_score(words, 0.85)
+    words = filter_words_by_score(words, SCORE_THRESHOLD)
     words = filter_words_by_count(words, G.config.count_threshold)
     words = truncate_context_by_length(
         words, 
-        512 if language == NER.LANGUAGE.EN else 768, # 根据语言调整保留的上下文长度
+        CONTEXT_LENGHT_THRESHOLD if language != NER.LANGUAGE.EN else CONTEXT_LENGHT_THRESHOLD_EN, # 根据语言调整保留的上下文长度
     )
     LogHelper.info(f"[阈值过滤] 已完成 ...")
+
+    # 等待翻译词语任务结果
+    LogHelper.info("即将开始执行 [词语翻译] ...")
+    words = await G.llm.translate_surface_batch(words)
+    words = remove_words_by_ner_type(words, "")
+
+    # 调试模式时，前置检查结果重复度
+    if LogHelper.is_debug():
+        with LogHelper.status(f"正在检查结果重复度..."):
+            TestHelper.check_result_duplication(
+                [word for word in words if G.llm.check_keyword_in_description(word)],
+                 "check_result_duplication_01.log",
+            )
 
     # 等待 语义分析任务 结果
     LogHelper.info("即将开始执行 [语义分析] ...")
     words_person = get_words_by_ner_type(words, "PER")
     words_person = await G.llm.summarize_context_batch(words_person)
-    words_person = remove_words_by_ner_type(words_person, "")
     words = replace_words_by_ner_type(words, words_person, "PER")
+    words = remove_words_by_ner_type(words, "")
 
-    # 调试模式时，检查结果重复度
+    # 调试模式时，后置检查结果重复度
     if LogHelper.is_debug():
         with LogHelper.status(f"正在检查结果重复度..."):
-            TestHelper.check_result_duplication(words, "check_result_duplication.log")
-
-    # 等待翻译词语任务结果
-    if (
-        G.config.translate_surface == 1
-        and (language == NER.LANGUAGE.EN or language == NER.LANGUAGE.JP or language == NER.LANGUAGE.KO)
-    ):
-        LogHelper.info("即将开始执行 [词语翻译] ...")
-        words = await G.llm.translate_surface_batch(words)
+            TestHelper.check_result_duplication(words, "check_result_duplication_02.log")
 
     ner_type = {
         "PER": "角色实体",
@@ -518,7 +528,6 @@ def print_app_info():
     rows = [
         ("接口密钥", str(G.config.api_key), "模型名称", str(G.config.model_name)),
         ("接口地址", str(G.config.base_url)),
-        ("出现次数阈值", str(G.config.count_threshold), "是否翻译词语", "是" if G.config.translate_surface == 1 else "否"),
         ("是否翻译角色实体上下文", "是" if G.config.translate_context_per == 1 else "否", "是否翻译其他实体上下文", "是" if G.config.translate_context_other == 1 else "否"),
         ("网络请求超时时间", f"{G.config.request_timeout} 秒" , "网络请求频率阈值", f"{G.config.request_frequency_threshold} 次/秒"),
     ]
