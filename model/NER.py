@@ -22,7 +22,7 @@ class NER:
     TASK_MODES.QUICK = 10
     TASK_MODES.ACCURACY = 20
 
-    GPU_BOOST = torch.cuda.is_available() and LogHelper.is_gpu_boost()
+    GPU_BOOST = torch.cuda.is_available()
     BATCH_SIZE = 32 if GPU_BOOST else 1
     MODEL_PATH = "resource/kg_ner_gpu" if GPU_BOOST else "resource/kg_ner_cpu"
 
@@ -301,11 +301,10 @@ class NER:
     def search_for_entity(self, input_lines, input_names, language):
         words = []
 
-        if LogHelper.is_gpu_boost() and torch.cuda.is_available():
-            LogHelper.info("启用 [green]GPU[/] 加速成功 ...")
-
-        if LogHelper.is_gpu_boost() and not torch.cuda.is_available():
-            LogHelper.warning("启用 [green]GPU[/] 加速失败 ...")
+        if self.GPU_BOOST:
+            LogHelper.info("检测到有效的 [green]GPU[/] 环境，已启用 [green]GPU[/] 加速 ...")
+        else:
+            LogHelper.warning("未检测到有效的 [green]GPU[/] 环境，无法启用 [green]GPU[/] 加速 ...")
 
         LogHelper.print(f"")
         with LogHelper.status("正在对文本进行预处理 ..."):
