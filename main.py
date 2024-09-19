@@ -420,6 +420,9 @@ async def process_text(language):
     )
     LogHelper.info(f"[阈值过滤] 已完成 ...")
 
+    # 设置请求限制器
+    G.llm.set_request_limiter()
+
     # 等待翻译词语任务结果
     LogHelper.info("即将开始执行 [词语翻译] ...")
     words = await G.llm.translate_surface_batch(words)

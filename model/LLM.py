@@ -2,6 +2,7 @@ import re
 import json
 import random
 import asyncio
+import urllib.request
 
 import pykakasi
 from openai import AsyncOpenAI
@@ -57,17 +58,7 @@ class LLM:
         self.base_url = config.base_url
         self.model_name = config.model_name
         self.request_timeout = config.request_timeout
-        
-        # 请求限制器
-        if config.request_frequency_threshold > 1:
-            self.semaphore = asyncio.Semaphore(config.request_frequency_threshold)
-            self.async_limiter = AsyncLimiter(max_rate = config.request_frequency_threshold, time_period = 1)
-        elif config.request_frequency_threshold > 0:
-            self.semaphore = asyncio.Semaphore(1)
-            self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1 / config.request_frequency_threshold)
-        else:
-            self.semaphore = asyncio.Semaphore(1)
-            self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
+        self.request_frequency_threshold = config.request_frequency_threshold
 
         # 初始化 pykakasi
         self.kakasi = pykakasi.kakasi()
@@ -149,6 +140,32 @@ class LLM:
             error = e
         finally:
             return usage, message, llm_request, llm_response, error
+
+    # 设置请求限制器
+    def set_request_limiter(self):
+            try:
+                with urllib.request.urlopen(f"{self.base_url.replace("/v1", "")}/slots") as response:
+                    data = json.loads(response.read().decode("utf-8"))
+
+                    # 如果信息读取成功，则覆盖原有的请求频率阈值
+                    if data != None and len(data) > 0:
+                        LogHelper.info(f"")
+                        LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(data)}[/] 次/秒 ...")
+                        LogHelper.info(f"")
+                        self.request_frequency_threshold = len(data)
+            except Exception as e:
+                LogHelper.debug(f"{LogHelper.get_trackback(e)}")
+            finally:
+                # 设置请求限制器
+                if self.request_frequency_threshold > 1:
+                    self.semaphore = asyncio.Semaphore(self.request_frequency_threshold)
+                    self.async_limiter = AsyncLimiter(max_rate = self.request_frequency_threshold, time_period = 1)
+                elif self.request_frequency_threshold > 0:
+                    self.semaphore = asyncio.Semaphore(1)
+                    self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1 / self.request_frequency_threshold)
+                else:
+                    self.semaphore = asyncio.Semaphore(1)
+                    self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
 
     # 接口测试任务
     async def api_test(self):
