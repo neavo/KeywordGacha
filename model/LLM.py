@@ -397,7 +397,7 @@ class LLM:
                     word.ner_type = ""
                     LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
 
-                word.attribute = result.get("sex", "").strip()
+                word.attribute = result.get("gender", "").strip()
                 word.context_summary = result.get("summary", "").strip()
                 word.llmresponse_summarize_context = llm_response
             except Exception as e:
