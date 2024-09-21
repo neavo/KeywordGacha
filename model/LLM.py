@@ -3,6 +3,7 @@ import json
 import random
 import asyncio
 import urllib.request
+from concurrent.futures import Future
 
 import pykakasi
 from openai import AsyncOpenAI
@@ -21,6 +22,11 @@ class LLM:
     TASK_TYPE_SUMMAIRZE_CONTEXT = 20    # 语义分析
     TASK_TYPE_TRANSLATE_SURFACE = 30    # 翻译词语
     TASK_TYPE_TRANSLATE_CONTEXT = 40    # 翻译上下文
+
+    # 处理模式
+    PROCESS_MODE = type("GClass", (), {})()
+    PROCESS_MODE.NORMAL = 1
+    PROCESS_MODE.QUICK = 2
 
     # 初始化请求配置参数
     LLMCONFIG = {}
@@ -108,7 +114,7 @@ class LLM:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 检查词语的描述是否包含特定关键词
-    def check_keyword_in_description(self, word: Word, keywords: list[str] = ["人名", "名字", "姓氏", "姓名", "名称"]):
+    def check_keyword_in_description(self, word: Word, keywords: list[str] = ["人名", "名字", "姓氏", "姓名", "名称", "昵称", "角色名"]):
         return any(keyword in word.surface_translation_description for keyword in keywords)
 
     # 异步发送请求到OpenAI获取模型回复
@@ -226,7 +232,8 @@ class LLM:
                 word.surface_translation_description = data.get("description", "").strip()
                 word.llmresponse_translate_surface = llm_response
 
-                # 检查词语描述种是否包含不应包含的关键字，如果包含则移除，只检查描述不为空的非角色实体
+                # 检查词语描述种是否包含不应包含的关键字，如果包含则移除
+                # 只检查描述不为空的非角色实体
                 if (
                     word.ner_type != "PER"
                     and word.surface_translation_description != ""
@@ -372,34 +379,39 @@ class LLM:
         return words
 
     # 语义分析任务 
-    async def summarize_context(self, word: Word, retry: bool):
+    async def summarize_context(self, word: Word, retry: bool, mode: int):
         async with self.semaphore, self.async_limiter:
             try:
-                usage, message, llm_request, llm_response, error = await self.request(
-                    self.prompt_summarize_context.replace("{surface}", word.surface).replace("{context}", "\n".join(word.context)),
-                    self.TASK_TYPE_SUMMAIRZE_CONTEXT,
-                    retry
-                )
+                error = None
 
-                if error:
-                    raise error
-
-                if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_SUMMAIRZE_CONTEXT].MAX_TOKENS:
-                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
-
-                result = json.loads(
-                    TextHelper.fix_broken_json_string(message.content.strip())
-                )
-
-                if "否" not in result.get("is_name", ""):
-                    LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
+                if mode == LLM.PROCESS_MODE.QUICK:
+                    word.ner_type = "" if not self.check_keyword_in_description(word) else word.ner_type
                 else:
-                    word.ner_type = ""
-                    LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
+                    usage, message, llm_request, llm_response, error = await self.request(
+                        self.prompt_summarize_context.replace("{surface}", word.surface).replace("{context}", "\n".join(word.context)),
+                        self.TASK_TYPE_SUMMAIRZE_CONTEXT,
+                        retry
+                    )
 
-                word.attribute = result.get("gender", "").strip()
-                word.context_summary = result.get("summary", "").strip()
-                word.llmresponse_summarize_context = llm_response
+                    if error:
+                        raise error
+
+                    if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_SUMMAIRZE_CONTEXT].MAX_TOKENS:
+                        raise Exception("usage.completion_tokens >= MAX_TOKENS")
+
+                    result = json.loads(
+                        TextHelper.fix_broken_json_string(message.content.strip())
+                    )
+
+                    if "否" not in result.get("is_name", ""):
+                        LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
+                    else:
+                        word.ner_type = ""
+                        LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
+
+                    word.attribute = result.get("gender", "").strip()
+                    word.context_summary = result.get("summary", "").strip()
+                    word.llmresponse_summarize_context = llm_response
             except Exception as e:
                 LogHelper.warning(f"[语义分析] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
                 LogHelper.debug(f"llm_request - {llm_request}")
@@ -409,7 +421,7 @@ class LLM:
                 return error if error else word
 
     # 语义分析任务完成时的回调
-    def on_summarize_context_task_done(self, future, words, words_failed, words_successed):
+    def on_summarize_context_task_done(self, future: Future, words: list[Word], words_failed: list[Word], words_successed: list[Word]):
         result = future.result()
 
         if not isinstance(result, Exception):
@@ -417,7 +429,7 @@ class LLM:
             LogHelper.info(f"[语义分析] 已完成 {len(words_successed)} / {len(words)} ...")
 
     # 批量执行语义分析任务的具体实现
-    async def do_summarize_context_batch(self, words, words_failed, words_successed):
+    async def do_summarize_context_batch(self, words: list[Word], words_failed: list[Word], words_successed: list[Word], mode: int):
         if len(words_failed) == 0:
             retry = False
             words_this_round = words
@@ -427,7 +439,7 @@ class LLM:
 
         tasks = []
         for k, word in enumerate(words_this_round):
-            task = asyncio.create_task(self.summarize_context(word, retry))
+            task = asyncio.create_task(self.summarize_context(word, retry, mode))
             task.add_done_callback(lambda future: self.on_summarize_context_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
 
@@ -441,17 +453,17 @@ class LLM:
         return words_failed, words_successed
 
     # 批量执行语义分析任务
-    async def summarize_context_batch(self, words):
+    async def summarize_context_batch(self, words: list[Word], mode: int):
         words_failed = []
         words_successed = []
 
         # 第一次请求
-        words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed)
+        words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed, mode)
 
         # 开始重试流程
         for i in range(self.MAX_RETRY):
             if len(words_failed) > 0:
                 LogHelper.warning( f"[语义分析] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
-                words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed)
+                words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed, mode)
 
         return words 

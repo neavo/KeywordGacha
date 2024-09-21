@@ -347,7 +347,7 @@ def write_ainiee_dict_to_file(words, path, language):
             elif word.ner_type == "PER" and "女" in word.attribute:
                 data["info"] = f"女性角色的名字"
             elif word.ner_type == "PER":
-                data["info"] = f"未知性别角色的名字"
+                data["info"] = f"角色的名字"
             else:
                 data["info"] = f"{type_map.get(word.ner_type)}名称"
 
@@ -378,7 +378,7 @@ def write_galtransl_dict_to_file(words, path, language):
             elif word.ner_type == "PER" and "女" in word.attribute:
                 line = line + f"\t女性角色的名字"
             elif word.ner_type == "PER":
-                line = line + f"\t未知性别角色的名字"
+                line = line + f"\t角色的名字"
             else:
                 line = line + f"\t{type_map.get(word.ner_type)}名称"
 
@@ -387,6 +387,13 @@ def write_galtransl_dict_to_file(words, path, language):
 
 # 开始处理文本
 async def process_text(language):
+    # 选择处理模式
+    # 中文没有翻译的过程，所以无法支持快速模式
+    if language == NER.LANGUAGE.ZH:
+        process_mode = LLM.PROCESS_MODE.NORMAL
+    else:
+        process_mode = print_menu_process_mode()
+
     # 读取输入文件
     input_lines, input_names = read_input_file(language)
 
@@ -424,9 +431,11 @@ async def process_text(language):
     G.llm.set_request_limiter()
 
     # 等待翻译词语任务结果
-    LogHelper.info("即将开始执行 [词语翻译] ...")
-    words = await G.llm.translate_surface_batch(words)
-    words = remove_words_by_ner_type(words, "")
+    # 中文无需翻译
+    if language != NER.LANGUAGE.ZH:
+        LogHelper.info("即将开始执行 [词语翻译] ...")
+        words = await G.llm.translate_surface_batch(words)
+        words = remove_words_by_ner_type(words, "")
 
     # 调试模式时，前置检查结果重复度
     if LogHelper.is_debug():
@@ -439,7 +448,7 @@ async def process_text(language):
     # 等待 语义分析任务 结果
     LogHelper.info("即将开始执行 [语义分析] ...")
     words_person = get_words_by_ner_type(words, "PER")
-    words_person = await G.llm.summarize_context_batch(words_person)
+    words_person = await G.llm.summarize_context_batch(words_person, process_mode)
     words = replace_words_by_ner_type(words, words_person, "PER")
     words = remove_words_by_ner_type(words, "")
 
@@ -545,7 +554,7 @@ def print_app_info():
 
 # 打印菜单
 def print_menu_main():
-    LogHelper.print(f"请选择：")
+    LogHelper.print(f"请选择功能：")
     LogHelper.print(f"")
     LogHelper.print(f"\t--> 1. 开始处理 [green]中文文本[/]")
     LogHelper.print(f"\t--> 2. 开始处理 [green]英文文本[/]")
@@ -556,6 +565,23 @@ def print_menu_main():
     choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的功能，默认为 [green][3][/] ", 
         choices = ["1", "2", "3", "4", "5"],
         default = "3",
+        show_choices = False,
+        show_default = False
+    ))
+    LogHelper.print(f"")
+
+    return choice
+
+# 打印处理模式菜单
+def print_menu_process_mode():
+    LogHelper.print(f"请选择处理模式：")
+    LogHelper.print(f"")
+    LogHelper.print(f"\t--> 1. [green]普通模式[/]：速度较慢，通过语义分析对结果进行确认，理论上可以提供最为精确的处理结果")
+    LogHelper.print(f"\t--> 2. [green]快速模式[/]：跳过语义分析步骤，速度快，消耗 Token 少，结果中将不包含角色性别与故事总结信息")
+    LogHelper.print(f"")
+    choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的处理模式，默认为 [green][1][/] ", 
+        choices = [f"{LLM.PROCESS_MODE.NORMAL}", f"{LLM.PROCESS_MODE.QUICK}"],
+        default = f"{LLM.PROCESS_MODE.NORMAL}",
         show_choices = False,
         show_default = False
     ))
