@@ -42,9 +42,13 @@ jobs:
       - name: Install Model
         shell: cmd
         run: |
-          .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20240826/kg_ner_cpu.zip -o kg_ner_cpu.zip
+          .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20240912/kg_ner_cpu.zip -o kg_ner_cpu.zip
           powershell -Command "Expand-Archive -Path 'kg_ner_cpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_cpu'"
-          powershell -Command "Remove-Item -Path 'kg_ner_cpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"   
+          powershell -Command "Remove-Item -Path 'kg_ner_cpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
+
+          .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20240912/kg_ner_gpu.zip -o kg_ner_gpu.zip
+          powershell -Command "Expand-Archive -Path 'kg_ner_gpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_gpu'"
+          powershell -Command "Remove-Item -Path 'kg_ner_gpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
 
       - name: Copy Files
         shell: cmd
@@ -61,22 +65,12 @@ jobs:
           copy "blacklist.txt" ".\dist\KeywordGacha\"
           copy "libomp140.x86_64.dll" ".\dist\KeywordGacha\"
 
-      - name: Compress Archive
-        shell: cmd
-        run: |
-          .\resource\7za.exe a -y -bt -mx5 -slp KeywordGacha_${{ steps.check_version.outputs.version }}.zip .\dist\*
-
       - name: Change To NV Version
         shell: cmd
         run: |
           .\dist\KeywordGacha\env\python.exe -m pip uninstall --yes torch torchvision torchaudio
-          .\dist\KeywordGacha\env\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+          .\dist\KeywordGacha\env\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu124
           .\dist\KeywordGacha\env\python.exe -m pip cache purge
-
-          .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20240826/kg_ner_gpu.zip -o kg_ner_gpu.zip
-          powershell -Command "Expand-Archive -Path 'kg_ner_gpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_gpu'"
-          powershell -Command "Remove-Item -Path 'kg_ner_gpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
-          echo > .\dist\KeywordGacha\gpuboost.txt
 
       - name: Compress Archive NV
         shell: cmd
@@ -93,16 +87,6 @@ jobs:
           release_name: KeywordGacha_${{ steps.check_version.outputs.version }}
           draft: true
           prerelease: false
-
-      - name: Upload Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_${{ steps.check_version.outputs.version }}.zip
-          asset_name: KeywordGacha_${{ steps.check_version.outputs.version }}.zip
-          asset_content_type: application/zip
 
       - name: Upload Release NV 001
         uses: actions/upload-release-asset@v1

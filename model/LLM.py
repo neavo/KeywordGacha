@@ -2,6 +2,8 @@ import re
 import json
 import random
 import asyncio
+import urllib.request
+from concurrent.futures import Future
 
 import pykakasi
 from openai import AsyncOpenAI
@@ -20,6 +22,11 @@ class LLM:
     TASK_TYPE_SUMMAIRZE_CONTEXT = 20    # 语义分析
     TASK_TYPE_TRANSLATE_SURFACE = 30    # 翻译词语
     TASK_TYPE_TRANSLATE_CONTEXT = 40    # 翻译上下文
+
+    # 处理模式
+    PROCESS_MODE = type("GClass", (), {})()
+    PROCESS_MODE.NORMAL = 1
+    PROCESS_MODE.QUICK = 2
 
     # 初始化请求配置参数
     LLMCONFIG = {}
@@ -57,17 +64,7 @@ class LLM:
         self.base_url = config.base_url
         self.model_name = config.model_name
         self.request_timeout = config.request_timeout
-        
-        # 请求限制器
-        if config.request_frequency_threshold > 1:
-            self.semaphore = asyncio.Semaphore(config.request_frequency_threshold)
-            self.async_limiter = AsyncLimiter(max_rate = config.request_frequency_threshold, time_period = 1)
-        elif config.request_frequency_threshold > 0:
-            self.semaphore = asyncio.Semaphore(1)
-            self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1 / config.request_frequency_threshold)
-        else:
-            self.semaphore = asyncio.Semaphore(1)
-            self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
+        self.request_frequency_threshold = config.request_frequency_threshold
 
         # 初始化 pykakasi
         self.kakasi = pykakasi.kakasi()
@@ -109,20 +106,16 @@ class LLM:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 根据类型加载不同的prompt模板文件
-    def load_prompt_translate_surface_common(self, filepath):
+    def load_prompt_translate_surface(self, filepath):
         try:
             with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_translate_surface_common = file.read()
+                self.prompt_translate_surface = file.read()
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-    # 根据类型加载不同的prompt模板文件
-    def load_prompt_translate_surface_person(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                self.prompt_translate_surface_person = file.read()
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
+    # 检查词语的描述是否包含特定关键词
+    def check_keyword_in_description(self, word: Word, keywords: list[str] = ["人名", "名字", "姓氏", "姓名", "名称", "昵称", "角色名"]):
+        return any(keyword in word.surface_translation_description for keyword in keywords)
 
     # 异步发送请求到OpenAI获取模型回复
     async def request(self, content, task_type, retry = False):     
@@ -154,6 +147,32 @@ class LLM:
         finally:
             return usage, message, llm_request, llm_response, error
 
+    # 设置请求限制器
+    def set_request_limiter(self):
+            try:
+                with urllib.request.urlopen(f"{self.base_url.replace("/v1", "")}/slots") as response:
+                    data = json.loads(response.read().decode("utf-8"))
+
+                    # 如果信息读取成功，则覆盖原有的请求频率阈值
+                    if data != None and len(data) > 0:
+                        LogHelper.info(f"")
+                        LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(data)}[/] 次/秒 ...")
+                        LogHelper.info(f"")
+                        self.request_frequency_threshold = len(data)
+            except Exception as e:
+                LogHelper.debug(f"{LogHelper.get_trackback(e)}")
+            finally:
+                # 设置请求限制器
+                if self.request_frequency_threshold > 1:
+                    self.semaphore = asyncio.Semaphore(self.request_frequency_threshold)
+                    self.async_limiter = AsyncLimiter(max_rate = self.request_frequency_threshold, time_period = 1)
+                elif self.request_frequency_threshold > 0:
+                    self.semaphore = asyncio.Semaphore(1)
+                    self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1 / self.request_frequency_threshold)
+                else:
+                    self.semaphore = asyncio.Semaphore(1)
+                    self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
+
     # 接口测试任务
     async def api_test(self):
         async with self.semaphore, self.async_limiter:
@@ -161,7 +180,7 @@ class LLM:
                 result = False
 
                 usage, message, llm_request, llm_response, error = await self.request(
-                    self.prompt_translate_surface_person.replace("{attribute}", "女性").replace("{surface}", "ダリヤ"),
+                    self.prompt_translate_surface.replace("{surface}", "ダリヤ").replace("{context}", "魔導具師ダリヤはうつむかない"),
                     self.TASK_TYPE_API_TEST,
                     True
                 )
@@ -186,39 +205,42 @@ class LLM:
                 LogHelper.warning(f"llm_response - {llm_response}")
 
     # 词语翻译任务
-    async def translate_surface(self, word, retry):
+    async def translate_surface(self, word: Word, retry: bool):
         async with self.semaphore, self.async_limiter:
             try:
-                error = None
+                prompt = self.prompt_translate_surface.replace("{surface}", word.surface)
+                prompt = prompt.replace("{context}", "\n".join(word.clip_context(256)))
 
-                if TextHelper.is_all_cjk(word.surface):
-                    word.surface_translation = [word.surface, word.surface]
-                else:
-                    if word.ner_type != "PER":
-                        prompt = self.prompt_translate_surface_common.replace("{surface}", word.surface)
-                    else:
-                        prompt = self.prompt_translate_surface_person.replace("{attribute}", word.attribute)
-                        prompt = prompt.replace("{surface}", word.surface)
+                usage, message, llm_request, llm_response, error = await self.request(
+                    prompt,
+                    self.TASK_TYPE_TRANSLATE_SURFACE,
+                    retry
+                )
 
-                    usage, message, llm_request, llm_response, error = await self.request(
-                        prompt,
-                        self.TASK_TYPE_TRANSLATE_SURFACE,
-                        retry
-                    )
+                if error:
+                    raise error
 
-                    if error:
-                        raise error
+                if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS:
+                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
 
-                    if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS:
-                        raise Exception("usage.completion_tokens >= MAX_TOKENS")
+                data = json.loads(
+                    TextHelper.fix_broken_json_string(message.content.strip())
+                )
 
-                    data = json.loads(
-                        TextHelper.fix_broken_json_string(message.content.strip())
-                    )
+                # 获取结果
+                word.surface_translation = data.get("translation", "").strip()
+                word.surface_translation_description = data.get("description", "").strip()
+                word.llmresponse_translate_surface = llm_response
 
-                    word.surface_translation = [translation.strip() for translation in data.get("translation", ",").split(",")]
-                    word.surface_translation_description = data["description"]
-                    word.llmresponse_translate_surface = llm_response
+                # 检查词语描述种是否包含不应包含的关键字，如果包含则移除
+                # 只检查描述不为空的非角色实体
+                if (
+                    word.ner_type != "PER"
+                    and word.surface_translation_description != ""
+                    and self.check_keyword_in_description(word, ["语气词", "拟声词", "感叹词", "形容词"])
+                ):
+                    word.ner_type = ""
+                    LogHelper.debug(f"[词语翻译] 已剔除 - {word.surface} - {word.surface_translation_description}")
 
                 # 生成罗马音，汉字有时候会生成重复的罗马音，所以需要去重
                 results = list(set([item.get("hepburn", "") for item in self.kakasi.convert(word.surface)]))
@@ -357,34 +379,39 @@ class LLM:
         return words
 
     # 语义分析任务 
-    async def summarize_context(self, word, retry):
+    async def summarize_context(self, word: Word, retry: bool, mode: int):
         async with self.semaphore, self.async_limiter:
             try:
-                usage, message, llm_request, llm_response, error = await self.request(
-                    self.prompt_summarize_context.replace("{surface}", word.surface).replace("{context}", "\n".join(word.context)),
-                    self.TASK_TYPE_SUMMAIRZE_CONTEXT,
-                    retry
-                )
+                error = None
 
-                if error:
-                    raise error
-
-                if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_SUMMAIRZE_CONTEXT].MAX_TOKENS:
-                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
-
-                result = json.loads(
-                    TextHelper.fix_broken_json_string(message.content.strip())
-                )
-
-                if ("否" in result.get("is_name") or "未知" in result.get("is_name")):
-                    word.ner_type = ""
-                    LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
+                if mode == LLM.PROCESS_MODE.QUICK:
+                    word.ner_type = "" if not self.check_keyword_in_description(word) else word.ner_type
                 else:
-                    LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
+                    usage, message, llm_request, llm_response, error = await self.request(
+                        self.prompt_summarize_context.replace("{surface}", word.surface).replace("{context}", "\n".join(word.context)),
+                        self.TASK_TYPE_SUMMAIRZE_CONTEXT,
+                        retry
+                    )
 
-                word.attribute = result.get("sex")
-                word.context_summary = result.get("summary")
-                word.llmresponse_summarize_context = llm_response
+                    if error:
+                        raise error
+
+                    if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_SUMMAIRZE_CONTEXT].MAX_TOKENS:
+                        raise Exception("usage.completion_tokens >= MAX_TOKENS")
+
+                    result = json.loads(
+                        TextHelper.fix_broken_json_string(message.content.strip())
+                    )
+
+                    if "否" not in result.get("is_name", ""):
+                        LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
+                    else:
+                        word.ner_type = ""
+                        LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
+
+                    word.attribute = result.get("gender", "").strip()
+                    word.context_summary = result.get("summary", "").strip()
+                    word.llmresponse_summarize_context = llm_response
             except Exception as e:
                 LogHelper.warning(f"[语义分析] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
                 LogHelper.debug(f"llm_request - {llm_request}")
@@ -394,7 +421,7 @@ class LLM:
                 return error if error else word
 
     # 语义分析任务完成时的回调
-    def on_summarize_context_task_done(self, future, words, words_failed, words_successed):
+    def on_summarize_context_task_done(self, future: Future, words: list[Word], words_failed: list[Word], words_successed: list[Word]):
         result = future.result()
 
         if not isinstance(result, Exception):
@@ -402,7 +429,7 @@ class LLM:
             LogHelper.info(f"[语义分析] 已完成 {len(words_successed)} / {len(words)} ...")
 
     # 批量执行语义分析任务的具体实现
-    async def do_summarize_context_batch(self, words, words_failed, words_successed):
+    async def do_summarize_context_batch(self, words: list[Word], words_failed: list[Word], words_successed: list[Word], mode: int):
         if len(words_failed) == 0:
             retry = False
             words_this_round = words
@@ -412,7 +439,7 @@ class LLM:
 
         tasks = []
         for k, word in enumerate(words_this_round):
-            task = asyncio.create_task(self.summarize_context(word, retry))
+            task = asyncio.create_task(self.summarize_context(word, retry, mode))
             task.add_done_callback(lambda future: self.on_summarize_context_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
 
@@ -426,17 +453,17 @@ class LLM:
         return words_failed, words_successed
 
     # 批量执行语义分析任务
-    async def summarize_context_batch(self, words):
+    async def summarize_context_batch(self, words: list[Word], mode: int):
         words_failed = []
         words_successed = []
 
         # 第一次请求
-        words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed)
+        words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed, mode)
 
         # 开始重试流程
         for i in range(self.MAX_RETRY):
             if len(words_failed) > 0:
                 LogHelper.warning( f"[语义分析] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
-                words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed)
+                words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed, mode)
 
         return words 

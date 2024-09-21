@@ -23,6 +23,11 @@ from helper.ProgressHelper import ProgressHelper
 # 丑陋，但是有效，不服你咬我啊
 G = type("GClass", (), {})()
 
+# 定义常量
+SCORE_THRESHOLD = 0.85
+CONTEXT_LENGHT_THRESHOLD = 768
+CONTEXT_LENGHT_THRESHOLD_EN = 512
+
 # 清理文本
 def cleanup(line):
     # 【\N[123]】 这种形式是代指角色名字的变量
@@ -274,9 +279,12 @@ def write_words_log_to_file(words, path, language):
             if getattr(word, "count", int(-1)) >= 0:
                 file.write(f"出现次数 : {word.count}\n")
 
-            if len(getattr(word, "surface_translation", [])) > 0:
-                file.write(f"词语翻译 : {", ".join(word.surface_translation)}, {word.surface_translation_description}\n")
-                
+            if len(getattr(word, "surface_translation", "")) > 0:
+                if word.surface_translation_description == "":
+                    file.write(f"词语翻译 : {word.surface_translation}\n")
+                else:
+                    file.write(f"词语翻译 : {word.surface_translation}, {word.surface_translation_description}\n")
+ 
             if getattr(word, "attribute", "") != "":
                 file.write(f"角色性别 : {word.attribute}\n")
 
@@ -309,10 +317,7 @@ def write_words_list_to_file(words, path, language):
     with open(path, "w", encoding = "utf-8") as file:
         data = {}
         for k, word in enumerate(words):
-            if word.surface_translation and len(word.surface_translation) > 0:
-                data[word.surface] = word.surface_translation[0]
-            else:
-                data[word.surface] = ""
+            data[word.surface] = word.surface_translation
 
         file.write(json.dumps(data, indent = 4, ensure_ascii = False))
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
@@ -330,19 +335,19 @@ def write_ainiee_dict_to_file(words, path, language):
     with open(path, "w", encoding = "utf-8") as file:
         datas = []
         for word in words:
-            if not (word.surface_translation and len(word.surface_translation) > 0):
+            if word.surface_translation == "":
                 continue
 
             data = {}
             data["srt"] = word.surface
-            data["dst"] = word.surface_translation[0]
+            data["dst"] = word.surface_translation
 
             if word.ner_type == "PER" and "男" in word.attribute:
                 data["info"] = f"男性角色的名字"
             elif word.ner_type == "PER" and "女" in word.attribute:
                 data["info"] = f"女性角色的名字"
             elif word.ner_type == "PER":
-                data["info"] = f"未知性别角色的名字"
+                data["info"] = f"角色的名字"
             else:
                 data["info"] = f"{type_map.get(word.ner_type)}名称"
 
@@ -363,17 +368,17 @@ def write_galtransl_dict_to_file(words, path, language):
 
     with open(path, "w", encoding = "utf-8") as file:
         for word in words:
-            if not (word.surface_translation and len(word.surface_translation) > 0):
+            if word.surface_translation == "":
                 continue
 
-            line = f"{word.surface}\t{word.surface_translation[0]}"
+            line = f"{word.surface}\t{word.surface_translation}"
 
             if word.ner_type == "PER" and "男" in word.attribute:
                 line = line + f"\t男性角色的名字"
             elif word.ner_type == "PER" and "女" in word.attribute:
                 line = line + f"\t女性角色的名字"
             elif word.ner_type == "PER":
-                line = line + f"\t未知性别角色的名字"
+                line = line + f"\t角色的名字"
             else:
                 line = line + f"\t{type_map.get(word.ner_type)}名称"
 
@@ -382,6 +387,13 @@ def write_galtransl_dict_to_file(words, path, language):
 
 # 开始处理文本
 async def process_text(language):
+    # 选择处理模式
+    # 中文没有翻译的过程，所以无法支持快速模式
+    if language == NER.LANGUAGE.ZH:
+        process_mode = LLM.PROCESS_MODE.NORMAL
+    else:
+        process_mode = print_menu_process_mode()
+
     # 读取输入文件
     input_lines, input_names = read_input_file(language)
 
@@ -407,33 +419,43 @@ async def process_text(language):
 
     # 按出现次数阈值进行筛选
     LogHelper.info(f"即将开始执行 [阈值过滤] ... 当前出现次数的阈值设置为 {G.config.count_threshold} ...")
-    words = filter_words_by_score(words, 0.80)
+    words = filter_words_by_score(words, SCORE_THRESHOLD)
     words = filter_words_by_count(words, G.config.count_threshold)
     words = truncate_context_by_length(
         words, 
-        512 if language == NER.LANGUAGE.EN else 768, # 根据语言调整保留的上下文长度
+        CONTEXT_LENGHT_THRESHOLD if language != NER.LANGUAGE.EN else CONTEXT_LENGHT_THRESHOLD_EN, # 根据语言调整保留的上下文长度
     )
     LogHelper.info(f"[阈值过滤] 已完成 ...")
+
+    # 设置请求限制器
+    G.llm.set_request_limiter()
+
+    # 等待翻译词语任务结果
+    # 中文无需翻译
+    if language != NER.LANGUAGE.ZH:
+        LogHelper.info("即将开始执行 [词语翻译] ...")
+        words = await G.llm.translate_surface_batch(words)
+        words = remove_words_by_ner_type(words, "")
+
+    # 调试模式时，前置检查结果重复度
+    if LogHelper.is_debug():
+        with LogHelper.status(f"正在检查结果重复度..."):
+            TestHelper.check_result_duplication(
+                [word for word in words if G.llm.check_keyword_in_description(word)],
+                 "check_result_duplication_01.log",
+            )
 
     # 等待 语义分析任务 结果
     LogHelper.info("即将开始执行 [语义分析] ...")
     words_person = get_words_by_ner_type(words, "PER")
-    words_person = await G.llm.summarize_context_batch(words_person)
-    words_person = remove_words_by_ner_type(words_person, "")
+    words_person = await G.llm.summarize_context_batch(words_person, process_mode)
     words = replace_words_by_ner_type(words, words_person, "PER")
+    words = remove_words_by_ner_type(words, "")
 
-    # 调试模式时，检查结果重复度
+    # 调试模式时，后置检查结果重复度
     if LogHelper.is_debug():
         with LogHelper.status(f"正在检查结果重复度..."):
-            TestHelper.check_result_duplication(words, "check_result_duplication.log")
-
-    # 等待翻译词语任务结果
-    if (
-        G.config.translate_surface == 1
-        and (language == NER.LANGUAGE.EN or language == NER.LANGUAGE.JP or language == NER.LANGUAGE.KO)
-    ):
-        LogHelper.info("即将开始执行 [词语翻译] ...")
-        words = await G.llm.translate_surface_batch(words)
+            TestHelper.check_result_duplication(words, "check_result_duplication_02.log")
 
     ner_type = {
         "PER": "角色实体",
@@ -518,7 +540,6 @@ def print_app_info():
     rows = [
         ("接口密钥", str(G.config.api_key), "模型名称", str(G.config.model_name)),
         ("接口地址", str(G.config.base_url)),
-        ("出现次数阈值", str(G.config.count_threshold), "是否翻译词语", "是" if G.config.translate_surface == 1 else "否"),
         ("是否翻译角色实体上下文", "是" if G.config.translate_context_per == 1 else "否", "是否翻译其他实体上下文", "是" if G.config.translate_context_other == 1 else "否"),
         ("网络请求超时时间", f"{G.config.request_timeout} 秒" , "网络请求频率阈值", f"{G.config.request_frequency_threshold} 次/秒"),
     ]
@@ -533,7 +554,7 @@ def print_app_info():
 
 # 打印菜单
 def print_menu_main():
-    LogHelper.print(f"请选择：")
+    LogHelper.print(f"请选择功能：")
     LogHelper.print(f"")
     LogHelper.print(f"\t--> 1. 开始处理 [green]中文文本[/]")
     LogHelper.print(f"\t--> 2. 开始处理 [green]英文文本[/]")
@@ -544,6 +565,23 @@ def print_menu_main():
     choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的功能，默认为 [green][3][/] ", 
         choices = ["1", "2", "3", "4", "5"],
         default = "3",
+        show_choices = False,
+        show_default = False
+    ))
+    LogHelper.print(f"")
+
+    return choice
+
+# 打印处理模式菜单
+def print_menu_process_mode():
+    LogHelper.print(f"请选择处理模式：")
+    LogHelper.print(f"")
+    LogHelper.print(f"\t--> 1. [green]普通模式[/]：速度较慢，通过语义分析对结果进行确认，理论上可以提供最为精确的处理结果")
+    LogHelper.print(f"\t--> 2. [green]快速模式[/]：跳过语义分析步骤，速度快，消耗 Token 少，结果中将不包含角色性别与故事总结信息")
+    LogHelper.print(f"")
+    choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的处理模式，默认为 [green][1][/] ", 
+        choices = [f"{LLM.PROCESS_MODE.NORMAL}", f"{LLM.PROCESS_MODE.QUICK}"],
+        default = f"{LLM.PROCESS_MODE.NORMAL}",
         show_choices = False,
         show_default = False
     ))
@@ -595,8 +633,7 @@ def init():
         G.llm.load_blacklist("blacklist.txt")
         G.llm.load_prompt_summarize_context("prompt/prompt_summarize_context.txt")
         G.llm.load_prompt_translate_context("prompt/prompt_translate_context.txt")
-        G.llm.load_prompt_translate_surface_common("prompt/prompt_translate_surface_common.txt")
-        G.llm.load_prompt_translate_surface_person("prompt/prompt_translate_surface_person.txt")
+        G.llm.load_prompt_translate_surface("prompt/prompt_translate_surface.txt")
 
         # 初始化 NER 对象
         G.ner = NER()
