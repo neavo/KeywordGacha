@@ -150,18 +150,20 @@ class LLM:
     # 设置请求限制器
     def set_request_limiter(self):
             try:
-                with urllib.request.urlopen(f"{self.base_url.replace("/v1", "")}/slots") as response:
+                num = -1
+                url = self.base_url.replace("/v1", "") if self.base_url.endswith("/v1") else self.base_url
+                with urllib.request.urlopen(f"{url}/slots") as response:
                     data = json.loads(response.read().decode("utf-8"))
-
-                    # 如果信息读取成功，则覆盖原有的请求频率阈值
-                    if data != None and len(data) > 0:
-                        LogHelper.info(f"")
-                        LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(data)}[/] 次/秒 ...")
-                        LogHelper.info(f"")
-                        self.request_frequency_threshold = len(data)
+                    num = len(data) if data != None and len(data) > 0 else num
             except Exception as e:
                 LogHelper.debug(f"{LogHelper.get_trackback(e)}")
             finally:
+                if num > 0:
+                    LogHelper.info(f"")
+                    LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(data)}[/] 次/秒 ...")
+                    LogHelper.info(f"")
+                    self.request_frequency_threshold = len(data)
+
                 # 设置请求限制器
                 if self.request_frequency_threshold > 1:
                     self.semaphore = asyncio.Semaphore(self.request_frequency_threshold)

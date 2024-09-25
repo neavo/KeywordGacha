@@ -505,6 +505,10 @@ async def process_text(language):
 
 # 接口测试
 async def test_api():
+    # 设置请求限制器
+    G.llm.set_request_limiter()
+
+    # 等待接口测试结果
     if await G.llm.api_test():
         LogHelper.print("")
         LogHelper.info("接口测试 [green]执行成功[/] ...")
