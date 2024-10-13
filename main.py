@@ -343,13 +343,13 @@ def write_ainiee_dict_to_file(words, path, language):
             data["dst"] = word.surface_translation
 
             if word.ner_type == "PER" and "男" in word.attribute:
-                data["info"] = f"男性角色的名字"
+                data["info"] = f"男性的名字"
             elif word.ner_type == "PER" and "女" in word.attribute:
-                data["info"] = f"女性角色的名字"
+                data["info"] = f"女性的名字"
             elif word.ner_type == "PER":
-                data["info"] = f"角色的名字"
+                data["info"] = f"名字"
             else:
-                data["info"] = f"{type_map.get(word.ner_type)}名称"
+                data["info"] = f"{type_map.get(word.ner_type)}的名字"
 
             datas.append(data)
 
@@ -374,13 +374,13 @@ def write_galtransl_dict_to_file(words, path, language):
             line = f"{word.surface}\t{word.surface_translation}"
 
             if word.ner_type == "PER" and "男" in word.attribute:
-                line = line + f"\t男性角色的名字"
+                line = line + f"\t男性的名字"
             elif word.ner_type == "PER" and "女" in word.attribute:
-                line = line + f"\t女性角色的名字"
+                line = line + f"\t女性的名字"
             elif word.ner_type == "PER":
-                line = line + f"\t角色的名字"
+                line = line + f"\t名字"
             else:
-                line = line + f"\t{type_map.get(word.ner_type)}名称"
+                line = line + f"\t{type_map.get(word.ner_type)}的名字"
 
             file.write(f"{line}\n")
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
