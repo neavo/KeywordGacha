@@ -2,6 +2,7 @@ import re
 import gc
 import os
 import json
+import warnings
 
 import torch
 import onnxruntime
@@ -55,6 +56,13 @@ class NER:
     LANGUAGE.KO = "KO"
 
     def __init__(self):
+        # 忽略指定的警告信息
+        warnings.filterwarnings(
+            "ignore",
+            message = "1Torch was not compiled with flash attention",
+            category = UserWarning, 
+        )
+        
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.MODEL_PATH,
             padding = "max_length",
