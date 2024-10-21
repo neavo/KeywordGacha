@@ -5,6 +5,9 @@ import copy
 import json
 import asyncio
 
+import jaconv
+import unicodedata
+
 import rich
 from rich import box
 from rich.table import Table
@@ -30,22 +33,32 @@ CONTEXT_LENGHT_THRESHOLD_EN = 512
 
 # 清理文本
 def cleanup(line):
-    # 【\N[123]】 这种形式是代指角色名字的变量
-    # 直接抹掉就没办法判断角色了，只把 \N 部分抹掉，保留 ID 部分
-    line = line.strip().replace("\\N", "")
 
-    # 放大或者缩小字体的代码，干掉
-    # \{\{ゴゴゴゴゴゴゴゴゴッ・・・\r\n（大地の揺れる音）
-    line = re.sub(r"(\\\{)|(\\\})", "", line) 
-
-    # /C[4] 这种形式的代码，干掉
-    line = re.sub(r"/[A-Z]{1,5}\[\d+\]", "", line, flags = re.IGNORECASE)
-
-    # \FS[29] 这种形式的代码，干掉
-    line = re.sub(r"\\[A-Z]{1,5}\[\d+\]", "", line, flags = re.IGNORECASE)
+    # 将 角色代码 \N[123] 和 队伍成员代码 \P[123] 替换为 player
+    line = re.sub(r"\\[NP]\[\d+\]", "player", line)
 
     # \nw[隊員Ｃ] 这种形式的代码，干掉 [ 前的部分
     line = re.sub(r"\\[A-Z]{1,5}\[", "[", line, flags = re.IGNORECASE)
+    
+    # 干掉以下常用代码
+    codes = [
+        r"(\\\{)", # 放大字体 \{
+        r"(\\\})", # 缩小字体 \}
+        r"(\\G)", # 显示货币 \G
+        r"(\\\$)", # 打开金币框 \$
+        r"(\\\.)", # 等待0.25秒 \.
+        r"(\\\|)", # 等待1秒 \|
+        r"(\\!)", # 等待按钮按下 \!
+        r"(\\>)", # 在同一行显示文字 \>
+        r"(\\<)", # 取消显示所有文字 \<
+        r"(\\\^)", # 显示文本后不需要等待 \^
+        r"(<br>)", # 如果你使用了换行模式，这将导致换行 <br>
+        r"(/[A-Z]{1,5}\[\d+\])", # /C[4]
+        r"(/[A-Z]{1,5}<\d+>)", # /C<4>
+        r"(\\[A-Z]{1,5}\[\d+\])", # \FS[29]
+        r"(\\[A-Z]{1,5}<\d+>)", # \FS<29>
+    ]
+    line = re.sub(rf"{"|".join(codes)}", "", line, flags = re.IGNORECASE)
 
     # 由于上面的代码移除，可能会产生空人名框的情况，干掉
     line = line.replace("【】", "") 
@@ -194,6 +207,15 @@ def read_input_file(language):
 
         if len(line) == 0:
             continue
+
+        if language == NER.LANGUAGE.EN:
+            if line != unicodedata.normalize("NFKC", line):
+                LogHelper.debug(f"{line} [green]->[/] {unicodedata.normalize("NFKC", line)}")
+
+            line = unicodedata.normalize("NFKC", line)
+            
+        if language == NER.LANGUAGE.JP:
+            line = jaconv.normalize(line, mode = "NFKC")
 
         if language == NER.LANGUAGE.ZH and not TextHelper.has_any_cjk(line):
             continue

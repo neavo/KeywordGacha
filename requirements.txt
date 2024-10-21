@@ -1,4 +1,5 @@
 rich
+jaconv
 loguru
 openai
 tiktoken
