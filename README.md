@@ -1,6 +1,6 @@
 <h1><p align='center' >KeywordGacha</p></h1>
 <div align=center><img src="https://img.shields.io/github/v/release/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/license/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/stars/neavo/KeywordGacha"/></div>
-<p align='center' >使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等内容文本中实体词语表的翻译辅助工具</p>
+<p align='center'>使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等内容文本中实体词语表的翻译辅助工具</p>
 
 &ensp;
 &ensp;
@@ -9,7 +9,7 @@
 ## 概述 📢
 - [KeywordGacha](https://github.com/neavo/KeywordGacha)，简称 KG，使用 AI 技术来自动生成 `实体词语表` 的次世代工具
 - `实体词语表` 可以在一定程度上解决在长篇文本翻译过程中 `人名` 等实体词语翻译版本不统一的问题
-- 从 `中文`、`英文`、`日文`、`韩文` 文本内容中 `一键抓取实体词语`，并且 `自动翻译`、`自动总结`、`自动生成词语表`
+- 根据 `中、英、日、韩` 文本内容自动生成 `实体词语表`，并且 `自动翻译`、`自动总结`、`自动分析`
 - 相较传统工具，具有高命中、语义化、智能总结角色信息等特色，对文本的兼容性更好
 - 极大的提升 `小说`、`漫画`、`字幕`、`游戏脚本` 等内容译前准备时制作词语表的工作效率
 - 随机选取 [绿站榜单作品](https://books.fishhawk.top) 作为测试样本，与人工校对制作的词表对比，命中率约为 `80%-90%`
@@ -17,11 +17,14 @@
 > <img src="image/01.jpg" style="width: 80%;" alt="image/01.jpg">
 
 > <img src="image/02.jpg" style="width: 80%;" alt="image/02.jpg">
+
+## 特别说明 ⚠️
+- 如您在翻译过程中使用了 [KeywordGacha](https://github.com/neavo/KeywordGacha)，请在作品信息或发布页面的显要位置进行说明！
   
-## 要求 🖥️
-- 兼容所有 OpenAI 标准的 AI 大模型接口
+## 配置要求 🖥️
+- 兼容 OpenAI 标准的 AI 大模型接口
 - 使用 [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek) 处理一本书只要 `几毛钱` + `一分钟`
-- 也可以运行 `本地模型` 来获得 `完全免费` 的服务（需要 8G 以上显存的 Nvidia 显卡）
+- 也可以通过运行 [一键包 - 点击查看教程](https://github.com/neavo/KeywordGachaServer) 来获得 `完全免费` 的服务（需要 8G 以上显存的 Nvidia 显卡）
 
 ## 使用流程 🛸
 - 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 或 [百度网盘](https://pan.baidu.com/s/1_JXmKvnar6PGHlIbl0Mi2Q?pwd=9e54) 下载应用
@@ -36,8 +39,6 @@
 ## 应用效果 ⚡
 - `抓取`、`分析` 和 `翻译` 效果取决于模型的能力，使用 💪 ~~更昂贵~~ 更强力  的模型可以显著提升效果
 - 是的，氪金可以变强
-- 如果不会选择模型，推荐按教程使用 `在线接口`，比如又快又便宜的 [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)
-- 如果拥有 `8G+` 显存的 `Nvidia` 显卡，也可以使用 [一键包 - 点击查看教程](https://github.com/neavo/KeywordGachaServer) 来获取免费的本地服务
 - 总体来说 `在线接口` 的效果和速度都远好于 `本地接口`，建议使用 `在线接口` 
 
 ## 文本格式 🏷️
@@ -134,5 +135,5 @@
 - [X] 添加 全自动生成模式
 
 ## 问题反馈 😥
-  - 运行时的日志保存在程序目录下的 `KeywordGacha.log` 等日志文件内
-  - 反馈问题的时候请附上这些日志文件
+- 运行时的日志保存在程序目录下的 `KeywordGacha.log` 等日志文件内
+- 反馈问题的时候请附上这些日志文件
