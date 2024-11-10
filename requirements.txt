@@ -2,6 +2,7 @@ rich
 jaconv
 loguru
 openai
+openpyxl
 tiktoken
 pykakasi
 aiolimiter

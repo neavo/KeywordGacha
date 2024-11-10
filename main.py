@@ -6,6 +6,7 @@ import json
 import asyncio
 
 import jaconv
+import openpyxl
 import unicodedata
 
 import rich
@@ -174,6 +175,23 @@ def read_json_file(file_path: str):
 
     return lines, names
 
+# 读取 .xlsx 文件
+def read_xlsx_file(file_path: str):
+    lines = []
+    names = []
+
+    try:
+        sheet = openpyxl.load_workbook(file_path).active
+        for row in range(1, sheet.max_row + 1):
+            cell_01 = sheet.cell(row = row, column = 1).value
+
+            if cell_01 != None and isinstance(cell_01, str) and cell_01 != "":
+                lines.append(cell_01)
+    except Exception as e:
+        LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
+
+    return lines, names
+
 # 读取数据文件
 def read_input_file(language: int):
     # 先尝试自动寻找数据文件，找不到提示用户输入
@@ -207,6 +225,8 @@ def read_input_file(language: int):
         input_lines, input_names = read_csv_file(file_path)
     elif file_path.endswith(".json"):
         input_lines, input_names = read_json_file(file_path, language)
+    elif file_path.endswith(".xlsx"):
+        input_lines, input_names = read_xlsx_file(file_path, language)
     elif os.path.isdir(file_path):
         for entry in os.scandir(file_path):
             if entry.is_file() and entry.name.endswith(".txt"):
@@ -219,6 +239,10 @@ def read_input_file(language: int):
                 input_names.extend(input_names_ex)
             elif entry.is_file() and entry.name.endswith(".json"):
                 input_lines_ex, input_names_ex = read_json_file(entry.path)
+                input_lines.extend(input_lines_ex)
+                input_names.extend(input_names_ex)
+            elif entry.is_file() and entry.name.endswith(".xlsx"):
+                input_lines_ex, input_names_ex = read_xlsx_file(entry.path)
                 input_lines.extend(input_lines_ex)
                 input_names.extend(input_names_ex)
     else:
