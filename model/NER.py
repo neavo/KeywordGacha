@@ -1,7 +1,8 @@
+import os
 import re
 import gc
-import os
 import json
+import warnings
 
 import torch
 import onnxruntime
@@ -27,7 +28,7 @@ class NER:
     MODEL_PATH = "resource/kg_ner_gpu" if GPU_BOOST else "resource/kg_ner_cpu"
 
     RE_SPLIT_BY_PUNCTUATION = re.compile(
-        rf"[" +
+        r"[" +
         rf"{TextHelper.GENERAL_PUNCTUATION[0]}-{TextHelper.GENERAL_PUNCTUATION[1]}" +
         rf"{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0]}-{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]}" +
         rf"{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]}" +
@@ -37,7 +38,7 @@ class NER:
         rf"{TextHelper.LATIN_PUNCTUATION_BASIC_4[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_4[1]}" +
         rf"{TextHelper.LATIN_PUNCTUATION_GENERAL[0]}-{TextHelper.LATIN_PUNCTUATION_GENERAL[1]}" +
         rf"{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]}" +
-        rf"・♥]+"
+        r"・♥]+"
     )
 
     NER_TYPES = {
@@ -49,12 +50,19 @@ class NER:
     }
 
     LANGUAGE = type("GClass", (), {})()
-    LANGUAGE.ZH = "ZH"
-    LANGUAGE.EN = "EN"
-    LANGUAGE.JP = "JP"
-    LANGUAGE.KO = "KO"
+    LANGUAGE.ZH = 100
+    LANGUAGE.EN = 200
+    LANGUAGE.JP = 300
+    LANGUAGE.KO = 400
 
     def __init__(self):
+        # 忽略指定的警告信息
+        warnings.filterwarnings(
+            "ignore",
+            message = "1Torch was not compiled with flash attention",
+            category = UserWarning,
+        )
+
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.MODEL_PATH,
             padding = "max_length",
@@ -74,7 +82,7 @@ class NER:
             session_options = onnxruntime.SessionOptions()
             session_options.log_severity_level = 4
             self.model = ORTModelForTokenClassification.from_pretrained(
-                self.MODEL_PATH, 
+                self.MODEL_PATH,
                 provider = "CPUExecutionProvider",
                 session_options = session_options,
                 use_io_binding = True,
@@ -106,25 +114,27 @@ class NER:
         LogHelper.debug(f"显存保留量 - {torch.cuda.memory_reserved()/1024/1024:>8.2f} MB")
         LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024:>8.2f} MB")
 
-    # 生成器 
+    # 生成器
     def generator(self, data):
         for v in data:
             yield v
 
-    # 从指定路径加载黑名单文件内容
-    def load_blacklist(self, filepath):
-        try:
-            with open(filepath, "r", encoding = "utf-8") as file:
-                data = json.load(file)
+    # 加载黑名单文件内容
+    def load_blacklist(self):
+        self.blacklist = set()
 
-                self.blacklist = ""
-                for k, v in enumerate(data):
-                    self.blacklist = self.blacklist + v + "\n"
+        try:
+            for entry in os.scandir("blacklist"):
+                if entry.is_file() and entry.name.endswith(".json"):
+                    with open(entry.path, "r", encoding = "utf-8") as file:
+                        for v in json.load(file):
+                            if v.get("srt") != None:
+                                self.blacklist.add(v.get("srt"))
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 判断是否是有意义的汉字词语
-    def is_valid_cjk_word(self, surface, blacklist):
+    def is_valid_cjk_word(self, surface: str, blacklist: set[str]):
         flag = True
 
         if len(surface) <= 1:
@@ -139,13 +149,13 @@ class NER:
         return flag
 
     # 判断是否是有意义的英文词语
-    def is_valid_english_word(self, surface, blacklist, ner_type, unique_words):
+    def is_valid_english_word(self, surface: str, blacklist: set[str], ner_type: str, unique_words: set[str]):
         flag = True
 
         if len(surface) <= 2:
             return False
 
-        if surface in blacklist:
+        if surface.lower() in blacklist:
             return False
 
         if not TextHelper.has_any_latin(surface):
@@ -164,7 +174,7 @@ class NER:
         return flag
 
     # 判断是否是有意义的日文词语
-    def is_valid_japanese_word(self, surface, blacklist):
+    def is_valid_japanese_word(self, surface: str, blacklist: set[str]):
         flag = True
 
         if len(surface) <= 1:
@@ -179,7 +189,7 @@ class NER:
         return flag
 
     # 判断是否是有意义的韩文词语
-    def is_valid_korean_word(self, surface, blacklist):
+    def is_valid_korean_word(self, surface: str, blacklist: set[str]):
         flag = True
 
         if len(surface) <= 1:
@@ -222,7 +232,7 @@ class NER:
 
         return chunks
 
-    # 生成词语 
+    # 生成词语
     def generate_words(self, text, line, score, ner_type, language, unique_words):
         words = []
 
@@ -271,7 +281,7 @@ class NER:
         return words
 
     # 获取英语词根
-    def get_english_lemma(self, surface):      
+    def get_english_lemma(self, surface):
         lemma_noun = getLemma(surface, upos = "NOUN")[0]
         lemma_propn = getLemma(surface, upos = "PROPN")[0]
 
@@ -306,12 +316,12 @@ class NER:
         else:
             LogHelper.warning("未检测到有效的 [green]GPU[/] 环境，无法启用 [green]GPU[/] 加速 ...")
 
-        LogHelper.print(f"")
+        LogHelper.print("")
         with LogHelper.status("正在对文本进行预处理 ..."):
             chunks = self.generate_chunks(input_lines, 512)
-            
+
         with ProgressHelper.get_progress() as progress:
-            pid = progress.add_task("查找 NER 实体", total = None)   
+            pid = progress.add_task("查找 NER 实体", total = None)
 
             i = 0
             unique_words = None
@@ -331,11 +341,11 @@ class NER:
                     else:
                         start = chunk_offsets[-1][1]
 
-                    end = start + len(line) + 1 
+                    end = start + len(line) + 1
                     chunk_offsets.append((start, start + len(line) + 1)) # 字符数加上换行符的长度
 
                 # 如果是英文，则抓取去重词表，再计算并添加所有词根到词表，以供后续筛选词语
-                if language == NER.LANGUAGE.EN: 
+                if language == NER.LANGUAGE.EN:
                     unique_words = set(re.findall(r"\b\w+\b", chunk))
                     unique_words.update(set(self.get_english_lemma(v) for v in unique_words))
 
@@ -367,8 +377,8 @@ class NER:
                             words.append(word)
 
         # 打印通过模式匹配抓取的角色实体
-        LogHelper.print(f"")
-        LogHelper.info(f"[查找 NER 实体] 已完成 ...")
+        LogHelper.print("")
+        LogHelper.info("[查找 NER 实体] 已完成 ...")
         if len(seen) > 0:
             LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}")
 
@@ -399,7 +409,7 @@ class NER:
             # 如果已不能再拆分，跳过
             if len(tokens) == 1:
                 continue
-          
+
             # 获取词根，获取成功则更新词语
             roots = []
             for k, v in enumerate(tokens):

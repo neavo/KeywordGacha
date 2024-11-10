@@ -1,6 +1,4 @@
-import re
 import json
-import random
 import asyncio
 import urllib.request
 from concurrent.futures import Future
@@ -9,7 +7,6 @@ import pykakasi
 from openai import AsyncOpenAI
 from aiolimiter import AsyncLimiter
 
-from model.NER import NER
 from model.Word import Word
 from helper.LogHelper import LogHelper
 from helper.TextHelper import TextHelper
@@ -25,8 +22,8 @@ class LLM:
 
     # 处理模式
     PROCESS_MODE = type("GClass", (), {})()
-    PROCESS_MODE.NORMAL = 1
     PROCESS_MODE.QUICK = 2
+    PROCESS_MODE.NORMAL = 1
 
     # 初始化请求配置参数
     LLMCONFIG = {}
@@ -56,9 +53,9 @@ class LLM:
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT] = type("GClass", (), {})()
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TEMPERATURE = 0.75
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TOP_P = 0.95
-    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS = 1024
+    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS = 1536
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].FREQUENCY_PENALTY = 0
-    
+
     def __init__(self, config):
         self.api_key = config.api_key
         self.base_url = config.base_url
@@ -76,18 +73,6 @@ class LLM:
             base_url = self.base_url,
             max_retries = 0
         )
-
-    # 从指定路径加载黑名单文件内容
-    def load_blacklist(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                data = json.load(file)
-
-                self.blacklist = ""
-                for k, v in enumerate(data):
-                    self.blacklist = self.blacklist + v + "\n"
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 根据类型加载不同的prompt模板文件
     def load_prompt_summarize_context(self, filepath):
@@ -118,7 +103,7 @@ class LLM:
         return any(keyword in word.surface_translation_description for keyword in keywords)
 
     # 异步发送请求到OpenAI获取模型回复
-    async def request(self, content, task_type, retry = False):     
+    async def request(self, content, task_type, retry = False):
         try:
             usage, message, llm_request, llm_response, error = None, None, None, None, None
 
@@ -131,12 +116,12 @@ class LLM:
                 "frequency_penalty" : self.LLMCONFIG[task_type].FREQUENCY_PENALTY + 0.2 if retry else self.LLMCONFIG[task_type].FREQUENCY_PENALTY,
                 "messages" : [
                     {
-                        "role": "user", 
+                        "role": "user",
                         "content": content
                     },
                 ],
             }
-            
+
             completion = await self.openai_handler.chat.completions.create(**llm_request)
 
             llm_response = completion
@@ -159,9 +144,9 @@ class LLM:
                 LogHelper.debug(f"{LogHelper.get_trackback(e)}")
             finally:
                 if num > 0:
-                    LogHelper.info(f"")
+                    LogHelper.info("")
                     LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(data)}[/] 次/秒 ...")
-                    LogHelper.info(f"")
+                    LogHelper.info("")
                     self.request_frequency_threshold = len(data)
 
                 # 设置请求限制器
@@ -191,8 +176,8 @@ class LLM:
                     raise error
 
                 if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_API_TEST].MAX_TOKENS:
-                    raise Exception("usage.completion_tokens >= MAX_TOKENS")                
-            
+                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
+
                 data = json.loads(
                     TextHelper.fix_broken_json_string(message.content.strip())
                 )
@@ -211,7 +196,7 @@ class LLM:
         async with self.semaphore, self.async_limiter:
             try:
                 prompt = self.prompt_translate_surface.replace("{surface}", word.surface)
-                prompt = prompt.replace("{context}", "\n".join(word.clip_context(256)))
+                prompt = prompt.replace("{context}", word.get_context_str_for_surface_translate())
 
                 usage, message, llm_request, llm_response, error = await self.request(
                     prompt,
@@ -270,7 +255,7 @@ class LLM:
             words_this_round = words
         else:
             retry = True
-            words_this_round = words_failed       
+            words_this_round = words_failed
 
         tasks = []
         for k, word in enumerate(words_this_round):
@@ -278,7 +263,7 @@ class LLM:
             task.add_done_callback(lambda future: self.on_translate_surface_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
 
-        # 等待异步任务完成 
+        # 等待异步任务完成
         await asyncio.gather(*tasks, return_exceptions = True)
 
         # 获得失败任务的列表
@@ -287,7 +272,7 @@ class LLM:
 
         return words_failed, words_successed
 
-    # 批量执行词语翻译任务 
+    # 批量执行词语翻译任务
     async def translate_surface_batch(self, words):
         words_failed = []
         words_successed = []
@@ -308,7 +293,7 @@ class LLM:
         async with self.semaphore, self.async_limiter:
             try:
                 usage, message, llm_request, llm_response, error = await self.request(
-                    self.prompt_translate_context.replace("{context}", "\n".join(word.context)),
+                    self.prompt_translate_context.replace("{context}", word.get_context_str_for_translate()),
                     self.TASK_TYPE_TRANSLATE_CONTEXT,
                     retry
                 )
@@ -318,7 +303,7 @@ class LLM:
 
                 if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS:
                     raise Exception("usage.completion_tokens >= MAX_TOKENS")
-                
+
                 context_translation = []
                 for k, line in enumerate(message.content.split("\n")):
                     if len(line) > 0:
@@ -349,7 +334,7 @@ class LLM:
             words_this_round = words
         else:
             retry = True
-            words_this_round = words_failed       
+            words_this_round = words_failed
 
         tasks = []
         for k, word in enumerate(words_this_round):
@@ -357,7 +342,7 @@ class LLM:
             task.add_done_callback(lambda future: self.on_translate_context_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
 
-        # 等待异步任务完成 
+        # 等待异步任务完成
         await asyncio.gather(*tasks, return_exceptions = True)
 
         # 获得失败任务的列表
@@ -366,7 +351,7 @@ class LLM:
 
         return words_failed, words_successed
 
-    # 批量执行上下文翻译任务 
+    # 批量执行上下文翻译任务
     async def translate_context_batch(self, words):
         words_failed = []
         words_successed = []
@@ -380,7 +365,7 @@ class LLM:
 
         return words
 
-    # 语义分析任务 
+    # 语义分析任务
     async def summarize_context(self, word: Word, retry: bool, mode: int):
         async with self.semaphore, self.async_limiter:
             try:
@@ -390,7 +375,7 @@ class LLM:
                     word.ner_type = "" if not self.check_keyword_in_description(word) else word.ner_type
                 else:
                     usage, message, llm_request, llm_response, error = await self.request(
-                        self.prompt_summarize_context.replace("{surface}", word.surface).replace("{context}", "\n".join(word.context)),
+                        self.prompt_summarize_context.replace("{surface}", word.surface).replace("{context}", word.get_context_str_for_summarize()),
                         self.TASK_TYPE_SUMMAIRZE_CONTEXT,
                         retry
                     )
@@ -437,7 +422,7 @@ class LLM:
             words_this_round = words
         else:
             retry = True
-            words_this_round = words_failed       
+            words_this_round = words_failed
 
         tasks = []
         for k, word in enumerate(words_this_round):
@@ -445,7 +430,7 @@ class LLM:
             task.add_done_callback(lambda future: self.on_summarize_context_task_done(future, words, words_failed, words_successed))
             tasks.append(task)
 
-        # 等待异步任务完成 
+        # 等待异步任务完成
         await asyncio.gather(*tasks, return_exceptions = True)
 
         # 获得失败任务的列表
@@ -468,4 +453,4 @@ class LLM:
                 LogHelper.warning( f"[语义分析] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
                 words_failed, words_successed = await self.do_summarize_context_batch(words, words_failed, words_successed, mode)
 
-        return words 
+        return words
