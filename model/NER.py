@@ -1,3 +1,4 @@
+import os
 import re
 import gc
 import json
@@ -118,20 +119,22 @@ class NER:
         for v in data:
             yield v
 
-    # 从指定路径加载黑名单文件内容
-    def load_blacklist(self, filepath):
-        try:
-            with open(filepath, "r", encoding = "utf-8") as file:
-                data = json.load(file)
+    # 加载黑名单文件内容
+    def load_blacklist(self):
+        self.blacklist = set()
 
-                self.blacklist = ""
-                for k, v in enumerate(data):
-                    self.blacklist = self.blacklist + v + "\n"
+        try:
+            for entry in os.scandir("blacklist"):
+                if entry.is_file() and entry.name.endswith(".json"):
+                    with open(entry.path, "r", encoding = "utf-8") as file:
+                        for v in json.load(file):
+                            if v.get("srt") != None:
+                                self.blacklist.add(v.get("srt"))
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 判断是否是有意义的汉字词语
-    def is_valid_cjk_word(self, surface, blacklist):
+    def is_valid_cjk_word(self, surface: str, blacklist: set[str]):
         flag = True
 
         if len(surface) <= 1:
@@ -146,13 +149,13 @@ class NER:
         return flag
 
     # 判断是否是有意义的英文词语
-    def is_valid_english_word(self, surface, blacklist, ner_type, unique_words):
+    def is_valid_english_word(self, surface: str, blacklist: set[str], ner_type: str, unique_words: set[str]):
         flag = True
 
         if len(surface) <= 2:
             return False
 
-        if surface in blacklist:
+        if surface.lower() in blacklist:
             return False
 
         if not TextHelper.has_any_latin(surface):
@@ -171,7 +174,7 @@ class NER:
         return flag
 
     # 判断是否是有意义的日文词语
-    def is_valid_japanese_word(self, surface, blacklist):
+    def is_valid_japanese_word(self, surface: str, blacklist: set[str]):
         flag = True
 
         if len(surface) <= 1:
@@ -186,7 +189,7 @@ class NER:
         return flag
 
     # 判断是否是有意义的韩文词语
-    def is_valid_korean_word(self, surface, blacklist):
+    def is_valid_korean_word(self, surface: str, blacklist: set[str]):
         flag = True
 
         if len(surface) <= 1:

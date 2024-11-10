@@ -1,0 +1,207 @@
+[
+    {
+        "srt": "father",
+        "dst": "",
+        "info": "父亲"
+    },
+    {
+        "srt": "dad",
+        "dst": "",
+        "info": "父亲"
+    },
+    {
+        "srt": "daddy",
+        "dst": "",
+        "info": "父亲"
+    },
+    {
+        "srt": "mother",
+        "dst": "",
+        "info": "母亲"
+    },
+    {
+        "srt": "mom",
+        "dst": "",
+        "info": "母亲"
+    },
+    {
+        "srt": "mum",
+        "dst": "",
+        "info": "母亲"
+    },
+    {
+        "srt": "mommy",
+        "dst": "",
+        "info": "母亲"
+    },
+    {
+        "srt": "mummy",
+        "dst": "",
+        "info": "母亲"
+    },
+    {
+        "srt": "son",
+        "dst": "",
+        "info": "儿子"
+    },
+    {
+        "srt": "daughter",
+        "dst": "",
+        "info": "女儿"
+    },
+    {
+        "srt": "bro",
+        "dst": "",
+        "info": "兄弟"
+    },
+    {
+        "srt": "brother",
+        "dst": "",
+        "info": "兄弟"
+    },
+    {
+        "srt": "sis",
+        "dst": "",
+        "info": "姐妹"
+    },
+    {
+        "srt": "sister",
+        "dst": "",
+        "info": "姐妹"
+    },
+    {
+        "srt": "sibling",
+        "dst": "",
+        "info": "兄弟姐妹，不区分性别"
+    },
+    {
+        "srt": "husband",
+        "dst": "",
+        "info": "丈夫"
+    },
+    {
+        "srt": "wife",
+        "dst": "",
+        "info": "妻子"
+    },
+    {
+        "srt": "spouse",
+        "dst": "",
+        "info": "配偶，不区分性别"
+    },
+    {
+        "srt": "partner",
+        "dst": "",
+        "info": "伴侣，适用于现代语境，不一定指已婚关系"
+    },
+    {
+        "srt": "grandfather",
+        "dst": "",
+        "info": "祖父/外祖父"
+    },
+    {
+        "srt": "grandpa",
+        "dst": "",
+        "info": "祖父/外祖父"
+    },
+    {
+        "srt": "gramps",
+        "dst": "",
+        "info": "祖父/外祖父"
+    },
+    {
+        "srt": "granddad",
+        "dst": "",
+        "info": "祖父/外祖父"
+    },
+    {
+        "srt": "grandmother",
+        "dst": "",
+        "info": "祖母/外祖母"
+    },
+    {
+        "srt": "grandma",
+        "dst": "",
+        "info": "祖母/外祖母"
+    },
+    {
+        "srt": "granny",
+        "dst": "",
+        "info": "祖母/外祖母"
+    },
+    {
+        "srt": "nana",
+        "dst": "",
+        "info": "祖母/外祖母"
+    },
+    {
+        "srt": "grammy",
+        "dst": "",
+        "info": "祖母/外祖母"
+    },
+    {
+        "srt": "grandparents",
+        "dst": "",
+        "info": "祖父母/外祖父母"
+    },
+    {
+        "srt": "grandson",
+        "dst": "",
+        "info": "孙子/外孙"
+    },
+    {
+        "srt": "granddaughter",
+        "dst": "",
+        "info": "孙女/外孙女"
+    },
+    {
+        "srt": "grandchild",
+        "dst": "",
+        "info": "孙子女的统称"
+    },
+    {
+        "srt": "grandchildren",
+        "dst": "",
+        "info": "孙子女复数"
+    },
+    {
+        "srt": "aunt",
+        "dst": "",
+        "info": "阿姨/姑姑/伯母"
+    },
+    {
+        "srt": "aunty",
+        "dst": "",
+        "info": "阿姨/姑姑/伯母"
+    },
+    {
+        "srt": "auntie",
+        "dst": "",
+        "info": "阿姨/姑姑/伯母"
+    },
+    {
+        "srt": "uncle",
+        "dst": "",
+        "info": "叔叔/伯父/舅舅"
+    },
+    {
+        "srt": "cousin",
+        "dst": "",
+        "info": "堂/表兄弟姐妹，不区分性别"
+    },
+    {
+        "srt": "niece",
+        "dst": "",
+        "info": "侄女/外甥女"
+    },
+    {
+        "srt": "nephew",
+        "dst": "",
+        "info": "侄子/外甥"
+    },
+    {
+        "srt": "",
+        "dst": "",
+        "info": ""
+    }
+]

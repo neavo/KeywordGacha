@@ -74,18 +74,6 @@ class LLM:
             max_retries = 0
         )
 
-    # 从指定路径加载黑名单文件内容
-    def load_blacklist(self, filepath):
-        try:
-            with open(filepath, "r", encoding="utf-8") as file:
-                data = json.load(file)
-
-                self.blacklist = ""
-                for k, v in enumerate(data):
-                    self.blacklist = self.blacklist + v + "\n"
-        except Exception as e:
-            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
-
     # 根据类型加载不同的prompt模板文件
     def load_prompt_summarize_context(self, filepath):
         try:

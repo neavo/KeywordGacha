@@ -696,14 +696,13 @@ def init():
 
         # 初始化 LLM 对象
         llm = LLM(config)
-        llm.load_blacklist("blacklist.txt")
         llm.load_prompt_summarize_context("prompt/prompt_summarize_context.txt")
         llm.load_prompt_translate_context("prompt/prompt_translate_context.txt")
         llm.load_prompt_translate_surface("prompt/prompt_translate_surface.txt")
 
         # 初始化 NER 对象
         ner = NER()
-        ner.load_blacklist("blacklist.txt")
+        ner.load_blacklist()
 
     return config, ner, llm
 
