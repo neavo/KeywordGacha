@@ -37,6 +37,8 @@ jobs:
           .\env\python.exe -m pip install --upgrade pip
           .\env\python.exe -m pip install --upgrade setuptools
           .\env\python.exe -m pip install -r requirements.txt
+          .\env\python.exe -m pip uninstall --yes torch
+          .\env\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu124
           .\env\python.exe -m pip cache purge
 
       - name: Install Model
@@ -57,20 +59,13 @@ jobs:
           xcopy "model" ".\dist\KeywordGacha\model" /E /I /Q /H /Y
           xcopy "helper" ".\dist\KeywordGacha\helper" /E /I /Q /H /Y
           xcopy "prompt" ".\dist\KeywordGacha\prompt" /E /I /Q /H /Y
+          xcopy "blacklist" ".\dist\KeywordGacha\blacklist" /E /I /Q /H /Y
 
           copy "01_启动.bat" ".\dist\KeywordGacha\"
           copy "main.py" ".\dist\KeywordGacha\"
           copy "config.json" ".\dist\KeywordGacha\"
           copy "version.txt" ".\dist\KeywordGacha\"
-          copy "blacklist.txt" ".\dist\KeywordGacha\"
           copy "libomp140.x86_64.dll" ".\dist\KeywordGacha\"
-
-      - name: Change To NV Version
-        shell: cmd
-        run: |
-          .\dist\KeywordGacha\env\python.exe -m pip uninstall --yes torch torchvision torchaudio
-          .\dist\KeywordGacha\env\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu124
-          .\dist\KeywordGacha\env\python.exe -m pip cache purge
 
       - name: Compress Archive NV
         shell: cmd
