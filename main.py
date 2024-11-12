@@ -196,61 +196,56 @@ def read_xlsx_file(file_path: str) -> tuple[list, list]:
 
 # 读取数据文件
 def read_input_file(language: int) -> tuple[list, list, str]:
-    # 先尝试自动寻找数据文件，找不到提示用户输入
-    file_path = ""
+    # 从 input 目录内寻找目标文件
+    paths = []
+    if os.path.isdir("input"):
+        paths = [
+            entry.path
+            for entry in os.scandir("input")
+            if entry.is_file() and entry.path.endswith((".txt", ".csv", ".json", ".xlsx"))
+        ]
 
-    num = 0
-    if os.path.exists("input") and os.path.isdir("input"):
-        for entry in os.scandir("input"):
-            if entry.is_file() and entry.name.endswith(".txt"):
-                num = num + 1
-            elif entry.is_file() and entry.name.endswith(".csv"):
-                num = num + 1
-            elif entry.is_file() and entry.name.endswith(".json"):
-                num = num + 1
-
-    if num > 0:
-        user_input = LogHelper.input(f"已在 [green]input[/] 路径下找到数据文件 {num} 个，按回车直接使用或输入其他文件路径：").strip('"')
-        file_path = user_input if user_input else "input"
-
-    if file_path == "":
-        file_path = LogHelper.input("请输入数据文件的路径: ").strip('"')
-
+    # 分别处理找到和没找到的情况
+    if len(paths) == 0:
+        input_path = LogHelper.input("请输入数据文件的路径: ").strip('"')
+    else:
+        user_input = LogHelper.input(f"已在 [green]input[/] 路径下找到数据文件 [green]{len(paths)}[/] 个，按回车直接使用或输入其他路径：").strip('"')
+        input_path = user_input if len(user_input) > 0 else "input"
     LogHelper.print(f"")
 
     # 开始读取数据
+    paths = []
     input_lines = []
     input_names = []
-    if file_path.endswith(".txt"):
-        input_lines, input_names = read_txt_file(file_path)
-    elif file_path.endswith(".csv"):
-        input_lines, input_names = read_csv_file(file_path)
-    elif file_path.endswith(".json"):
-        input_lines, input_names = read_json_file(file_path)
-    elif file_path.endswith(".xlsx"):
-        input_lines, input_names = read_xlsx_file(file_path)
-    elif os.path.isdir(file_path):
-        for entry in os.scandir(file_path):
-            if entry.is_file() and entry.name.endswith(".txt"):
-                input_lines_ex, input_names_ex = read_txt_file(entry.path)
-                input_lines.extend(input_lines_ex)
-                input_names.extend(input_names_ex)
-            elif entry.is_file() and entry.name.endswith(".csv"):
-                input_lines_ex, input_names_ex = read_csv_file(entry.path)
-                input_lines.extend(input_lines_ex)
-                input_names.extend(input_names_ex)
-            elif entry.is_file() and entry.name.endswith(".json"):
-                input_lines_ex, input_names_ex = read_json_file(entry.path)
-                input_lines.extend(input_lines_ex)
-                input_names.extend(input_names_ex)
-            elif entry.is_file() and entry.name.endswith(".xlsx"):
-                input_lines_ex, input_names_ex = read_xlsx_file(entry.path)
-                input_lines.extend(input_lines_ex)
-                input_names.extend(input_names_ex)
-    else:
-        LogHelper.warning(f"不支持的文件格式: {file_path}")
+
+    # 分别处理输入路径是文件和文件夹的情况
+    if os.path.isfile(input_path) and input_path.endswith((".txt", ".csv", ".json", ".xlsx")):
+        paths = [input_path]
+    elif os.path.isdir(input_path):
+        paths = [
+            entry.path
+            for entry in os.scandir(input_path)
+            if entry.is_file() and entry.path.endswith((".txt", ".csv", ".json", ".xlsx"))
+        ]
+
+    # 如果没有找到有效的数据文件，则退出
+    if len(paths) == 0:
+        LogHelper.warning(f"在目标路径中未找到数据文件，请检查路径是否正确 ...")
         os.system("pause")
         exit(1)
+
+    # 依次读取每个数据文件
+    for path in paths:
+        if path.endswith(".txt"):
+            input_lines_ex, input_names_ex = read_txt_file(path)
+        elif path.endswith(".csv"):
+            input_lines_ex, input_names_ex = read_csv_file(path)
+        elif path.endswith(".json"):
+            input_lines_ex, input_names_ex = read_json_file(path)
+        elif path.endswith(".xlsx"):
+            input_lines_ex, input_names_ex = read_xlsx_file(path)
+        input_lines.extend(input_lines_ex)
+        input_names.extend(input_names_ex)
 
     input_names_filtered = []
     for name, message in input_names:
@@ -264,9 +259,6 @@ def read_input_file(language: int) -> tuple[list, list, str]:
             continue
 
         if language == NER.LANGUAGE.EN:
-            if line != unicodedata.normalize("NFKC", line):
-                LogHelper.debug(f"{line} [green]->[/] {unicodedata.normalize("NFKC", line)}")
-
             line = unicodedata.normalize("NFKC", line)
 
         if language == NER.LANGUAGE.JP:
@@ -287,7 +279,7 @@ def read_input_file(language: int) -> tuple[list, list, str]:
         input_lines_filtered.append(line.strip())
 
     LogHelper.info(f"已读取到文本 {len(input_lines)} 行，其中有效文本 {len(input_lines_filtered)} 行, 角色名 {len(input_names_filtered)} 个...")
-    return input_lines_filtered, input_names_filtered, file_path
+    return input_lines_filtered, input_names_filtered, input_path
 
 # 合并词语，并按出现次数排序
 def merge_words(words: list[Word]) -> list[Word]:
@@ -468,7 +460,7 @@ async def process_text(llm: LLM, ner: NER, config: SimpleNamespace, language: in
         process_mode = print_menu_process_mode()
 
     # 读取输入文件
-    input_lines, input_names, config.input_file_path = read_input_file(language)
+    input_lines, input_names, config.input_path = read_input_file(language)
 
     # 查找 NER 实体
     LogHelper.info("即将开始执行 [查找 NER 实体] ...")
@@ -547,7 +539,7 @@ async def process_text(llm: LLM, ner: NER, config: SimpleNamespace, language: in
                 words = replace_words_by_ner_type(words, word_type, k)
 
     # 将结果写入文件
-    dir_name, file_name_with_extension = os.path.split(config.input_file_path)
+    dir_name, file_name_with_extension = os.path.split(config.input_path)
     file_name, extension = os.path.splitext(file_name_with_extension)
 
     LogHelper.info("")
