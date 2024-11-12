@@ -1,4 +1,3 @@
-import re
 from rich.progress import Progress
 from rich.progress import BarColumn
 from rich.progress import TextColumn
@@ -9,7 +8,7 @@ class ProgressHelper:
 
     # 获取一个进度条实例
     @staticmethod
-    def get_progress(**kwargs):
+    def get_progress(**kwargs) -> Progress:
         return Progress(
             TextColumn("{task.description}", justify = "right"),
             "•",

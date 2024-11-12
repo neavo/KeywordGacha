@@ -2,9 +2,10 @@ import os
 import logging
 import traceback
 
-from loguru import logger as LoguruLogger
+from rich.status import Status
 from rich.console import Console
 from rich.logging import RichHandler
+from loguru import logger as LoguruLogger
 
 class LogHelper:
 
@@ -28,7 +29,7 @@ class LogHelper:
         format = "[{time:YYYY-MM-DD HH:mm:ss}] [{level}] {message}",
         enqueue = True,
         encoding = "utf-8",
-        rotation = "2 MB",
+        rotation = "4 MB",
         retention = 3
     )
 
@@ -37,53 +38,53 @@ class LogHelper:
     console_no_highlight = Console(highlight = False, tab_size = 4)
 
     @staticmethod
-    def rule(*args, **kwargs):
+    def rule(*args, **kwargs) -> None:
         LogHelper.console_no_highlight.rule(*args, **kwargs)
 
     @staticmethod
-    def input(*args, **kwargs):
+    def input(*args, **kwargs) -> str:
         return LogHelper.console_no_highlight.input(*args, **kwargs)
 
     @staticmethod
-    def print(*args, **kwargs):
-        if "highlight" in kwargs and kwargs["highlight"] == True:
+    def print(*args, **kwargs) -> None:
+        if kwargs.get("highlight") == True:
             LogHelper.console_highlight.print(*args, **kwargs)
         else:
             LogHelper.console_no_highlight.print(*args, **kwargs)
 
     @staticmethod
-    def status(*args, **kwargs):
+    def status(*args, **kwargs) -> Status:
         return LogHelper.console_no_highlight.status(*args, **kwargs)
 
     @staticmethod
-    def is_debug():
+    def is_debug() -> bool:
         return os.path.exists("debug.txt")
 
     @staticmethod
-    def get_trackback(e):
+    def get_trackback(e: Exception) -> str:
         return f"{e}\n{("".join(traceback.format_exception(None, e, e.__traceback__))).strip()}"
 
     @staticmethod
-    def debug(*args, **kwargs):
+    def debug(*args, **kwargs) -> None:
         LoguruLogger.debug(*args, **kwargs)
         LogHelper.logger.debug(*args, **kwargs)
 
     @staticmethod
-    def info(message, *args, **kwargs):
-        LoguruLogger.info(str(message), *args, **kwargs)
-        LogHelper.logger.info(str(message), *args, **kwargs)
+    def info(*args, **kwargs) -> None:
+        LoguruLogger.info(*args, **kwargs)
+        LogHelper.logger.info(*args, **kwargs)
 
     @staticmethod
-    def warning(*args, **kwargs):
+    def warning(*args, **kwargs) -> None:
         LoguruLogger.warning(*args, **kwargs)
         LogHelper.logger.warning(*args, **kwargs)
 
     @staticmethod
-    def error(*args, **kwargs):
+    def error(*args, **kwargs) -> None:
         LoguruLogger.error(*args, **kwargs)
         LogHelper.logger.error(*args, **kwargs)
 
     @staticmethod
-    def critical(*args, **kwargs):
+    def critical(*args, **kwargs) -> None:
         LoguruLogger.critical(*args, **kwargs)
         LogHelper.logger.critical(*args, **kwargs)

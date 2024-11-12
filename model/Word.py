@@ -23,11 +23,11 @@ class Word:
     llmresponse_translate_context: str = ""
     llmresponse_translate_surface: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         pass
 
     # 获取token数量，优先从缓存中获取
-    def get_token_count(self, line: str):
+    def get_token_count(self, line: str) -> int:
         if not hasattr(Word, "cache"):
             Word.cache = {}
 
@@ -48,7 +48,7 @@ class Word:
         return count
 
     # 按长度截取上下文并返回，如果句子长度全部超过 Token 阈值，则取最接近阈值的一条
-    def clip_context(self, line_threshold: int, token_threshold: int):
+    def clip_context(self, line_threshold: int, token_threshold: int) -> list[str]:
         # 理论上不应该有上下文为空的情况
         if len(self.context) == 0:
             LogHelper.debug(f"len(self.context) == 0 : {self}")
@@ -88,22 +88,30 @@ class Word:
         return context
 
     # 获取用于上下文分析任务的上下文文本
-    def get_context_str_for_summarize(self):
-        return "\n".join(self.clip_context(
-            line_threshold = 0,
-            token_threshold = 1536,
-        )).replace("\n\n", "\n").strip()
+    def get_context_str_for_summarize(self, language: int) -> str:
+        from model.NER import NER
+        return "\n".join(
+            self.clip_context(
+                line_threshold = 0,
+                token_threshold = 1024 if language == NER.LANGUAGE.EN else 1536,
+            )
+        ).replace("\n\n", "\n").strip()
 
     # 获取用于上下文翻译任务的上下文文本
-    def get_context_str_for_translate(self):
-        return "\n".join(self.clip_context(
-            line_threshold = 16,
-            token_threshold = 1024,
-        )).replace("\n\n", "\n").strip()
+    def get_context_str_for_translate(self, language: int) -> str:
+        from model.NER import NER
+        return "\n".join(
+            self.clip_context(
+                line_threshold = 20,
+                token_threshold = 768 if language == NER.LANGUAGE.EN else 1024,
+            )
+        ).replace("\n\n", "\n").strip()
 
     # 获取用于词语翻译任务的上下文文本
-    def get_context_str_for_surface_translate(self):
-        return "\n".join(self.clip_context(
-            line_threshold = 5,
-            token_threshold = 256,
-        )).replace("\n\n", "\n").strip()
+    def get_context_str_for_surface_translate(self) -> str:
+        return "\n".join(
+            self.clip_context(
+                line_threshold = 10,
+                token_threshold = 384,
+            )
+        ).replace("\n\n", "\n").strip()
