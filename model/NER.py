@@ -2,7 +2,9 @@ import os
 import re
 import gc
 import json
+from typing import Generator
 import warnings
+from types import SimpleNamespace
 
 import torch
 import onnxruntime
@@ -19,7 +21,7 @@ from helper.ProgressHelper import ProgressHelper
 
 class NER:
 
-    TASK_MODES = type("GClass", (), {})()
+    TASK_MODES = SimpleNamespace()
     TASK_MODES.QUICK = 10
     TASK_MODES.ACCURACY = 20
 
@@ -38,7 +40,7 @@ class NER:
         rf"{TextHelper.LATIN_PUNCTUATION_BASIC_4[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_4[1]}" +
         rf"{TextHelper.LATIN_PUNCTUATION_GENERAL[0]}-{TextHelper.LATIN_PUNCTUATION_GENERAL[1]}" +
         rf"{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]}" +
-        r"・♥]+"
+        r"·・♥]+"
     )
 
     NER_TYPES = {
@@ -49,13 +51,13 @@ class NER:
         "EVT": "EVT",       # 表示事件，如"奥运会"、"地震"等。
     }
 
-    LANGUAGE = type("GClass", (), {})()
+    LANGUAGE = SimpleNamespace()
     LANGUAGE.ZH = 100
     LANGUAGE.EN = 200
     LANGUAGE.JP = 300
     LANGUAGE.KO = 400
 
-    def __init__(self):
+    def __init__(self) -> None:
         # 忽略指定的警告信息
         warnings.filterwarnings(
             "ignore",
@@ -98,7 +100,7 @@ class NER:
         )
 
     # 释放资源
-    def release(self):
+    def release(self) -> None:
         LogHelper.debug(f"显存保留量 - {torch.cuda.memory_reserved()/1024/1024:>8.2f} MB")
         LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024:>8.2f} MB")
 
@@ -115,26 +117,26 @@ class NER:
         LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024:>8.2f} MB")
 
     # 生成器
-    def generator(self, data):
-        for v in data:
-            yield v
+    def generator(self, chunks: list) -> Generator:
+        for chunk in chunks:
+            yield chunk
 
     # 加载黑名单文件内容
-    def load_blacklist(self):
+    def load_blacklist(self) -> None:
         self.blacklist = set()
 
         try:
             for entry in os.scandir("blacklist"):
                 if entry.is_file() and entry.name.endswith(".json"):
-                    with open(entry.path, "r", encoding = "utf-8") as file:
-                        for v in json.load(file):
+                    with open(entry.path, "r", encoding = "utf-8") as reader:
+                        for v in json.load(reader):
                             if v.get("srt") != None:
                                 self.blacklist.add(v.get("srt"))
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 判断是否是有意义的汉字词语
-    def is_valid_cjk_word(self, surface: str, blacklist: set[str]):
+    def is_valid_cjk_word(self, surface: str, blacklist: set) -> bool:
         flag = True
 
         if len(surface) <= 1:
@@ -149,7 +151,7 @@ class NER:
         return flag
 
     # 判断是否是有意义的英文词语
-    def is_valid_english_word(self, surface: str, blacklist: set[str], ner_type: str, unique_words: set[str]):
+    def is_valid_english_word(self, surface: str, blacklist: set, ner_type: str, unique_words: set[str]) -> bool:
         flag = True
 
         if len(surface) <= 2:
@@ -174,7 +176,7 @@ class NER:
         return flag
 
     # 判断是否是有意义的日文词语
-    def is_valid_japanese_word(self, surface: str, blacklist: set[str]):
+    def is_valid_japanese_word(self, surface: str, blacklist: set) -> bool:
         flag = True
 
         if len(surface) <= 1:
@@ -189,7 +191,7 @@ class NER:
         return flag
 
     # 判断是否是有意义的韩文词语
-    def is_valid_korean_word(self, surface: str, blacklist: set[str]):
+    def is_valid_korean_word(self, surface: str, blacklist: set) -> bool:
         flag = True
 
         if len(surface) <= 1:
@@ -204,7 +206,7 @@ class NER:
         return flag
 
     # 生成片段
-    def generate_chunks(self, input_lines, chunk_size):
+    def generate_chunks(self, input_lines: list, chunk_size: int) -> list[str]:
         chunks = []
 
         chunk = ""
@@ -233,7 +235,7 @@ class NER:
         return chunks
 
     # 生成词语
-    def generate_words(self, text, line, score, ner_type, language, unique_words):
+    def generate_words(self, text: str, line: str, score: float, ner_type: str, language: int, unique_words: set[str]) -> list[Word]:
         words = []
 
         if ner_type != "PER":
@@ -281,7 +283,7 @@ class NER:
         return words
 
     # 获取英语词根
-    def get_english_lemma(self, surface):
+    def get_english_lemma(self, surface: str) -> str:
         lemma_noun = getLemma(surface, upos = "NOUN")[0]
         lemma_propn = getLemma(surface, upos = "PROPN")[0]
 
@@ -293,7 +295,7 @@ class NER:
             return surface
 
     # 查找 Token 所在的行
-    def get_line_by_offset(self, text, lines, offsets, start, end):
+    def get_line_by_offset(self, text: str, lines: list[str], offsets: list[tuple[int]], start: int, end: int) -> str:
         result = ""
 
         # 当实体词语位于行的末尾时，会将换行符的长度也计入起止位置，所以要 end 要 -1
@@ -308,7 +310,7 @@ class NER:
         return result
 
     # 查找 NER 实体
-    def search_for_entity(self, input_lines, input_names, language):
+    def search_for_entity(self, input_lines: list[str], input_names: list[str], language: int) -> list[Word]:
         words = []
 
         if self.GPU_BOOST:
@@ -341,7 +343,6 @@ class NER:
                     else:
                         start = chunk_offsets[-1][1]
 
-                    end = start + len(line) + 1
                     chunk_offsets.append((start, start + len(line) + 1)) # 字符数加上换行符的长度
 
                 # 如果是英文，则抓取去重词表，再计算并添加所有词根到词表，以供后续筛选词语
@@ -387,7 +388,7 @@ class NER:
         return words
 
     # 通过 词语形态 校验词语
-    def lemmatize_words_by_morphology(self, words, full_lines):
+    def lemmatize_words_by_morphology(self, words: list[Word]) -> list[Word]:
         seen = set()
         words_ex = []
         for word in words:

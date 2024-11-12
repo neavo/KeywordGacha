@@ -4,6 +4,7 @@ import csv
 import copy
 import json
 import asyncio
+from types import SimpleNamespace
 
 import jaconv
 import openpyxl
@@ -13,6 +14,7 @@ import rich
 from rich import box
 from rich.table import Table
 from rich.prompt import Prompt
+from rich.traceback import install
 
 from model.LLM import LLM
 from model.NER import NER
@@ -75,7 +77,7 @@ CODE_PATTERN_NON_EN = (
 )
 
 # 清理文本
-def cleanup(line: str, language: int):
+def cleanup(line: str, language: int) -> str:
     # 将 角色代码 \N[123] 修改为 player_123
     line = re.sub(r"\\[N]\[(\d+)\]", r"player_\1", line, flags = re.IGNORECASE)
 
@@ -99,7 +101,7 @@ def cleanup(line: str, language: int):
     return line
 
 # 读取 .txt 文件
-def read_txt_file(file_path: str):
+def read_txt_file(file_path: str) -> tuple[list, list]:
     lines = []
     names = []
     encodings = ["utf-8", "utf-16", "shift-jis"]
@@ -117,7 +119,7 @@ def read_txt_file(file_path: str):
     return lines, names
 
 # 读取 .csv 文件
-def read_csv_file(file_path: str):
+def read_csv_file(file_path: str) -> tuple[list, list]:
     lines = []
     names = []
 
@@ -133,7 +135,7 @@ def read_csv_file(file_path: str):
     return lines, names
 
 # 读取 .json 文件
-def read_json_file(file_path: str):
+def read_json_file(file_path: str) -> tuple[list, list]:
     lines = []
     names = []
 
@@ -176,7 +178,7 @@ def read_json_file(file_path: str):
     return lines, names
 
 # 读取 .xlsx 文件
-def read_xlsx_file(file_path: str):
+def read_xlsx_file(file_path: str) -> tuple[list, list]:
     lines = []
     names = []
 
@@ -193,7 +195,7 @@ def read_xlsx_file(file_path: str):
     return lines, names
 
 # 读取数据文件
-def read_input_file(language: int):
+def read_input_file(language: int) -> tuple[list, list, str]:
     # 先尝试自动寻找数据文件，找不到提示用户输入
     file_path = ""
 
@@ -224,9 +226,9 @@ def read_input_file(language: int):
     elif file_path.endswith(".csv"):
         input_lines, input_names = read_csv_file(file_path)
     elif file_path.endswith(".json"):
-        input_lines, input_names = read_json_file(file_path, language)
+        input_lines, input_names = read_json_file(file_path)
     elif file_path.endswith(".xlsx"):
-        input_lines, input_names = read_xlsx_file(file_path, language)
+        input_lines, input_names = read_xlsx_file(file_path)
     elif os.path.isdir(file_path):
         for entry in os.scandir(file_path):
             if entry.is_file() and entry.name.endswith(".txt"):
@@ -288,7 +290,7 @@ def read_input_file(language: int):
     return input_lines_filtered, input_names_filtered, file_path
 
 # 合并词语，并按出现次数排序
-def merge_words(words: list[Word]):
+def merge_words(words: list[Word]) -> list[Word]:
     words_unique = {}
     for word in words:
         key = (word.surface, word.ner_type) # 只有文字和类型都一样才视为相同条目，避免跨类词条目合并
@@ -308,30 +310,30 @@ def merge_words(words: list[Word]):
     return sorted(words_merged, key = lambda x: x.count, reverse = True)
 
 # 按置信度过滤词语
-def filter_words_by_score(words: list[Word], threshold: float):
+def filter_words_by_score(words: list[Word], threshold: float) -> list[Word]:
     return [word for word in words if word.score >= threshold]
 
 # 按出现次数过滤词语
-def filter_words_by_count(words: list[Word], threshold: float):
+def filter_words_by_count(words: list[Word], threshold: float) -> list[Word]:
     return [word for word in words if word.count >= max(1, threshold)]
 
 # 获取指定类型的词
-def get_words_by_ner_type(words: list[Word], ner_type: str):
+def get_words_by_ner_type(words: list[Word], ner_type: str) -> list[Word]:
     # 显式的复制对象，避免后续修改对原始列表的影响，浅拷贝不复制可变对象（列表、字典、自定义对象等），慎重修改它们
     return [copy.copy(word) for word in words if word.ner_type == ner_type]
 
 # 移除指定类型的词
-def remove_words_by_ner_type(words: list[Word], ner_type: str):
+def remove_words_by_ner_type(words: list[Word], ner_type: str) -> list[Word]:
     return [word for word in words if word.ner_type != ner_type]
 
 # 指定类型的词
-def replace_words_by_ner_type(words: list[Word], in_words: list[Word], ner_type: str):
+def replace_words_by_ner_type(words: list[Word], in_words: list[Word], ner_type: str) -> list[Word]:
     words = remove_words_by_ner_type(words, ner_type)
     words.extend(in_words)
     return words
 
 # 将 词语日志 写入文件
-def write_words_log_to_file(words: list[Word], path, language: int):
+def write_words_log_to_file(words: list[Word], path, language: int) -> None:
     with open(path, "w", encoding = "utf-8") as file:
         for k, word in enumerate(words):
             if getattr(word, "surface", "") != "":
@@ -361,7 +363,7 @@ def write_words_log_to_file(words: list[Word], path, language: int):
 
             if len(getattr(word, "context", [])) > 0:
                 file.write("上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                file.write(f"{word.get_context_str_for_translate()}\n")
+                file.write(f"{word.get_context_str_for_translate(language)}\n")
 
             if len(getattr(word, "context_translation", [])) > 0:
                 file.write("上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
@@ -381,7 +383,7 @@ def write_words_log_to_file(words: list[Word], path, language: int):
     LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
 # 将 词语列表 写入文件
-def write_words_list_to_file(words: list[Word], path, language: int):
+def write_words_list_to_file(words: list[Word], path, language: int) -> None:
     with open(path, "w", encoding = "utf-8") as file:
         data = {}
         for k, word in enumerate(words):
@@ -391,7 +393,7 @@ def write_words_list_to_file(words: list[Word], path, language: int):
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
 # 将 AiNiee 词典写入文件
-def write_ainiee_dict_to_file(words: list[Word], path, language: int):
+def write_ainiee_dict_to_file(words: list[Word], path, language: int) -> None:
     type_map = {
         "PER": "角色",      # 表示人名，如"张三"、"约翰·多伊"等。
         "ORG": "组织",      # 表示组织，如"联合国"、"苹果公司"等。
@@ -425,7 +427,7 @@ def write_ainiee_dict_to_file(words: list[Word], path, language: int):
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
 # 将 GalTransl 词典写入文件
-def write_galtransl_dict_to_file(words: list[Word], path, language: int):
+def write_galtransl_dict_to_file(words: list[Word], path, language: int) -> None:
     type_map = {
         "PER": "角色",      # 表示人名，如"张三"、"约翰·多伊"等。
         "ORG": "组织",      # 表示组织，如"联合国"、"苹果公司"等。
@@ -454,7 +456,10 @@ def write_galtransl_dict_to_file(words: list[Word], path, language: int):
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
 # 开始处理文本
-async def process_text(config: any, ner: NER, llm: LLM, language: int):
+async def process_text(llm: LLM, ner: NER, config: SimpleNamespace, language: int) -> None:
+    # 设置 LLM 语言
+    llm.set_language(language)
+
     # 选择处理模式
     # 中文没有翻译的过程，所以无法支持快速模式
     if language == NER.LANGUAGE.ZH:
@@ -473,7 +478,7 @@ async def process_text(config: any, ner: NER, llm: LLM, language: int):
     # 等待 还原词根任务 结果，只对日文启用
     if language == NER.LANGUAGE.JP:
         LogHelper.info("即将开始执行 [还原词根] ...")
-        words = ner.lemmatize_words_by_morphology(words, input_lines)
+        words = ner.lemmatize_words_by_morphology(words)
         words = remove_words_by_ner_type(words, "")
         LogHelper.info("[还原词根] 已完成 ...")
 
@@ -505,7 +510,7 @@ async def process_text(config: any, ner: NER, llm: LLM, language: int):
     if LogHelper.is_debug():
         with LogHelper.status("正在检查结果重复度..."):
             TestHelper.check_result_duplication(
-                [word for word in words if llm.check_keyword_in_description(word)],
+                [word for word in words if llm.check_keyword_in_description(word, None)],
                  "check_result_duplication_01.log",
             )
 
@@ -568,7 +573,7 @@ async def process_text(config: any, ner: NER, llm: LLM, language: int):
     os.system("pause")
 
 # 接口测试
-async def test_api(llm: LLM):
+async def test_api(llm: LLM) -> None:
     # 设置请求限制器
     llm.set_request_limiter()
 
@@ -585,7 +590,7 @@ async def test_api(llm: LLM):
     os.system("cls")
 
 # 打印应用信息
-def print_app_info(config):
+def print_app_info(config: SimpleNamespace) -> None:
     LogHelper.print()
     LogHelper.print()
     LogHelper.rule("KeywordGacha", style = "light_goldenrod2")
@@ -621,7 +626,7 @@ def print_app_info(config):
     LogHelper.print()
 
 # 打印菜单
-def print_menu_main():
+def print_menu_main() -> int:
     LogHelper.print("请选择功能：")
     LogHelper.print("")
     LogHelper.print("\t--> 1. 开始处理 [green]中文文本[/]")
@@ -641,7 +646,7 @@ def print_menu_main():
     return choice
 
 # 打印处理模式菜单
-def print_menu_process_mode():
+def print_menu_process_mode() -> int:
     LogHelper.print("请选择处理模式：")
     LogHelper.print("")
     LogHelper.print("\t--> 1. [green]普通模式[/]：速度较慢，通过语义分析对结果进行确认，理论上可以提供最为精确的处理结果")
@@ -658,35 +663,31 @@ def print_menu_process_mode():
     return choice
 
 # 主函数
-async def begin(config: any, ner: NER, llm: LLM):
+async def begin(llm: LLM, ner: NER, config: SimpleNamespace) -> None:
     choice = -1
     while choice not in [1, 2, 3, 4]:
         print_app_info(config)
 
         choice = print_menu_main()
         if choice == 1:
-            await process_text(config, ner, llm, NER.LANGUAGE.ZH)
+            await process_text(llm, ner, config, NER.LANGUAGE.ZH)
         elif choice == 2:
-            await process_text(config, ner, llm, NER.LANGUAGE.EN)
+            await process_text(llm, ner, config, NER.LANGUAGE.EN)
         elif choice == 3:
-            await process_text(config, ner, llm, NER.LANGUAGE.JP)
+            await process_text(llm, ner, config, NER.LANGUAGE.JP)
         elif choice == 4:
-            await process_text(config, ner, llm, NER.LANGUAGE.KO)
+            await process_text(llm, ner, config, NER.LANGUAGE.KO)
         elif choice == 5:
             await test_api(llm)
 
 # 一些初始化步骤
-def init():
+def load_config() -> tuple[LLM, NER, SimpleNamespace]:
     with LogHelper.status("正在初始化 [green]KG[/] 引擎 ..."):
-        # 注册全局异常追踪器
-        rich.traceback.install()
-
         # 加载配置文件
         try:
+            config = SimpleNamespace()
             config_file = "config_dev.json" if os.path.exists("config_dev.json") else "config.json"
-
             with open(config_file, "r", encoding = "utf-8") as file:
-                config = type("GClass", (), {})()
                 for k, v in json.load(file).items():
                     setattr(config, k, v[0])
         except FileNotFoundError:
@@ -696,21 +697,26 @@ def init():
 
         # 初始化 LLM 对象
         llm = LLM(config)
-        llm.load_prompt_summarize_context("prompt/prompt_summarize_context.txt")
-        llm.load_prompt_translate_context("prompt/prompt_translate_context.txt")
-        llm.load_prompt_translate_surface("prompt/prompt_translate_surface.txt")
+        llm.load_prompt()
 
         # 初始化 NER 对象
         ner = NER()
         ner.load_blacklist()
 
-    return config, ner, llm
+
+    return llm, ner, config
 
 # 确保程序出错时可以捕捉到错误日志
-async def main():
+async def main() -> None:
     try:
-        config, ner, llm = init()
-        await begin(config, ner, llm)
+        # 注册全局异常追踪器
+        install()
+
+        # 加载配置
+        llm, ner, config = load_config()
+
+        # 开始处理
+        await begin(llm, ner, config)
     except EOFError:
         LogHelper.error("EOFError - 程序即将退出 ...")
     except KeyboardInterrupt:
