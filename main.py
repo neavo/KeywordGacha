@@ -10,7 +10,6 @@ import jaconv
 import openpyxl
 import unicodedata
 
-import rich
 from rich import box
 from rich.table import Table
 from rich.prompt import Prompt
@@ -77,9 +76,14 @@ CODE_PATTERN_NON_EN = (
 )
 
 # 清理文本
-def cleanup(line: str, language: int) -> str:
-    # 将 角色代码 \N[123] 修改为 player_123
-    line = re.sub(r"\\[N]\[(\d+)\]", r"player_\1", line, flags = re.IGNORECASE)
+def cleanup(line: str, language: int, actors: list[str]) -> str:
+    # 根据 actors 中的数据还原 角色代码 \N[123] 实际指向的名字
+    line = re.sub(
+        r"\\[N]\[(\d+)\]",
+        lambda match: actors[int(match.group(1))] if 0 <= int(match.group(1)) < len(actors) else match.group(0),
+        line,
+        flags = re.IGNORECASE
+    )
 
     # 将 队伍成员代码 \P[123] 替换为 teammate_123
     line = re.sub(r"\\[P]\[(\d+)\]", r"teammate_\1", line, flags = re.IGNORECASE)
@@ -101,14 +105,14 @@ def cleanup(line: str, language: int) -> str:
     return line
 
 # 读取 .txt 文件
-def read_txt_file(file_path: str) -> tuple[list, list]:
+def read_txt_file(path: str) -> tuple[list, list]:
     lines = []
     names = []
     encodings = ["utf-8", "utf-16", "shift-jis"]
 
     for encoding in encodings:
         try:
-            with open(file_path, "r", encoding = encoding) as file:
+            with open(path, "r", encoding = encoding) as file:
                 return file.readlines(), []
         except UnicodeDecodeError as e:
             LogHelper.debug(f"使用 {encoding} 编码读取数据文件时发生错误 - {e}")
@@ -119,15 +123,13 @@ def read_txt_file(file_path: str) -> tuple[list, list]:
     return lines, names
 
 # 读取 .csv 文件
-def read_csv_file(file_path: str) -> tuple[list, list]:
+def read_csv_file(path: str) -> tuple[list, list]:
     lines = []
     names = []
 
     try:
-        with open(file_path, "r", newline = "", encoding = "utf-8") as file:
-            reader = csv.reader(file)
-
-            for row in reader:
+        with open(path, "r", newline = "", encoding = "utf-8") as file:
+            for row in csv.reader(file):
                 lines.append(row[0])
     except Exception as e:
         LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
@@ -135,13 +137,13 @@ def read_csv_file(file_path: str) -> tuple[list, list]:
     return lines, names
 
 # 读取 .json 文件
-def read_json_file(file_path: str) -> tuple[list, list]:
+def read_json_file(path: str) -> tuple[list, list]:
     lines = []
     names = []
 
     try:
         # 读取并加载JSON文件
-        with open(file_path, "r", encoding = "utf-8") as file:
+        with open(path, "r", encoding = "utf-8") as file:
             datas = json.load(file)
 
             # 针对 MTool 导出文本
@@ -178,24 +180,39 @@ def read_json_file(file_path: str) -> tuple[list, list]:
     return lines, names
 
 # 读取 .xlsx 文件
-def read_xlsx_file(file_path: str) -> tuple[list, list]:
+def read_xlsx_file(path: str) -> tuple[list, list]:
     lines = []
     names = []
 
     try:
-        sheet = openpyxl.load_workbook(file_path).active
+        sheet = openpyxl.load_workbook(path).active
         for row in range(1, sheet.max_row + 1):
             cell_01 = sheet.cell(row = row, column = 1).value
-
-            if cell_01 != None and isinstance(cell_01, str) and cell_01 != "":
+            if isinstance(cell_01, str) and cell_01 != "":
                 lines.append(cell_01)
     except Exception as e:
         LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     return lines, names
 
-# 读取数据文件
-def read_input_file(language: int) -> tuple[list, list, str]:
+# 读取文件
+def read_file(path: str) -> tuple[list, list]:
+    lines_ex = []
+    names_ex = []
+
+    if path.endswith(".txt"):
+        lines_ex, names_ex = read_txt_file(path)
+    elif path.endswith(".csv"):
+        lines_ex, names_ex = read_csv_file(path)
+    elif path.endswith(".json"):
+        lines_ex, names_ex = read_json_file(path)
+    elif path.endswith(".xlsx"):
+        lines_ex, names_ex = read_xlsx_file(path)
+
+    return lines_ex, names_ex
+
+# 从输入文件中加载数据
+def load_lines_from_input_file(language: int) -> tuple[list, list, str]:
     # 从 input 目录内寻找目标文件
     paths = []
     if os.path.isdir("input"):
@@ -211,72 +228,67 @@ def read_input_file(language: int) -> tuple[list, list, str]:
     else:
         user_input = LogHelper.input(f"已在 [green]input[/] 路径下找到数据文件 [green]{len(paths)}[/] 个，按回车直接使用或输入其他路径：").strip('"')
         input_path = user_input if len(user_input) > 0 else "input"
-    LogHelper.print(f"")
-
-    # 开始读取数据
-    paths = []
-    input_lines = []
-    input_names = []
+    LogHelper.print("")
 
     # 分别处理输入路径是文件和文件夹的情况
-    if os.path.isfile(input_path) and input_path.endswith((".txt", ".csv", ".json", ".xlsx")):
+    paths = []
+    if os.path.isfile(input_path):
         paths = [input_path]
     elif os.path.isdir(input_path):
-        paths = [
-            entry.path
-            for entry in os.scandir(input_path)
-            if entry.is_file() and entry.path.endswith((".txt", ".csv", ".json", ".xlsx"))
-        ]
+        paths = [entry.path for entry in os.scandir(input_path)]
+    paths = [path for path in paths if path.endswith((".txt", ".csv", ".json", ".xlsx"))]
 
     # 如果没有找到有效的数据文件，则退出
     if len(paths) == 0:
-        LogHelper.warning(f"在目标路径中未找到数据文件，请检查路径是否正确 ...")
+        LogHelper.warning("在目标路径中未找到数据文件，请检查路径是否正确 ...")
         os.system("pause")
         exit(1)
 
     # 依次读取每个数据文件
-    for path in paths:
-        if path.endswith(".txt"):
-            input_lines_ex, input_names_ex = read_txt_file(path)
-        elif path.endswith(".csv"):
-            input_lines_ex, input_names_ex = read_csv_file(path)
-        elif path.endswith(".json"):
-            input_lines_ex, input_names_ex = read_json_file(path)
-        elif path.endswith(".xlsx"):
-            input_lines_ex, input_names_ex = read_xlsx_file(path)
-        input_lines.extend(input_lines_ex)
-        input_names.extend(input_names_ex)
+    with LogHelper.status("正在读取输入文件 ..."):
+        input_lines = []
+        input_names = []
+        for path in paths:
+            lines_ex, names_ex = read_file(path)
+            input_lines.extend(lines_ex)
+            input_names.extend(names_ex)
 
-    input_names_filtered = []
-    for name, message in input_names:
-        input_names_filtered.append((name, cleanup(message, language)))
+        # 读取角色表（如有）
+        actors = []
+        for path in paths:
+            if os.path.basename(path).startswith("Actors."):
+                actors, _ = read_file(path)
 
-    input_lines_filtered = []
-    for line in input_lines:
-        line = cleanup(line, language)
+        input_names_filtered = []
+        for name, message in input_names:
+            input_names_filtered.append((name, cleanup(message, language, actors)))
 
-        if len(line) == 0:
-            continue
+        input_lines_filtered = []
+        for line in input_lines:
+            line = cleanup(line, language, actors)
 
-        if language == NER.LANGUAGE.EN:
-            line = unicodedata.normalize("NFKC", line)
+            if len(line) == 0:
+                continue
 
-        if language == NER.LANGUAGE.JP:
-            line = jaconv.normalize(line, mode = "NFKC")
+            if language == NER.LANGUAGE.EN:
+                line = unicodedata.normalize("NFKC", line)
 
-        if language == NER.LANGUAGE.ZH and not TextHelper.has_any_cjk(line):
-            continue
+            if language == NER.LANGUAGE.JP:
+                line = jaconv.normalize(line, mode = "NFKC")
 
-        if language == NER.LANGUAGE.EN and not TextHelper.has_any_latin(line):
-            continue
+            if language == NER.LANGUAGE.ZH and not TextHelper.has_any_cjk(line):
+                continue
 
-        if language == NER.LANGUAGE.JP and not TextHelper.has_any_japanese(line):
-            continue
+            if language == NER.LANGUAGE.EN and not TextHelper.has_any_latin(line):
+                continue
 
-        if language == NER.LANGUAGE.KO and not TextHelper.has_any_korean(line):
-            continue
+            if language == NER.LANGUAGE.JP and not TextHelper.has_any_japanese(line):
+                continue
 
-        input_lines_filtered.append(line.strip())
+            if language == NER.LANGUAGE.KO and not TextHelper.has_any_korean(line):
+                continue
+
+            input_lines_filtered.append(line.strip())
 
     LogHelper.info(f"已读取到文本 {len(input_lines)} 行，其中有效文本 {len(input_lines_filtered)} 行, 角色名 {len(input_names_filtered)} 个...")
     return input_lines_filtered, input_names_filtered, input_path
@@ -460,7 +472,7 @@ async def process_text(llm: LLM, ner: NER, config: SimpleNamespace, language: in
         process_mode = print_menu_process_mode()
 
     # 读取输入文件
-    input_lines, input_names, config.input_path = read_input_file(language)
+    input_lines, input_names, config.input_path = load_lines_from_input_file(language)
 
     # 查找 NER 实体
     LogHelper.info("即将开始执行 [查找 NER 实体] ...")
@@ -675,7 +687,6 @@ async def begin(llm: LLM, ner: NER, config: SimpleNamespace) -> None:
 # 一些初始化步骤
 def load_config() -> tuple[LLM, NER, SimpleNamespace]:
     with LogHelper.status("正在初始化 [green]KG[/] 引擎 ..."):
-        # 加载配置文件
         try:
             config = SimpleNamespace()
             config_file = "config_dev.json" if os.path.exists("config_dev.json") else "config.json"
@@ -694,7 +705,6 @@ def load_config() -> tuple[LLM, NER, SimpleNamespace]:
         # 初始化 NER 对象
         ner = NER()
         ner.load_blacklist()
-
 
     return llm, ner, config
 
