@@ -25,73 +25,112 @@ from helper.TextHelper import TextHelper
 # 定义常量
 SCORE_THRESHOLD = 0.85
 
+# 用于英文的代码段规则
 CODE_PATTERN_EN = (
-    r"[/\\][A-Z]{1,5}<[\d]{0,10}>",         # /C<1> \FS<12>
-    r"[/\\][A-Z]{1,5}\[[\d]{0,10}\]",       # /C[1] \FS[12]
-    r"[/\\][A-Z]{1,5}(?=<.{0,10}>)",        # /C<非数字> /C<非数字> \FS<非数字> \FS<非数字> 中的前半部分
-    r"[/\\][A-Z]{1,5}(?=\[.{0,10}\])",      # /C[非数字] /C[非数字] \FS[非数字] \FS[非数字] 中的前半部分
-    r"\\fr",                                # 重置文本的改变
-    r"\\fb",                                # 加粗
-    r"\\fi",                                # 倾斜
-    r"\\\{",                                # 放大字体 \{
-    r"\\\}",                                # 缩小字体 \}
-    r"\\G",                                 # 显示货币 \G
-    r"\\\$",                                # 打开金币框 \$
-    r"\\\.",                                # 等待0.25秒 \.
-    r"\\\|",                                # 等待1秒 \|
-    r"\\!",                                 # 等待按钮按下 \!
-    # r"\\>",                               # 在同一行显示文字 \>
-    # r"\\<",                               # 取消显示所有文字 \<
-    r"\\\^",                                # 显示文本后不需要等待 \^
-    # r"\\n",                               # 换行符 \\n
-    r"\r\n",                                # 换行符 \r\n
-    r"\n",                                  # 换行符 \n
-    r"\\\\<br>",                            # 换行符 \\<br>
-    r"<br>",                                # 换行符 <br>
+    "" + r"if\(.{0,10}[vs]\[\d+\].{0,10}\)" + "",           # if(!s[982]) if(v[982] >= 1)
+    "" + r"en\(.{0,10}[vs]\[\d+\].{0,10}\)" + "",           # en(!s[982]) en(v[982] >= 1)
+    "" + r"[/\\][a-z]{1,5}<[\d]{0,10}>" + "",               # /C<1> \FS<12>
+    "" + r"[/\\][a-z]{1,5}\[[\d]{0,10}\]" + "",             # /C[1] \FS[12]
+    "" + r"[/\\][a-z]{1,5}(?=<.{0,10}>)" + "",              # /C<非数字> /C<非数字> \FS<非数字> \FS<非数字> 中的前半部分
+    "" + r"[/\\][a-z]{1,5}(?=\[.{0,10}\])" + "",            # /C[非数字] /C[非数字] \FS[非数字] \FS[非数字] 中的前半部分
 )
 
+# 用于非英文的代码段规则
 CODE_PATTERN_NON_EN = (
-    r"[/\\][A-Z]{1,5}<[\dA-Z]{0,10}>",      # /C<y> /C<1> \FS<xy> \FS<12>
-    r"[/\\][A-Z]{1,5}\[[\dA-Z]{0,10}\]",    # /C[x] /C[1] \FS[xy] \FS[12]
-    r"[/\\][A-Z]{1,5}(?=<.{0,10}>)",        # /C<非数字非字母> /C<非数字非字母> \FS<非数字非字母> \FS<非数字非字母> 中的前半部分
-    r"[/\\][A-Z]{1,5}(?=\[.{0,10}\])",      # /C[非数字非字母] /C[非数字非字母] \FS[非数字非字母] \FS[非数字非字母] 中的前半部分
-    r"\\fr",                                # 重置文本的改变
-    r"\\fb",                                # 加粗
-    r"\\fi",                                # 倾斜
-    r"\\\{",                                # 放大字体 \{
-    r"\\\}",                                # 缩小字体 \}
-    r"\\G",                                 # 显示货币 \G
-    r"\\\$",                                # 打开金币框 \$
-    r"\\\.",                                # 等待0.25秒 \.
-    r"\\\|",                                # 等待1秒 \|
-    r"\\!",                                 # 等待按钮按下 \!
-    # r"\\>",                               # 在同一行显示文字 \>
-    # r"\\<",                               # 取消显示所有文字 \<
-    r"\\\^",                                # 显示文本后不需要等待 \^
-    # r"\\n",                               # 换行符 \\n
-    r"\r\n",                                # 换行符 \r\n
-    r"\n",                                  # 换行符 \n
-    r"\\\\<br>",                            # 换行符 \\<br>
-    r"<br>",                                # 换行符 <br>
+    "" + r"if\(.{0,10}[vs]\[\d+\].{0,10}\)" + "",           # if(!s[982]) if(v[982] >= 1)
+    "" + r"en\(.{0,10}[vs]\[\d+\].{0,10}\)" + "",           # en(!s[982]) en(v[982] >= 1)
+    "" + r"[/\\][a-z]{1,5}<[\da-z]{0,10}>" + "",            # /C<y> /C<1> \FS<xy> \FS<12>
+    "" + r"[/\\][a-z]{1,5}\[[\da-z]{0,10}\]" + "",          # /C[x] /C[1] \FS[xy] \FS[12]
+    "" + r"[/\\][a-z]{1,5}(?=<.{0,10}>)" + "",              # /C<非数字非字母> /C<非数字非字母> \FS<非数字非字母> \FS<非数字非字母> 中的前半部分
+    "" + r"[/\\][a-z]{1,5}(?=\[.{0,10}\])" + "",            # /C[非数字非字母] /C[非数字非字母] \FS[非数字非字母] \FS[非数字非字母] 中的前半部分
 )
 
-# 清理文本
-def cleanup(line: str, language: int, actors: list[str]) -> str:
+# 同时作用于英文于非英文的代码段规则
+CODE_PATTERN_COMMON = (
+    "" + r"\\fr" + "",                                      # 重置文本的改变
+    "" + r"\\fb" + "",                                      # 加粗
+    "" + r"\\fi" + "",                                      # 倾斜
+    "" + r"\\\{" + "",                                      # 放大字体 \{
+    "" + r"\\\}" + "",                                      # 缩小字体 \}
+    "" + r"\\g" + "",                                       # 显示货币 \G
+    "" + r"\\\$" + "",                                      # 打开金币框 \$
+    "" + r"\\\." + "",                                      # 等待0.25秒 \.
+    "" + r"\\\|" + "",                                      # 等待1秒 \|
+    "" + r"\\!" + "",                                       # 等待按钮按下 \!
+    # "" + r"\\>" + "",                                     # 在同一行显示文字 \>
+    # "" + r"\\<" + "",                                     # 取消显示所有文字 \<
+    "" + r"\\\^" + "",                                      # 显示文本后不需要等待 \^
+    # "" + r"\\n" + "",                                     # 换行符 \\n
+    "" + r"\r\n" + "",                                      # 换行符 \r\n
+    "" + r"\n" + "",                                        # 换行符 \n
+    "" + r"\\\\<br>" + "",                                  # 换行符 \\<br>
+    "" + r"<br>" + "",                                      # 换行符 <br>
+)
+
+# 加载 Actors.json 数据
+def load_names(path: str) -> tuple[dict, dict]:
+    names = {}
+    nicknames = {}
+
+    if not os.path.exists(path):
+        pass
+    else:
+        with open(path, "r", encoding = "utf-8") as reader:
+            for item in json.load(reader):
+                if isinstance(item, dict):
+                    id = item.get("id", -1)
+
+                    if not isinstance(id, int):
+                        continue
+
+                    names[id] = item.get("name", "")
+                    nicknames[id] = item.get("nickname", "")
+        LogHelper.info(f"从 [green]Actors.json[/] 文件中加载了 {len(names) + len(nicknames)} 条数据，稍后将执行 [green]姓名还原[/] 步骤 ...")
+
+    return names, nicknames
+
+# 执行替换
+def do_replace(match: re.Match, names: dict) -> str:
+    i = int(match.group(1))
+
+    # 索引在范围内则替换，不在范围内则原文返回
+    if i in names:
+        return names.get(i, "")
+    else:
+        return match.group(0)
+
+# 还原角色代码
+def replace_name_code(text: str, names: dict, nicknames: dict) -> str:
     # 根据 actors 中的数据还原 角色代码 \N[123] 实际指向的名字
-    line = re.sub(
-        r"\\[N]\[(\d+)\]",
-        lambda match: actors[int(match.group(1))] if 0 <= int(match.group(1)) < len(actors) else match.group(0),
-        line,
+    text = re.sub(
+        r"\\n\[(\d+)\]",
+        lambda match: do_replace(match, names),
+        text,
         flags = re.IGNORECASE
     )
+
+    # 根据 actors 中的数据还原 角色代码 \NN[123] 实际指向的名字
+    text = re.sub(
+        r"\\nn\[(\d+)\]",
+        lambda match: do_replace(match, nicknames),
+        text,
+        flags = re.IGNORECASE
+    )
+
+    return text
+
+# 清理文本
+def cleanup(line: str, language: int, names: dict, nicknames: dict) -> str:
+    # 还原角色代码
+    line = replace_name_code(line, names, nicknames)
 
     # 将 队伍成员代码 \P[123] 替换为 teammate_123
     line = re.sub(r"\\[P]\[(\d+)\]", r"teammate_\1", line, flags = re.IGNORECASE)
 
     if language == NER.LANGUAGE.EN:
-        line = re.sub(rf"(?:{"|".join(CODE_PATTERN_EN)})+", "", line, flags = re.IGNORECASE)
+        line = re.sub(rf"(?:{"|".join(CODE_PATTERN_EN + CODE_PATTERN_COMMON)})+", "", line, flags = re.IGNORECASE)
     else:
-        line = re.sub(rf"(?:{"|".join(CODE_PATTERN_NON_EN)})+", "", line, flags = re.IGNORECASE)
+        line = re.sub(rf"(?:{"|".join(CODE_PATTERN_NON_EN + CODE_PATTERN_COMMON)})+", "", line, flags = re.IGNORECASE)
 
     # 由于上面的代码移除，可能会产生空人名框的情况，干掉
     line = line.replace("【】", "")
@@ -161,7 +200,8 @@ def read_json_file(path: str) -> tuple[list, list]:
             #   "message": "「お前かよ。開けて。着替えなきゃ」"
             # }]
             if isinstance(datas, list):
-                for data in datas:
+                # 确保数据是字典类型
+                for data in [data for data in datas if isinstance(data, dict)]:
                     name = data.get("name", "").strip()
                     message = data.get("message", "").strip()
 
@@ -238,34 +278,28 @@ def load_lines_from_input_file(language: int) -> tuple[list, list, str]:
         paths = [entry.path for entry in os.scandir(input_path)]
     paths = [path for path in paths if path.endswith((".txt", ".csv", ".json", ".xlsx"))]
 
-    # 如果没有找到有效的数据文件，则退出
-    if len(paths) == 0:
-        LogHelper.warning("在目标路径中未找到数据文件，请检查路径是否正确 ...")
-        os.system("pause")
-        exit(1)
+    # 尝试从输入路径的同级路径或者下级路径加载角色数据
+    names, nicknames = {}, {}
+    if os.path.isfile(f"{input_path}/Actors.json"):
+        names, nicknames = load_names(f"{input_path}/Actors.json")
+    elif os.path.isfile(f"{os.path.dirname(input_path)}/Actors.json"):
+        names, nicknames = load_names(f"{os.path.dirname(input_path)}/Actors.json")
 
     # 依次读取每个数据文件
     with LogHelper.status("正在读取输入文件 ..."):
-        input_lines = []
-        input_names = []
+        input_lines, input_names = [], []
         for path in paths:
             lines_ex, names_ex = read_file(path)
             input_lines.extend(lines_ex)
             input_names.extend(names_ex)
 
-        # 读取角色表（如有）
-        actors = []
-        for path in paths:
-            if os.path.basename(path).startswith("Actors."):
-                actors, _ = read_file(path)
-
         input_names_filtered = []
         for name, message in input_names:
-            input_names_filtered.append((name, cleanup(message, language, actors)))
+            input_names_filtered.append((name, cleanup(message, language, names, nicknames)))
 
         input_lines_filtered = []
         for line in input_lines:
-            line = cleanup(line, language, actors)
+            line = cleanup(line, language, names, nicknames)
 
             if len(line) == 0:
                 continue
