@@ -47,7 +47,7 @@ class LogHelper:
 
     @staticmethod
     def print(*args, **kwargs) -> None:
-        if kwargs.get("highlight") == True:
+        if kwargs.get("highlight", True) == True:
             LogHelper.console_highlight.print(*args, **kwargs)
         else:
             LogHelper.console_no_highlight.print(*args, **kwargs)
