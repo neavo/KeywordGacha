@@ -25,6 +25,7 @@
 - 兼容 OpenAI 标准的 AI 大模型接口
 - 使用 [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek) 处理一本书只要 `几毛钱` + `一分钟`
 - 也可以通过运行 [一键包 - 点击查看教程](https://github.com/neavo/KeywordGachaServer) 来获得 `完全免费` 的服务（需要 8G 以上显存的 Nvidia 显卡）
+- 注意，`SakuraLLM` 系列模型只具有翻译功能，无法进行文本分析，不能与 `KG` 配合使用
 
 ## 使用流程 🛸
 - 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 或 [百度网盘](https://pan.baidu.com/s/1_JXmKvnar6PGHlIbl0Mi2Q?pwd=9e54) 下载应用
@@ -39,16 +40,20 @@
 ## 应用效果 ⚡
 - `抓取`、`分析` 和 `翻译` 效果取决于模型的能力，使用 💪 ~~更昂贵~~ 更强力  的模型可以显著提升效果
 - 是的，氪金可以变强
-- 总体来说 `在线接口` 的效果和速度都远好于 `本地接口`，建议使用 `在线接口` 
+- 总体来说 `在线接口` 的效果和速度都远好于 `本地接口`，建议使用 `在线接口`
+- 建议遵循 [常见问题](https://github.com/neavo/KeywordGacha#%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98-) 里的建议以获得最佳的使用效果
 
 ## 文本格式 🏷️
 - 支持从 `.txt`、`.csv`、`.json`、`.xlsx` 文件中读取文本
-- 大部分主流的 `小说` 和 `游戏脚本` 数据格式都可以直接或者通过转换被 KG 识别
+- 大部分主流的 `小说` 和 `游戏脚本` 数据格式都可以直接或者通过转换被 `KG` 识别
 - 输入路径是文件夹时，会读取文件夹内所有的 `.txt`、`.csv` 、`.json` 和 `.xlsx` 文件
 - 当应用目录下有 `input` 文件夹时，会自动读取 `input` 内所有的 `.txt`、`.csv` 、`.json` 和 `.xlsx` 文件
-- 具体可见 [Wiki - 支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
+- 具体可见 [支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
 
 ## 近期更新 📅
+- 20241121 v0.6.0
+  - 新增 - [角色代码还原](https://github.com/neavo/KeywordGacha/wiki/%E8%A7%92%E8%89%B2%E4%BB%A3%E7%A0%81%E8%BF%98%E5%8E%9F) 功能
+
 - 20241111 v0.5.4
   - 调整 - 优化了对英文文本的兼容性
   - 修正 - 添加了 v0.5.2 中遗失的黑名单文件
@@ -109,14 +114,15 @@
 }
 ```
 ## 常见问题 📥
-- 处理 `小说` 时
-  - 注意单行不要太长
-  - 目前模型能处理的单行最大长度约为500字，过长的句子会被截断
+- 分析 `小说文本` 的最佳实践
+  - 提前移除 `作者评论`、`出版社信息` 等与故事内容无关的文本
+  - 目前模型能处理的单行最大长度约为 `500` 字，过长的句子会被截断，超长单行文本请提前手动分行
 
-- 处理 `游戏文本` 时
-  - 建议使用 [SExtractor](https://github.com/satan53x/SExtractor) 、[Translator++](https://dreamsavior.net/translator-plusplus/) 导出的文本
-  - [MTool](https://afdian.com/a/AdventCirno) 导出的文本抓取效果很不稳定
-  - 如果抓取效果不好，可以多试几种导出工具和导出格式，往往会有奇效
+- 处理 `游戏文本` 时的最佳实践
+  - 使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出游戏文本为 `csv` 或 `xlsx` 格式
+  - 如果是 `RPGMaker MV/MZ` 游戏
+    - 复制 `Actors.json` 到指定位置以启用 [角色代码还原](https://github.com/neavo/KeywordGacha/wiki/%E8%A7%92%E8%89%B2%E4%BB%A3%E7%A0%81%E8%BF%98%E5%8E%9F) 功能
+  - 如果抓取效果不好，可以多试几种导出工具和导出格式，有时候会有奇效
 
 ## 开发计划 📈
 - [X] 添加 对 `英文内容` 的支持
