@@ -118,10 +118,9 @@
   - 提前移除 `作者评论`、`出版社信息` 等与故事内容无关的文本
   - 目前模型能处理的单行最大长度约为 `500` 字，过长的句子会被截断，超长单行文本请提前手动分行
 
-- 处理 `游戏文本` 时的最佳实践
+- 处理 `游戏文本` 的最佳实践
   - 使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出游戏文本为 `csv` 或 `xlsx` 格式
-  - 如果是 `RPGMaker MV/MZ` 游戏
-    - 复制 `Actors.json` 到指定位置以启用 [角色代码还原](https://github.com/neavo/KeywordGacha/wiki/%E8%A7%92%E8%89%B2%E4%BB%A3%E7%A0%81%E8%BF%98%E5%8E%9F) 功能
+  - 如果是 `RPGMaker MV/MZ` 游戏：复制 `Actors.json` 到指定位置以启用 [角色代码还原](https://github.com/neavo/KeywordGacha/wiki/%E8%A7%92%E8%89%B2%E4%BB%A3%E7%A0%81%E8%BF%98%E5%8E%9F) 功能
   - 如果抓取效果不好，可以多试几种导出工具和导出格式，有时候会有奇效
 
 ## 开发计划 📈
