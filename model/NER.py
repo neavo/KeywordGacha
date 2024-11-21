@@ -2,9 +2,10 @@ import os
 import re
 import gc
 import json
-from typing import Generator
 import warnings
+import unicodedata
 from types import SimpleNamespace
+from typing import Generator
 
 import torch
 import onnxruntime
@@ -294,6 +295,13 @@ class NER:
         else:
             return surface
 
+    # 计算字符串的实际显示长度
+    def get_display_lenght(self, text: str) -> int:
+        # unicodedata.east_asian_width(c) 返回字符 c 的东亚洲宽度属性。
+        # NaH 表示窄（Narrow）、中立（Neutral）和半宽（Halfwidth）字符，这些字符通常被认为是半角字符。
+        # 其他字符（如全宽字符）的宽度属性为 W 或 F，这些字符被认为是全角字符。
+        return sum(1 if unicodedata.east_asian_width(c) in "NaH" else 2 for c in text)
+
     # 查找 Token 所在的行
     def get_line_by_offset(self, text: str, lines: list[str], offsets: list[tuple[int]], start: int, end: int) -> str:
         result = ""
@@ -327,10 +335,7 @@ class NER:
 
             i = 0
             unique_words = None
-            for result in self.classifier(
-                self.generator(chunks),
-                batch_size = self.BATCH_SIZE,
-            ):
+            for result in self.classifier(self.generator(chunks),batch_size = self.BATCH_SIZE):
                 # 获取当前文本
                 chunk = chunks[i]
 
@@ -364,24 +369,22 @@ class NER:
         # 后处理步骤
         with LogHelper.status("正在对文本进行后处理 ..."):
             # 添加输入文件中读取到的角色名
-            for text, line in input_names:
-                words.extend(self.generate_words(text, line, 65535, "PER", language, None))
+            for name, line in input_names:
+                words.extend(self.generate_words(name, line, 65535, "PER", language, None))
 
             # 匹配【】中的字符串
             seen = set()
             for line in input_lines:
                 for name in re.findall(r"【(.*?)】", line):
-                    if len(name) <= 12:
+                    if self.get_display_lenght(name) <= 16:
                         for word in self.generate_words(name, line, 65535, "PER", language, None):
-                            if word.surface not in seen:
-                                seen.add(word.surface)
+                            seen.add(word.surface) if word.surface not in seen else None
                             words.append(word)
 
         # 打印通过模式匹配抓取的角色实体
         LogHelper.print("")
-        LogHelper.info("[查找 NER 实体] 已完成 ...")
-        if len(seen) > 0:
-            LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}")
+        LogHelper.info(f"[查找 NER 实体] 已完成 ...")
+        LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}") if len(seen) > 0 else None
 
         # 释放显存
         self.release()
