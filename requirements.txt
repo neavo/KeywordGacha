@@ -10,4 +10,4 @@ lemminflect
 
 onnx==1.16.1
 optimum
-onnxruntime-gpu
+onnxruntime

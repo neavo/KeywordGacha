@@ -70,7 +70,7 @@ jobs:
       - name: Compress Archive NV
         shell: cmd
         run: |
-          .\resource\7zr.exe a -y -bt -mx5 -slp -v2000M KeywordGacha_NV_${{ steps.check_version.outputs.version }}.zip .\dist\*
+          .\resource\7zr.exe a -y -bt -mx3 -mqs -t7z -v2000M KeywordGacha_NV_${{ steps.check_version.outputs.version }}.7z .\dist\*
 
       - name: Create Release
         id: create_release
