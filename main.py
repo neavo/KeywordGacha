@@ -447,6 +447,7 @@ def write_ainiee_dict_to_file(words: list[Word], path, language: int) -> None:
                 continue
 
             data = {}
+            data["src"] = word.surface
             data["srt"] = word.surface
             data["dst"] = word.surface_translation
 
