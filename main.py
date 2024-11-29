@@ -85,7 +85,7 @@ def load_names(path: str) -> tuple[dict, dict]:
 
                     names[id] = item.get("name", "")
                     nicknames[id] = item.get("nickname", "")
-        LogHelper.info(f"从 [green]Actors.json[/] 文件中加载了 {len(names) + len(nicknames)} 条数据，稍后将执行 [green]姓名还原[/] 步骤 ...")
+        LogHelper.info(f"从 [green]Actors.json[/] 文件中加载了 {len(names) + len(nicknames)} 条数据，稍后将执行 [green]角色代码还原[/] 步骤 ...")
 
     return names, nicknames
 
