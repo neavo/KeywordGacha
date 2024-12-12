@@ -23,7 +23,7 @@ from helper.TestHelper import TestHelper
 from helper.TextHelper import TextHelper
 
 # 定义常量
-SCORE_THRESHOLD = 0.85
+SCORE_THRESHOLD = 0.80
 
 # 用于英文的代码段规则
 CODE_PATTERN_EN = (
