@@ -229,8 +229,8 @@ class FileManager():
         SPACE_PATTERN + r"en\(.{0,5}[vs]\[\d+\].{0,10}\)" + SPACE_PATTERN,            # en(!s[982]) en(v[982] >= 1)
         SPACE_PATTERN + r"[/\\][a-z]{1,5}<[\d]{0,10}>" + SPACE_PATTERN,               # /C<1> \FS<12>
         SPACE_PATTERN + r"[/\\][a-z]{1,5}\[[\d]{0,10}\]" + SPACE_PATTERN,             # /C[1] \FS[12]
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=<[^0-9]{0,10}>)" + SPACE_PATTERN,         # /C<非数字> \FS<非数字> 中的前半部分
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=\[[^0-9]{0,10}\])" + SPACE_PATTERN,       # /C[非数字] \FS[非数字] 中的前半部分
+        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=<[^\d]{0,10}>)" + SPACE_PATTERN,          # /C<非数字> \FS<非数字> 中的前半部分
+        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=\[[^\d]{0,10}\])" + SPACE_PATTERN,        # /C[非数字] \FS[非数字] 中的前半部分
     )
 
     # 用于非英文的代码段规则
@@ -239,8 +239,8 @@ class FileManager():
         SPACE_PATTERN + r"en\(.{0,5}[vs]\[\d+\].{0,10}\)" + SPACE_PATTERN,            # en(!s[982]) en(v[982] >= 1)
         SPACE_PATTERN + r"[/\\][a-z]{1,5}<[a-z\d]{0,10}>" + SPACE_PATTERN,            # /C<y> /C<1> \FS<xy> \FS<12>
         SPACE_PATTERN + r"[/\\][a-z]{1,5}\[[a-z\d]{0,10}\]" + SPACE_PATTERN,          # /C[x] /C[1] \FS[xy] \FS[12]
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=<[^a-z0-9]{0,10}>)" + SPACE_PATTERN,      # /C<非数字非字母> \FS<非数字非字母> 中的前半部分
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=\[[^a-z0-9]{0,10}\])" + SPACE_PATTERN,    # /C[非数字非字母] \FS[非数字非字母] 中的前半部分
+        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=<[^a-z\d]{0,10}>)" + SPACE_PATTERN,       # /C<非数字非字母> \FS<非数字非字母> 中的前半部分
+        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=\[[^a-z\d]{0,10}\])" + SPACE_PATTERN,     # /C[非数字非字母] \FS[非数字非字母] 中的前半部分
     )
 
     # 同时作用于英文于非英文的代码段规则
@@ -567,8 +567,8 @@ class FileManager():
                     else:
                         file.write(f"词语翻译 : {word.surface_translation}, {word.surface_translation_description}\n")
 
-                if getattr(word, "attribute", "") != "":
-                    file.write(f"角色性别 : {word.attribute}\n")
+                if getattr(word, "gender", "") != "":
+                    file.write(f"角色性别 : {word.gender}\n")
 
                 if getattr(word, "context_summary", "") != "":
                     file.write(f"语义分析 : {word.context_summary}\n")
@@ -625,14 +625,14 @@ class FileManager():
                 data["srt"] = word.surface
                 data["dst"] = word.surface_translation
 
-                if word.ner_type == "PER" and "男" in word.attribute:
+                if word.type == "PER" and "男" in word.gender:
                     data["info"] = "男性的名字"
-                elif word.ner_type == "PER" and "女" in word.attribute:
+                elif word.type == "PER" and "女" in word.gender:
                     data["info"] = "女性的名字"
-                elif word.ner_type == "PER":
+                elif word.type == "PER":
                     data["info"] = "名字"
                 else:
-                    data["info"] = f"{type_map.get(word.ner_type)}的名字"
+                    data["info"] = f"{type_map.get(word.type)}的名字"
 
                 datas.append(data)
 
@@ -656,14 +656,14 @@ class FileManager():
 
                 line = f"{word.surface}\t{word.surface_translation}"
 
-                if word.ner_type == "PER" and "男" in word.attribute:
+                if word.type == "PER" and "男" in word.gender:
                     line = line + "\t男性的名字"
-                elif word.ner_type == "PER" and "女" in word.attribute:
+                elif word.type == "PER" and "女" in word.gender:
                     line = line + "\t女性的名字"
-                elif word.ner_type == "PER":
+                elif word.type == "PER":
                     line = line + "\t名字"
                 else:
-                    line = line + f"\t{type_map.get(word.ner_type)}的名字"
+                    line = line + f"\t{type_map.get(word.type)}的名字"
 
                 file.write(f"{line}\n")
             LogHelper.info(f"结果已写入 - [green]{path}[/]")
@@ -682,7 +682,7 @@ class FileManager():
         ]
 
         for k, v in NER.TYPES.items():
-            words_by_type = [word for word in words if word.ner_type == k]
+            words_by_type = [word for word in words if word.type == k]
 
             # 检查数据有效性
             if len(words_by_type) == 0:

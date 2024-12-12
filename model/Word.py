@@ -1,50 +1,61 @@
 import threading
-from dataclasses import field
-from dataclasses import dataclass
 
 import tiktoken
 from module.LogHelper import LogHelper
 
-@dataclass
 class Word:
 
-    score: float = 0.0
-    count: int = 0
-    context: list[str] = field(default_factory = list)
-    context_summary: str = ""
-    context_translation: list[str] = field(default_factory = list)
-    surface: str = ""
-    surface_romaji: str = ""
-    surface_translation: str = ""
-    surface_translation_description: str = ""
-    ner_type: str = ""
-    attribute: str = ""
-    llmresponse_summarize_context: str = ""
-    llmresponse_translate_context: str = ""
-    llmresponse_translate_surface: str = ""
+    TYPE_FILTER = (int, str, bool, float, list, dict, tuple)
 
-    def __post_init__(self) -> None:
-        pass
+    def __init__(self) -> None:
+        super().__init__()
+
+        # 默认值
+        self.score: float = 0.0
+        self.count: int = 0
+        self.context: list[str] = []
+        self.context_summary: str = ""
+        self.context_translation: list[str] = []
+        self.surface: str = ""
+        self.surface_romaji: str = ""
+        self.surface_translation: str = ""
+        self.surface_translation_description: str = ""
+        self.type: str = ""
+        self.gender: str = ""
+        self.llmresponse_summarize_context: str = ""
+        self.llmresponse_translate_context: str = ""
+        self.llmresponse_translate_surface: str = ""
+
+        # 类变量
+        Word.cache = {} if not hasattr(Word, "cache") else Word.cache
+
+        # 类线程锁
+        Word.lock = threading.Lock() if not hasattr(Word, "lock") else Word.lock
+
+    def __repr__(self) -> str:
+        return (
+            f"{type(self).__name__}({self.get_vars()})"
+        )
+
+    def get_vars(self) -> dict:
+        return {
+            k:v
+            for k, v in vars(self).items()
+            if isinstance(v, __class__.TYPE_FILTER)
+        }
 
     # 获取token数量，优先从缓存中获取
     def get_token_count(self, line: str) -> int:
-        if not hasattr(Word, "cache"):
-            Word.cache = {}
-
-        if not hasattr(Word, "cache_lock"):
-            Word.cache_lock = threading.Lock()
-
-        if not hasattr(Word, "tiktoken_encoding"):
-            Word.tiktoken_encoding = tiktoken.get_encoding("cl100k_base")
+        count = 0
 
         # 优先从缓存中取数据
-        count = 0
-        with Word.cache_lock:
+        with Word.lock:
             if line in Word.cache:
                 count = Word.cache[line]
             else:
-                count = len(Word.tiktoken_encoding.encode(line))
+                count = len(tiktoken.get_encoding("cl100k_base").encode(line))
                 Word.cache[line] = count
+
         return count
 
     # 按长度截取上下文并返回，如果句子长度全部超过 Token 阈值，则取最接近阈值的一条

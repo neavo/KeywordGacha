@@ -4,7 +4,6 @@ import gc
 import json
 import warnings
 import unicodedata
-from types import SimpleNamespace
 from typing import Generator
 
 import torch
@@ -20,16 +19,28 @@ from module.LogHelper import LogHelper
 from module.TextHelper import TextHelper
 from module.ProgressHelper import ProgressHelper
 
+class Language():
+
+    ZH = 100
+    EN = 200
+    JP = 300
+    KO = 400
+
 class NER:
 
-    TASK_MODES = SimpleNamespace()
-    TASK_MODES.QUICK = 10
-    TASK_MODES.ACCURACY = 20
+    # 实体类型
+    TYPES = {
+        "PER": "角色实体",       # 表示人名，如"张三"、"约翰·多伊"等。
+        "ORG": "组织实体",       # 表示组织，如"联合国"、"苹果公司"等。
+        "LOC": "地点实体",       # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
+        "PRD": "物品实体",       # 表示产品，如"iPhone"、"Windows操作系统"等。
+        "EVT": "事件实体",       # 表示事件，如"奥运会"、"地震"等。
+    }
 
-    GPU_BOOST = torch.cuda.is_available()
-    BATCH_SIZE = 32 if GPU_BOOST else 1
-    MODEL_PATH = "resource/kg_ner_gpu" if GPU_BOOST else "resource/kg_ner_cpu"
+    # 语言模式
+    LANGUAGE = Language()
 
+    # 分割符号
     RE_SPLIT_BY_PUNCTUATION = re.compile(
         r"[" +
         rf"{TextHelper.GENERAL_PUNCTUATION[0]}-{TextHelper.GENERAL_PUNCTUATION[1]}" +
@@ -44,21 +55,14 @@ class NER:
         r"·・♥]+"
     )
 
-    TYPES = {
-        "PER": "角色实体",       # 表示人名，如"张三"、"约翰·多伊"等。
-        "ORG": "组织实体",       # 表示组织，如"联合国"、"苹果公司"等。
-        "LOC": "地点实体",       # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
-        "PRD": "物品实体",       # 表示产品，如"iPhone"、"Windows操作系统"等。
-        "EVT": "事件实体",       # 表示事件，如"奥运会"、"地震"等。
-    }
-
-    LANGUAGE = SimpleNamespace()
-    LANGUAGE.ZH = 100
-    LANGUAGE.EN = 200
-    LANGUAGE.JP = 300
-    LANGUAGE.KO = 400
-
     def __init__(self) -> None:
+        super().__init__()
+
+        # 初始化
+        self.gpu_boost = torch.cuda.is_available()
+        self.bacth_size = 32 if self.gpu_boost else 1
+        self.model_path = "resource/kg_ner_gpu" if self.gpu_boost else "resource/kg_ner_cpu"
+
         # 忽略指定的警告信息
         warnings.filterwarnings(
             "ignore",
@@ -67,7 +71,7 @@ class NER:
         )
 
         self.tokenizer = AutoTokenizer.from_pretrained(
-            self.MODEL_PATH,
+            self.model_path,
             padding = "max_length",
             truncation = True,
             max_length = 512,
@@ -75,9 +79,9 @@ class NER:
             local_files_only = True,
         )
 
-        if self.GPU_BOOST:
+        if self.gpu_boost:
             self.model = AutoModelForTokenClassification.from_pretrained(
-                self.MODEL_PATH,
+                self.model_path,
                 torch_dtype = torch.float16,
                 local_files_only = True,
             ).to(device = "cuda")
@@ -85,7 +89,7 @@ class NER:
             session_options = onnxruntime.SessionOptions()
             session_options.log_severity_level = 4
             self.model = ORTModelForTokenClassification.from_pretrained(
-                self.MODEL_PATH,
+                self.model_path,
                 provider = "CPUExecutionProvider",
                 session_options = session_options,
                 use_io_binding = True,
@@ -95,7 +99,7 @@ class NER:
         self.classifier = pipeline(
             "token-classification",
             model = self.model,
-            device = "cuda" if self.GPU_BOOST else "cpu",
+            device = "cuda" if self.gpu_boost else "cpu",
             tokenizer = self.tokenizer,
             aggregation_strategy = "simple",
         )
@@ -152,7 +156,7 @@ class NER:
         return flag
 
     # 判断是否是有意义的英文词语
-    def is_valid_english_word(self, surface: str, blacklist: set, ner_type: str, unique_words: set[str]) -> bool:
+    def is_valid_english_word(self, surface: str, blacklist: set, type: str, unique_words: set[str]) -> bool:
         flag = True
 
         if len(surface) <= 2:
@@ -165,7 +169,7 @@ class NER:
             return False
 
         # 排除类型为角色首字母没有大写的词语
-        if ner_type == "PER" and not surface[0].isupper():
+        if type == "PER" and not surface[0].isupper():
             return False
 
         # 排除不是完整单词的词语
@@ -236,17 +240,17 @@ class NER:
         return chunks
 
     # 生成词语
-    def generate_words(self, text: str, line: str, score: float, ner_type: str, language: int, unique_words: set[str]) -> list[Word]:
+    def generate_words(self, text: str, line: str, score: float, type: str, language: int, unique_words: set[str]) -> list[Word]:
         words = []
 
-        if ner_type != "PER":
+        if type != "PER":
             surfaces = [text]
         else:
             surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, text)
 
         for surface in surfaces:
             # 过滤非实体
-            if ner_type not in self.TYPES:
+            if type not in self.TYPES:
                 continue
 
             # 中文词语判断
@@ -258,7 +262,7 @@ class NER:
             # 英文词语判断
             if language == NER.LANGUAGE.EN:
                 surface = TextHelper.strip_not_latin(surface)
-                if not self.is_valid_english_word(surface, self.blacklist, ner_type, unique_words):
+                if not self.is_valid_english_word(surface, self.blacklist, type, unique_words):
                     continue
 
             # 日文词语判断
@@ -277,7 +281,7 @@ class NER:
             word.count = 1
             word.score = score
             word.surface = surface
-            word.ner_type = ner_type
+            word.type = type
             word.context.append(line)
             words.append(word)
 
@@ -321,7 +325,7 @@ class NER:
     def search_for_entity(self, input_lines: list[str], input_names: list[str], language: int) -> list[Word]:
         words = []
 
-        if self.GPU_BOOST:
+        if self.gpu_boost:
             LogHelper.info("检测到有效的 [green]GPU[/] 环境，已启用 [green]GPU[/] 加速 ...")
         else:
             LogHelper.warning("未检测到有效的 [green]GPU[/] 环境，无法启用 [green]GPU[/] 加速 ...")
@@ -335,7 +339,7 @@ class NER:
 
             i = 0
             unique_words = None
-            for result in self.classifier(self.generator(chunks),batch_size = self.BATCH_SIZE):
+            for result in self.classifier(self.generator(chunks),batch_size = self.bacth_size):
                 # 获取当前文本
                 chunk = chunks[i]
 
@@ -383,7 +387,7 @@ class NER:
 
         # 打印通过模式匹配抓取的角色实体
         LogHelper.print("")
-        LogHelper.info(f"[查找 NER 实体] 已完成 ...")
+        LogHelper.info("[查找 NER 实体] 已完成 ...")
         LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}") if len(seen) > 0 else None
 
         # 释放显存
@@ -396,7 +400,7 @@ class NER:
         words_ex = []
         for word in words:
             # 以下步骤只对角色实体进行
-            if not word.ner_type == "PER":
+            if not word.type == "PER":
                 continue
 
             # 前面的步骤中已经移除了首尾的 の，如果还有，那就是 AのB 的形式，跳过
@@ -423,19 +427,19 @@ class NER:
                     word_ex.count = word.count
                     word_ex.score = word.score
                     word_ex.context = word.context
-                    word_ex.ner_type = word.ner_type
+                    word_ex.type = word.type
 
                     roots.append(v)
                     words_ex.append(word_ex)
 
             if len(roots) > 0:
-                key = (word.ner_type, word.surface)
+                key = (word.type, word.surface)
 
                 if key not in seen:
-                    LogHelper.info(f"通过 [green]词语形态[/] 还原词根 - {word.ner_type} - {word.surface} [green]->[/] {" / ".join(roots)}")
+                    LogHelper.info(f"通过 [green]词语形态[/] 还原词根 - {word.type} - {word.surface} [green]->[/] {" / ".join(roots)}")
 
                 seen.add(key)
-                word.ner_type = ""
+                word.type = ""
 
         # 合并拆分出来的词语
         words.extend(words_ex)
