@@ -10,8 +10,8 @@ from openai import AsyncOpenAI
 from aiolimiter import AsyncLimiter
 
 from model.Word import Word
-from helper.LogHelper import LogHelper
-from helper.TextHelper import TextHelper
+from module.LogHelper import LogHelper
+from module.TextHelper import TextHelper
 
 class LLM:
 
