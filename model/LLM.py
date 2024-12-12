@@ -13,6 +13,18 @@ from model.Word import Word
 from module.LogHelper import LogHelper
 from module.TextHelper import TextHelper
 
+class LLMConfig():
+
+    TEMPERATURE = 0.05
+    TOP_P = 0.85
+    MAX_TOKENS = 768
+    FREQUENCY_PENALTY = 0
+
+class ProcessMode():
+
+    NORMAL = 1
+    QUICK = 2
+
 class LLM:
 
     MAX_RETRY = 3 # 最大重试次数
@@ -23,36 +35,34 @@ class LLM:
     TASK_TYPE_TRANSLATE_CONTEXT = 40    # 翻译上下文
 
     # 处理模式
-    PROCESS_MODE = SimpleNamespace()
-    PROCESS_MODE.QUICK = 2
-    PROCESS_MODE.NORMAL = 1
+    PROCESS_MODE = ProcessMode()
 
     # 初始化请求配置参数
-    LLMCONFIG = {}
+    LLMCONFIG: dict[int, LLMConfig] = {}
 
     # 请求参数配置 - 接口测试
-    LLMCONFIG[TASK_TYPE_API_TEST] = SimpleNamespace()
+    LLMCONFIG[TASK_TYPE_API_TEST] = LLMConfig()
     LLMCONFIG[TASK_TYPE_API_TEST].TEMPERATURE = 0.05
     LLMCONFIG[TASK_TYPE_API_TEST].TOP_P = 0.85
     LLMCONFIG[TASK_TYPE_API_TEST].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_API_TEST].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 语义分析
-    LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT] = SimpleNamespace()
+    LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT] = LLMConfig()
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].TEMPERATURE = 0.05
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].TOP_P = 0.85
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_SUMMAIRZE_CONTEXT].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 翻译词语
-    LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE] = SimpleNamespace()
+    LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE] = LLMConfig()
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].TEMPERATURE = 0.05
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].TOP_P = 0.85
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS = 768
     LLMCONFIG[TASK_TYPE_TRANSLATE_SURFACE].FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 翻译上下文
-    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT] = SimpleNamespace()
+    LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT] = LLMConfig()
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TEMPERATURE = 0.75
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].TOP_P = 0.95
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS = 1024
@@ -225,11 +235,11 @@ class LLM:
                 # 检查词语描述种是否包含不应包含的关键字，如果包含则移除
                 # 只检查描述不为空的非角色实体
                 if (
-                    word.ner_type != "PER"
+                    word.type != "PER"
                     and word.surface_translation_description != ""
                     and self.check_keyword_in_description(word, ("语气词", "拟声词", "感叹词", "形容词"))
                 ):
-                    word.ner_type = ""
+                    word.type = ""
                     LogHelper.debug(f"[词语翻译] 已剔除 - {word.surface} - {word.surface_translation_description}")
 
                 # 生成罗马音，汉字有时候会生成重复的罗马音，所以需要去重
@@ -270,8 +280,8 @@ class LLM:
         await asyncio.gather(*tasks, return_exceptions = True)
 
         # 获得失败任务的列表
-        successed_word_pairs = {(word.surface, word.ner_type) for word in success}
-        failure = [word for word in words if (word.surface, word.ner_type) not in successed_word_pairs]
+        successed_word_pairs = {(word.surface, word.type) for word in success}
+        failure = [word for word in words if (word.surface, word.type) not in successed_word_pairs]
 
         return failure, success
 
@@ -357,8 +367,8 @@ class LLM:
         await asyncio.gather(*tasks, return_exceptions = True)
 
         # 获得失败任务的列表
-        successed_word_pairs = {(word.surface, word.ner_type) for word in success}
-        failure = [word for word in words if (word.surface, word.ner_type) not in successed_word_pairs]
+        successed_word_pairs = {(word.surface, word.type) for word in success}
+        failure = [word for word in words if (word.surface, word.type) not in successed_word_pairs]
 
         return failure, success
 
@@ -383,7 +393,7 @@ class LLM:
                 error = None
 
                 if mode == LLM.PROCESS_MODE.QUICK:
-                    word.ner_type = "" if not self.check_keyword_in_description(word, None) else word.ner_type
+                    word.type = "" if not self.check_keyword_in_description(word, None) else word.type
                 else:
                     usage, message, llm_request, llm_response, error = await self.do_request(
                         [
@@ -413,10 +423,10 @@ class LLM:
                     if "否" not in result.get("is_name", ""):
                         LogHelper.debug(f"[语义分析] 已完成 - {word.surface} - {result}")
                     else:
-                        word.ner_type = ""
+                        word.type = ""
                         LogHelper.info(f"[语义分析] 已剔除 - {word.surface} - {result}")
 
-                    word.attribute = result.get("gender", "").strip()
+                    word.gender = result.get("gender", "").strip()
                     word.context_summary = result.get("summary", "").strip()
                     word.llmresponse_summarize_context = llm_response
             except Exception as e:
@@ -454,8 +464,8 @@ class LLM:
         await asyncio.gather(*tasks, return_exceptions = True)
 
         # 获得失败任务的列表
-        successed_word_pairs = {(word.surface, word.ner_type) for word in success}
-        failure = [word for word in words if (word.surface, word.ner_type) not in successed_word_pairs]
+        successed_word_pairs = {(word.surface, word.type) for word in success}
+        failure = [word for word in words if (word.surface, word.type) not in successed_word_pairs]
 
         return failure, success
 

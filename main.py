@@ -23,7 +23,7 @@ SCORE_THRESHOLD = 0.80
 def merge_words(words: list[Word]) -> list[Word]:
     words_unique = {}
     for word in words:
-        key = (word.surface, word.ner_type) # 只有文字和类型都一样才视为相同条目，避免跨类词条目合并
+        key = (word.surface, word.type) # 只有文字和类型都一样才视为相同条目，避免跨类词条目合并
         if key not in words_unique:
             words_unique[key] = []
         words_unique[key].append(word)
@@ -48,17 +48,17 @@ def filter_words_by_count(words: list[Word], threshold: float) -> list[Word]:
     return [word for word in words if word.count >= max(1, threshold)]
 
 # 获取指定类型的词
-def get_words_by_ner_type(words: list[Word], ner_type: str) -> list[Word]:
+def get_words_by_type(words: list[Word], type: str) -> list[Word]:
     # 显式的复制对象，避免后续修改对原始列表的影响，浅拷贝不复制可变对象（列表、字典、自定义对象等），慎重修改它们
-    return [copy.copy(word) for word in words if word.ner_type == ner_type]
+    return [copy.copy(word) for word in words if word.type == type]
 
 # 移除指定类型的词
-def remove_words_by_ner_type(words: list[Word], ner_type: str) -> list[Word]:
-    return [word for word in words if word.ner_type != ner_type]
+def remove_words_by_type(words: list[Word], type: str) -> list[Word]:
+    return [word for word in words if word.type != type]
 
 # 指定类型的词
-def replace_words_by_ner_type(words: list[Word], in_words: list[Word], ner_type: str) -> list[Word]:
-    words = remove_words_by_ner_type(words, ner_type)
+def replace_words_by_type(words: list[Word], in_words: list[Word], type: str) -> list[Word]:
+    words = remove_words_by_type(words, type)
     words.extend(in_words)
     return words
 
@@ -85,7 +85,7 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     if language == NER.LANGUAGE.JP:
         LogHelper.info("即将开始执行 [还原词根] ...")
         words = ner.lemmatize_words_by_morphology(words)
-        words = remove_words_by_ner_type(words, "")
+        words = remove_words_by_type(words, "")
         LogHelper.info("[还原词根] 已完成 ...")
 
     # 合并相同词条
@@ -110,7 +110,7 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     if language != NER.LANGUAGE.ZH:
         LogHelper.info("即将开始执行 [词语翻译] ...")
         words = await llm.translate_surface_batch(words)
-        words = remove_words_by_ner_type(words, "")
+        words = remove_words_by_type(words, "")
 
     # 调试模式时，前置检查结果重复度
     if LogHelper.is_debug():
@@ -122,10 +122,10 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
 
     # 等待 语义分析任务 结果
     LogHelper.info("即将开始执行 [语义分析] ...")
-    words_person = get_words_by_ner_type(words, "PER")
+    words_person = get_words_by_type(words, "PER")
     words_person = await llm.summarize_context_batch(words_person, process_mode)
-    words = replace_words_by_ner_type(words, words_person, "PER")
-    words = remove_words_by_ner_type(words, "")
+    words = replace_words_by_type(words, words_person, "PER")
+    words = remove_words_by_type(words, "")
 
     # 调试模式时，后置检查结果重复度
     if LogHelper.is_debug():
@@ -142,9 +142,9 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
                 continue
 
             LogHelper.info(f"即将开始执行 [上下文翻译 - {v}] ...")
-            word_type = get_words_by_ner_type(words, k)
+            word_type = get_words_by_type(words, k)
             word_type = await llm.translate_context_batch(word_type)
-            words = replace_words_by_ner_type(words, word_type, k)
+            words = replace_words_by_type(words, word_type, k)
 
     # 将结果写入文件
     LogHelper.info("")
