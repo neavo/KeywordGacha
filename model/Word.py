@@ -3,7 +3,7 @@ from dataclasses import field
 from dataclasses import dataclass
 
 import tiktoken
-from helper.LogHelper import LogHelper
+from module.LogHelper import LogHelper
 
 @dataclass
 class Word:
