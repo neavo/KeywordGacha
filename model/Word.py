@@ -1,7 +1,6 @@
 import threading
 
 import tiktoken
-from module.LogHelper import LogHelper
 
 class Word:
 

@@ -2,7 +2,6 @@ import os
 import re
 import csv
 import json
-import random
 import unicodedata
 
 import jaconv
