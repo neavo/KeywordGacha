@@ -61,7 +61,7 @@ class NER:
         # 初始化
         self.gpu_boost = torch.cuda.is_available()
         self.bacth_size = 32 if self.gpu_boost else 1
-        self.model_path = "resource/facebookai_xlm_roberta_base_pretrain_20241212_ner_best" if self.gpu_boost else "resource/kg_ner_cpu"
+        self.model_path = "resource/kg_ner_gpu" if self.gpu_boost else "resource/kg_ner_cpu"
 
         # 忽略指定的警告信息
         warnings.filterwarnings(
