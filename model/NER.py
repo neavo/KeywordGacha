@@ -61,7 +61,7 @@ class NER:
         # 初始化
         self.gpu_boost = torch.cuda.is_available()
         self.bacth_size = 32 if self.gpu_boost else 1
-        self.model_path = "resource/kg_ner_gpu" if self.gpu_boost else "resource/kg_ner_cpu"
+        self.model_path = "resource/facebookai_xlm_roberta_base_pretrain_20241212_ner_best" if self.gpu_boost else "resource/kg_ner_cpu"
 
         # 忽略指定的警告信息
         warnings.filterwarnings(
@@ -240,7 +240,7 @@ class NER:
         return chunks
 
     # 生成词语
-    def generate_words(self, text: str, line: str, score: float, type: str, language: int, unique_words: set[str]) -> list[Word]:
+    def generate_words(self, text: str, line: str, score: float, type: str, language: int, input_lines: list[str], unique_words: set[str]) -> list[Word]:
         words = []
 
         if type != "PER":
@@ -282,6 +282,7 @@ class NER:
             word.score = score
             word.surface = surface
             word.type = type
+            word.input_lines = input_lines
             word.context.append(line)
             words.append(word)
 
@@ -365,7 +366,7 @@ class NER:
                     line = self.get_line_by_offset(text, chunk_lines, chunk_offsets, token.get("start"), token.get("end"))
                     score = token.get("score")
                     entity_group = token.get("entity_group")
-                    words.extend(self.generate_words(text, line, score, entity_group, language, unique_words))
+                    words.extend(self.generate_words(text, line, score, entity_group, language, input_lines, unique_words))
 
                 i = i + 1
                 progress.update(pid, advance = 1, total = len(chunks))
@@ -374,14 +375,14 @@ class NER:
         with LogHelper.status("正在对文本进行后处理 ..."):
             # 添加输入文件中读取到的角色名
             for name, line in input_names:
-                words.extend(self.generate_words(name, line, 65535, "PER", language, None))
+                words.extend(self.generate_words(name, line, 65535, "PER", language, input_lines, None))
 
             # 匹配【】中的字符串
             seen = set()
             for line in input_lines:
                 for name in re.findall(r"【(.*?)】", line):
                     if self.get_display_lenght(name) <= 16:
-                        for word in self.generate_words(name, line, 65535, "PER", language, None):
+                        for word in self.generate_words(name, line, 65535, "PER", language, input_lines, None):
                             seen.add(word.surface) if word.surface not in seen else None
                             words.append(word)
 
@@ -427,6 +428,7 @@ class NER:
                     word_ex.count = word.count
                     word_ex.score = word.score
                     word_ex.context = word.context
+                    word_ex.input_lines = word.input_lines
                     word_ex.type = word.type
 
                     roots.append(v)
