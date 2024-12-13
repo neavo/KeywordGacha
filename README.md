@@ -23,25 +23,20 @@
   
 ## 配置要求 🖥️
 - 兼容 OpenAI 标准的 AI 大模型接口
-- 使用 [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek) 处理一本书只要 `几毛钱` + `一分钟`
-- 也可以通过运行 [一键包 - 点击查看教程](https://github.com/neavo/KeywordGachaServer) 来获得 `完全免费` 的服务（需要 8G 以上显存的 Nvidia 显卡）
 - 注意，`SakuraLLM` 系列模型只具有翻译功能，无法进行文本分析，不能与 `KG` 配合使用
 
 ## 使用流程 🛸
 - 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 或 [百度网盘](https://pan.baidu.com/s/1_JXmKvnar6PGHlIbl0Mi2Q?pwd=9e54) 下载应用
-- 打开配置文件 `config.json`，填入 API 信息，默认为使用本地接口
+- 打开配置文件 `config.json`，填入 API 信息，推荐在以下两种方式中选择其一：
+  - [本地接口 - 点击查看教程](https://github.com/neavo/KeywordGachaServer)，完全免费，速度较慢，需要 8G+ 显存的 Nvidia 显卡
+  - [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)，需付费但很便宜，速度快，无显卡要求
 - 双击 `01_启动.bat` 启动应用，处理流程结束后，结果会保存在 `output` 文件夹内
 - 其中：
   - `*_日志.txt` - 抓取到的词语的原文、上下文、翻译建议、角色信息总结等详细信息，用于人工确认
   - `*_列表.json` - 通用词表，可以导入 [AiNiee - 替换词典](https://github.com/NEKOparapa/AiNiee)、[绿站 - 术语表](https://books.fishhawk.top/workspace/katakana) 等处使用
   - `*_ainiee.json` - [AiNiee - 提示字典](https://github.com/NEKOparapa/AiNiee) 功能专用词语表
   - `*_galtransl.json` - [GalTransl - GPT 字典](https://github.com/xd2333/GalTransl) 功能专用词语表
-
-## 应用效果 ⚡
-- `抓取`、`分析` 和 `翻译` 效果取决于模型的能力，使用 💪 ~~更昂贵~~ 更强力  的模型可以显著提升效果
-- 是的，氪金可以变强
-- 总体来说 `在线接口` 的效果和速度都远好于 `本地接口`，建议使用 `在线接口`
-- 建议遵循 [常见问题](https://github.com/neavo/KeywordGacha#%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98-) 里的建议以获得最佳的使用效果
+- 遵循 [常见问题](https://github.com/neavo/KeywordGacha#%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98-) 里的建议以获得最佳的使用效果
 
 ## 文本格式 🏷️
 - 支持从 `.txt`、`.csv`、`.json`、`.xlsx` 文件中读取文本
@@ -51,6 +46,11 @@
 - 具体可见 [支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
 
 ## 近期更新 📅
+- 20241213 v0.7.0
+  - 分析能力提升，主要来自于：
+    - NER 模型更新
+    - 参考文本匹配机制优化
+
 - 20241129 v0.6.1
   - 调整 - 兼容 AiNiee 词典新旧字段
   
@@ -123,7 +123,8 @@
 
 - 处理 `游戏文本` 的最佳实践
   - 使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出游戏文本为 `csv` 或 `xlsx` 格式
-  - 如果是 `RPGMaker MV/MZ` 游戏：复制 `Actors.json` 到指定位置以启用 [角色代码还原](https://github.com/neavo/KeywordGacha/wiki/%E8%A7%92%E8%89%B2%E4%BB%A3%E7%A0%81%E8%BF%98%E5%8E%9F) 功能
+  - 对于 `RPGMaker MV/MZ` 游戏
+    - 复制 `Actors.json` 到指定位置以启用 [角色代码还原](https://github.com/neavo/KeywordGacha/wiki/%E8%A7%92%E8%89%B2%E4%BB%A3%E7%A0%81%E8%BF%98%E5%8E%9F) 功能
   - 如果抓取效果不好，可以多试几种导出工具和导出格式，有时候会有奇效
 
 ## 开发计划 📈
