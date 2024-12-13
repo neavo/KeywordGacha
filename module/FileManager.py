@@ -2,7 +2,6 @@ import os
 import re
 import csv
 import json
-import random
 import unicodedata
 
 import jaconv
@@ -290,8 +289,8 @@ class FileManager():
 
     # 将角色代码还原为角色名字
     def restore_code_to_name(self, text: str, names: dict, nicknames: dict) -> str:
-        # names = names if len(names) > 0 else FileManager.NAMES
-        # nicknames = nicknames if len(names) > 0 else FileManager.NICKNAMES
+        names = names if len(names) > 0 else FileManager.NAMES
+        nicknames = nicknames if len(names) > 0 else FileManager.NICKNAMES
 
         # 根据 actors 中的数据还原 角色代码 \N[123] 实际指向的名字
         text = re.sub(
@@ -689,9 +688,9 @@ class FileManager():
                 return
 
             # 将角色名字还原为角色代码
-            # for word in words_by_type:
-            #     for key in ("context", "context_summary", "context_translation", "surface", "surface_translation", "surface_translation_description"):
-            #         setattr(word, key, self.restore_name_to_code(getattr(word, key), FileManager.NAMES, FileManager.NICKNAMES))
+            for word in words_by_type:
+                for key in ("context", "context_summary", "context_translation", "surface", "surface_translation", "surface_translation_description"):
+                    setattr(word, key, self.restore_name_to_code(getattr(word, key), FileManager.NAMES, FileManager.NICKNAMES))
 
             # 写入文件
             self.write_words_log_to_file(words_by_type, f"output/{file_name}_{v}_日志.txt", language)
