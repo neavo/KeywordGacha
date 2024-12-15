@@ -68,6 +68,17 @@ class LLM:
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS = 1024
     LLMCONFIG[TASK_TYPE_TRANSLATE_CONTEXT].FREQUENCY_PENALTY = 0
 
+    # 角色实体关键词
+    PER_KEYWORD = (
+        "人名",
+        "名字",
+        "姓氏",
+        "姓名",
+        "昵称",
+        "角色",
+        "人物",
+    )
+
     def __init__(self, config: SimpleNamespace) -> None:
         self.api_key = config.api_key
         self.base_url = config.base_url
@@ -102,7 +113,6 @@ class LLM:
 
     # 检查词语的描述是否包含特定关键词
     def check_keyword_in_description(self, word: Word, keywords: tuple) -> bool:
-        keywords = keywords if keywords != None else ("人名", "名字", "姓氏", "姓名", "名称", "昵称", "角色名")
         return any(keyword in word.surface_translation_description for keyword in keywords)
 
     # 异步发送请求到 OpenAI 获取模型回复
@@ -199,7 +209,7 @@ class LLM:
                 LogHelper.warning(f"llm_response - {llm_response}")
 
     # 词语翻译任务
-    async def translate_surface(self, word: Word, retry: bool) -> tuple[Word, Exception]:
+    async def translate_surface(self, word: Word, words: list[Word], failure: list[Word], success: list[Word], retry: bool) -> None:
         async with self.semaphore, self.async_limiter:
             try:
                 usage, message, llm_request, llm_response, error = await self.do_request(
@@ -217,7 +227,7 @@ class LLM:
                     retry
                 )
 
-                if error:
+                if error != None:
                     raise error
 
                 if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_SURFACE].MAX_TOKENS:
@@ -233,12 +243,7 @@ class LLM:
                 word.llmresponse_translate_surface = llm_response
 
                 # 检查词语描述种是否包含不应包含的关键字，如果包含则移除
-                # 只检查描述不为空的非角色实体
-                if (
-                    word.type != "PER"
-                    and word.surface_translation_description != ""
-                    and self.check_keyword_in_description(word, ("语气词", "拟声词", "感叹词", "形容词"))
-                ):
+                if self.check_keyword_in_description(word, ("语气词", "拟声词", "感叹词", "形容词")):
                     word.type = ""
                     LogHelper.debug(f"[词语翻译] 已剔除 - {word.surface} - {word.surface_translation_description}")
 
@@ -251,58 +256,39 @@ class LLM:
                 LogHelper.debug(f"llm_response - {llm_response}")
                 error = e
             finally:
-                return word, error
-
-    # 词语翻译任务完成时的回调
-    def on_translate_surface_task_done(self, future: Future, words: list[Word], success: list[Word]) -> None:
-        word, error = future.result()
-
-        if error == None:
-            success.append(word)
-            LogHelper.info(f"[词语翻译] 已完成 {len(success)} / {len(words)} ...")
-
-    # 批量执行词语翻译任务的具体实现
-    async def do_translate_surface_batch(self, words: list[Word], failure: list[Word], success: list[Word]) -> tuple[list, list]:
-        if len(failure) == 0:
-            retry = False
-            words_this_round = words
-        else:
-            retry = True
-            words_this_round = failure
-
-        tasks = []
-        for k, word in enumerate(words_this_round):
-            task = asyncio.create_task(self.translate_surface(word, retry))
-            task.add_done_callback(lambda future: self.on_translate_surface_task_done(future, words, success))
-            tasks.append(task)
-
-        # 等待异步任务完成
-        await asyncio.gather(*tasks, return_exceptions = True)
-
-        # 获得失败任务的列表
-        successed_word_pairs = {(word.surface, word.type) for word in success}
-        failure = [word for word in words if (word.surface, word.type) not in successed_word_pairs]
-
-        return failure, success
+                if error != None:
+                    failure.append(word)
+                else:
+                    success.append(word)
+                    LogHelper.info(f"[词语翻译] 已完成 {len(success)} / {len(words)} ...")
 
     # 批量执行词语翻译任务
     async def translate_surface_batch(self, words: list[Word]) -> list[Word]:
         failure = []
         success = []
 
-        failure, success = await self.do_translate_surface_batch(words, failure, success)
+        for i in range(self.MAX_RETRY + 1):
+            if i == 0:
+                retry = False
+                words_this_round = words
+            elif len(failure) > 0:
+                retry = True
+                words_this_round = failure
+                LogHelper.warning(f"[词语翻译] 即将开始第 {i} / {self.MAX_RETRY} 轮重试...")
+            else:
+                break
 
-        if len(failure) > 0:
-            for i in range(self.MAX_RETRY):
-                LogHelper.warning( f"[词语翻译] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
+            # 执行异步任务
+            tasks = [
+                asyncio.create_task(self.translate_surface(word, words, failure, success, retry))
+                for word in words_this_round
+            ]
+            await asyncio.gather(*tasks, return_exceptions = True)
 
-                failure, success = await self.do_translate_surface_batch(words, failure, success)
-                if len(failure) == 0:
-                    break
         return words
 
     # 上下文翻译任务
-    async def translate_context(self, word: Word, retry: bool) -> tuple[Word, Exception]:
+    async def translate_context(self, word: Word, words: list[Word], failure: list[Word], success: list[Word], retry: bool) -> None:
         async with self.semaphore, self.async_limiter:
             try:
                 usage, message, llm_request, llm_response, error = await self.do_request(
@@ -325,10 +311,7 @@ class LLM:
                 if usage.completion_tokens >= self.LLMCONFIG[self.TASK_TYPE_TRANSLATE_CONTEXT].MAX_TOKENS:
                     raise Exception("usage.completion_tokens >= MAX_TOKENS")
 
-                context_translation = []
-                for k, line in enumerate(message.content.split("\n")):
-                    if len(line) > 0:
-                        context_translation.append(line)
+                context_translation = [line.strip() for line in message.content.split("\n") if line.strip() != ""]
 
                 word.context_translation = context_translation
                 word.llmresponse_translate_context = llm_response
@@ -338,62 +321,45 @@ class LLM:
                 LogHelper.debug(f"llm_response - {llm_response}")
                 error = e
             finally:
-                return word, error
-
-    # 上下文翻译任务完成时的回调
-    def on_translate_context_task_done(self, future: Future, words: list[Word], success: list[Word]) -> None:
-        word, error = future.result()
-
-        if error == None:
-            success.append(word)
-            LogHelper.info(f"[上下文翻译] 已完成 {len(success)} / {len(words)} ...")
-
-    # 批量执行上下文翻译任务的具体实现
-    async def do_translate_context_batch(self, words: list[Word], failure: list[Word], success: list[Word]) -> tuple[list, list]:
-        if len(failure) == 0:
-            retry = False
-            words_this_round = words
-        else:
-            retry = True
-            words_this_round = failure
-
-        tasks = []
-        for k, word in enumerate(words_this_round):
-            task = asyncio.create_task(self.translate_context(word, retry))
-            task.add_done_callback(lambda future: self.on_translate_context_task_done(future, words, success))
-            tasks.append(task)
-
-        # 等待异步任务完成
-        await asyncio.gather(*tasks, return_exceptions = True)
-
-        # 获得失败任务的列表
-        successed_word_pairs = {(word.surface, word.type) for word in success}
-        failure = [word for word in words if (word.surface, word.type) not in successed_word_pairs]
-
-        return failure, success
+                if error != None:
+                    failure.append(word)
+                else:
+                    success.append(word)
+                    LogHelper.info(f"[上下文翻译] 已完成 {len(success)} / {len(words)} ...")
 
     # 批量执行上下文翻译任务
     async def translate_context_batch(self, words: list[Word]) -> list[Word]:
         failure = []
         success = []
 
-        failure, success = await self.do_translate_context_batch(words, failure, success)
+        for i in range(self.MAX_RETRY + 1):
+            if i == 0:
+                retry = False
+                words_this_round = words
+            elif len(failure) > 0:
+                retry = True
+                words_this_round = failure
+                LogHelper.warning(f"[上下文翻译] 即将开始第 {i} / {self.MAX_RETRY} 轮重试...")
+            else:
+                break
 
-        for i in range(self.MAX_RETRY):
-            if len(failure) > 0:
-                LogHelper.warning( f"[上下文翻译] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
-                failure, success = await self.do_translate_context_batch(words, failure, success)
+            # 执行异步任务
+            tasks = [
+                asyncio.create_task(self.translate_context(word, words, failure, success, retry))
+                for word in words_this_round
+            ]
+            await asyncio.gather(*tasks, return_exceptions = True)
 
         return words
 
     # 语义分析任务
-    async def summarize_context(self, word: Word, retry: bool, mode: int) -> tuple[Word, Exception]:
+    async def summarize_context(self, word: Word, words: list[Word], failure: list[Word], success: list[Word], mode: int, retry: bool) -> None:
         async with self.semaphore, self.async_limiter:
             try:
                 error = None
 
                 if mode == LLM.PROCESS_MODE.QUICK:
-                    word.type = "" if not self.check_keyword_in_description(word, None) else word.type
+                    word.type = "" if not self.check_keyword_in_description(word, LLM.PER_KEYWORD) else word.type
                 else:
                     usage, message, llm_request, llm_response, error = await self.do_request(
                         [
@@ -435,52 +401,33 @@ class LLM:
                 LogHelper.debug(f"llm_response - {llm_response}")
                 error = e
             finally:
-                return word, error
-
-    # 语义分析任务完成时的回调
-    def on_summarize_context_task_done(self, future: Future, words: list[Word], success: list[Word]) -> None:
-        word, error = future.result()
-
-        if error == None:
-            success.append(word)
-            LogHelper.info(f"[语义分析] 已完成 {len(success)} / {len(words)} ...")
-
-    # 批量执行语义分析任务的具体实现
-    async def do_summarize_context_batch(self, words: list[Word], failure: list[Word], success: list[Word], mode: int) -> tuple[list, list]:
-        if len(failure) == 0:
-            retry = False
-            words_this_round = words
-        else:
-            retry = True
-            words_this_round = failure
-
-        tasks = []
-        for k, word in enumerate(words_this_round):
-            task = asyncio.create_task(self.summarize_context(word, retry, mode))
-            task.add_done_callback(lambda future: self.on_summarize_context_task_done(future, words, success))
-            tasks.append(task)
-
-        # 等待异步任务完成
-        await asyncio.gather(*tasks, return_exceptions = True)
-
-        # 获得失败任务的列表
-        successed_word_pairs = {(word.surface, word.type) for word in success}
-        failure = [word for word in words if (word.surface, word.type) not in successed_word_pairs]
-
-        return failure, success
+                if error != None:
+                    failure.append(word)
+                else:
+                    success.append(word)
+                    LogHelper.info(f"[语义分析] 已完成 {len(success)} / {len(words)} ...")
 
     # 批量执行语义分析任务
     async def summarize_context_batch(self, words: list[Word], mode: int) -> list[Word]:
         failure = []
         success = []
 
-        # 第一次请求
-        failure, success = await self.do_summarize_context_batch(words, failure, success, mode)
+        for i in range(self.MAX_RETRY + 1):
+            if i == 0:
+                retry = False
+                words_this_round = words
+            elif len(failure) > 0:
+                retry = True
+                words_this_round = failure
+                LogHelper.warning(f"[语义分析] 即将开始第 {i} / {self.MAX_RETRY} 轮重试...")
+            else:
+                break
 
-        # 开始重试流程
-        for i in range(self.MAX_RETRY):
-            if len(failure) > 0:
-                LogHelper.warning( f"[语义分析] 即将开始第 {i + 1} / {self.MAX_RETRY} 轮重试...")
-                failure, success = await self.do_summarize_context_batch(words, failure, success, mode)
+            # 执行异步任务
+            tasks = [
+                asyncio.create_task(self.summarize_context(word, words, failure, success, mode, retry))
+                for word in words_this_round
+            ]
+            await asyncio.gather(*tasks, return_exceptions = True)
 
         return words

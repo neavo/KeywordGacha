@@ -116,9 +116,19 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     if LogHelper.is_debug():
         with LogHelper.status("正在检查结果重复度..."):
             TestHelper.check_result_duplication(
-                [word for word in words if llm.check_keyword_in_description(word, None)],
+                [word for word in words if llm.check_keyword_in_description(word, LLM.PER_KEYWORD)],
                  "check_result_duplication_01.log",
             )
+
+        # for word in [word for word in words if word.type == "PER"]:
+        #     if llm.check_keyword_in_description(word, LLM.PER_KEYWORD) == False:
+        #         try:
+        #             LogHelper.print(f"")
+        #             LogHelper.debug(f"{word.surface}")
+        #             LogHelper.debug(f"{word.llmresponse_translate_surface.choices[0].message.content.strip()}")
+        #         except Exception as e:
+        #             pass
+        # raise
 
     # 等待 语义分析任务 结果
     LogHelper.info("即将开始执行 [语义分析] ...")
