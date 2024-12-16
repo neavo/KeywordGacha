@@ -107,23 +107,13 @@ class Word:
 
         return context
 
-    # 获取用于上下文分析任务的上下文文本
-    def get_context_str_for_summarize(self, language: int) -> str:
-        from model.NER import NER
-        return "\n".join(
-            self.clip_context(
-                line_threshold = 0,
-                token_threshold = 384 if language == NER.Language.EN else 512,
-            )
-        ).replace("\n\n", "\n").strip()
-
     # 获取用于上下文翻译任务的上下文文本
     def get_context_str_for_translate(self, language: int) -> str:
         from model.NER import NER
         return "\n".join(
             self.clip_context(
                 line_threshold = 20,
-                token_threshold = 384 if language == NER.Language.EN else 512,
+                token_threshold = 512 if language == NER.Language.EN else 768,
             )
         ).replace("\n\n", "\n").strip()
 
@@ -133,6 +123,6 @@ class Word:
         return "\n".join(
             self.clip_context(
                 line_threshold = 0,
-                token_threshold = 384 if language == NER.Language.EN else 512,
+                token_threshold = 512 if language == NER.Language.EN else 768,
             )
         ).replace("\n\n", "\n").strip()
