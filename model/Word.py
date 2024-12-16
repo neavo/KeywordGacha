@@ -22,9 +22,8 @@ class Word:
         self.type: str = ""
         self.gender: str = ""
         self.input_lines: list[str] = []
-        self.llmresponse_summarize_context: str = ""
+        self.llmresponse_surface_analysis: str = ""
         self.llmresponse_translate_context: str = ""
-        self.llmresponse_translate_surface: str = ""
 
         # 类变量
         Word.cache = {} if not hasattr(Word, "cache") else Word.cache
@@ -34,7 +33,6 @@ class Word:
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.get_vars()})"
-
 
     def get_vars(self) -> dict:
         return {
@@ -115,7 +113,7 @@ class Word:
         return "\n".join(
             self.clip_context(
                 line_threshold = 0,
-                token_threshold = 960 if language == NER.LANGUAGE.EN else 1280,
+                token_threshold = 384 if language == NER.Language.EN else 512,
             )
         ).replace("\n\n", "\n").strip()
 
@@ -125,15 +123,16 @@ class Word:
         return "\n".join(
             self.clip_context(
                 line_threshold = 20,
-                token_threshold = 768 if language == NER.LANGUAGE.EN else 1024,
+                token_threshold = 384 if language == NER.Language.EN else 512,
             )
         ).replace("\n\n", "\n").strip()
 
-    # 获取用于词语翻译任务的上下文文本
-    def get_context_str_for_surface_translate(self) -> str:
+    # 获取用于词义分析任务的上下文文本
+    def get_context_str_for_surface_analysis(self, language: int) -> str:
+        from model.NER import NER
         return "\n".join(
             self.clip_context(
-                line_threshold = 10,
-                token_threshold = 384,
+                line_threshold = 0,
+                token_threshold = 384 if language == NER.Language.EN else 512,
             )
         ).replace("\n\n", "\n").strip()
