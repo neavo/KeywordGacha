@@ -27,12 +27,12 @@
     .\env\python.exe -m pip cache purge
 
     @REM 部署模型
-    .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20240912/kg_ner_cpu.zip -o kg_ner_cpu.zip
+    .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20241212/kg_ner_cpu.zip -o kg_ner_cpu.zip
     powershell -Command "Remove-Item -Path 'resource\kg_ner_cpu' -Recurse -Force -ErrorAction SilentlyContinue"
     powershell -Command "Expand-Archive -Path 'kg_ner_cpu.zip' -DestinationPath 'resource\kg_ner_cpu'"
     powershell -Command "Remove-Item -Path 'kg_ner_cpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
 
-    .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20240912/kg_ner_gpu.zip -o kg_ner_gpu.zip
+    .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20241212/kg_ner_gpu.zip -o kg_ner_gpu.zip
     powershell -Command "Remove-Item -Path 'resource\kg_ner_gpu' -Recurse -Force -ErrorAction SilentlyContinue"
     powershell -Command "Expand-Archive -Path 'kg_ner_gpu.zip' -DestinationPath 'resource\kg_ner_gpu'"
     powershell -Command "Remove-Item -Path 'kg_ner_gpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
