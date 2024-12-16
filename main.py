@@ -49,40 +49,24 @@ def filter_words_by_count(words: list[Word], threshold: float) -> list[Word]:
 
 # 获取指定类型的词
 def get_words_by_type(words: list[Word], type: str) -> list[Word]:
-    # 显式的复制对象，避免后续修改对原始列表的影响，浅拷贝不复制可变对象（列表、字典、自定义对象等），慎重修改它们
-    return [copy.copy(word) for word in words if word.type == type]
+    return [word for word in words if word.type == type]
 
 # 移除指定类型的词
 def remove_words_by_type(words: list[Word], type: str) -> list[Word]:
     return [word for word in words if word.type != type]
 
-# 指定类型的词
-def replace_words_by_type(words: list[Word], in_words: list[Word], type: str) -> list[Word]:
-    words = remove_words_by_type(words, type)
-    words.extend(in_words)
-    return words
-
 # 开始处理文本
 async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: SimpleNamespace, language: int) -> None:
-    # 设置 LLM 语言
-    llm.set_language(language)
-
-    # 选择处理模式，中文没有翻译的过程，所以无法支持快速模式
-    if language == NER.LANGUAGE.ZH:
-        process_mode = LLM.PROCESS_MODE.NORMAL
-    else:
-        process_mode = print_menu_process_mode()
-
     # 读取输入文件
     input_lines, input_names = file_manager.load_lines_from_input_file(language)
 
-    # 查找 NER 实体
-    LogHelper.info("即将开始执行 [查找 NER 实体] ...")
+    # 查找实体词语
+    LogHelper.info("即将开始执行 [查找实体词语] ...")
     words = []
     words = ner.search_for_entity(input_lines, input_names, language)
 
     # 等待 还原词根任务 结果，只对日文启用
-    if language == NER.LANGUAGE.JP:
+    if language == NER.Language.JP:
         LogHelper.info("即将开始执行 [还原词根] ...")
         words = ner.lemmatize_words_by_morphology(words)
         words = remove_words_by_type(words, "")
@@ -102,48 +86,24 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     words = filter_words_by_count(words, config.count_threshold)
     LogHelper.info("[阈值过滤] 已完成 ...")
 
+    # 设置 LLM 语言
+    llm.set_language(language)
+
     # 设置请求限制器
     llm.set_request_limiter()
 
-    # 等待翻译词语任务结果
-    # 中文无需翻译
-    if language != NER.LANGUAGE.ZH:
-        LogHelper.info("即将开始执行 [词语翻译] ...")
-        words = await llm.translate_surface_batch(words)
-        words = remove_words_by_type(words, "")
-
-    # 调试模式时，前置检查结果重复度
-    if LogHelper.is_debug():
-        with LogHelper.status("正在检查结果重复度..."):
-            TestHelper.check_result_duplication(
-                [word for word in words if llm.check_keyword_in_description(word, LLM.PER_KEYWORD)],
-                 "check_result_duplication_01.log",
-            )
-
-        # for word in [word for word in words if word.type == "PER"]:
-        #     if llm.check_keyword_in_description(word, LLM.PER_KEYWORD) == False:
-        #         try:
-        #             LogHelper.print(f"")
-        #             LogHelper.debug(f"{word.surface}")
-        #             LogHelper.debug(f"{word.llmresponse_translate_surface.choices[0].message.content.strip()}")
-        #         except Exception as e:
-        #             pass
-        # raise
-
-    # 等待 语义分析任务 结果
-    LogHelper.info("即将开始执行 [语义分析] ...")
-    words_person = get_words_by_type(words, "PER")
-    words_person = await llm.summarize_context_batch(words_person, process_mode)
-    words = replace_words_by_type(words, words_person, "PER")
+    # 等待词义分析任务结果
+    LogHelper.info("即将开始执行 [词义分析] ...")
+    words = await llm.surface_analysis_batch(words)
     words = remove_words_by_type(words, "")
 
     # 调试模式时，后置检查结果重复度
     if LogHelper.is_debug():
         with LogHelper.status("正在检查结果重复度..."):
-            TestHelper.check_result_duplication(words, "check_result_duplication_02.log")
+            TestHelper.check_result_duplication(words, "check_result_duplication.log")
 
     # 等待 上下文翻译 任务结果
-    if language in (NER.LANGUAGE.EN, NER.LANGUAGE.JP, NER.LANGUAGE.KO):
+    if language in (NER.Language.EN, NER.Language.JP, NER.Language.KO):
         for k, v in NER.TYPES.items():
             if k == "PER" and config.translate_context_per != 1:
                 continue
@@ -154,7 +114,6 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
             LogHelper.info(f"即将开始执行 [上下文翻译 - {v}] ...")
             word_type = get_words_by_type(words, k)
             word_type = await llm.translate_context_batch(word_type)
-            words = replace_words_by_type(words, word_type, k)
 
     # 将结果写入文件
     LogHelper.info("")
@@ -265,13 +224,13 @@ async def begin(llm: LLM, ner: NER, file_manager: FileManager, config: SimpleNam
 
         choice = print_menu_main()
         if choice == 1:
-            await process_text(llm, ner, file_manager, config, NER.LANGUAGE.ZH)
+            await process_text(llm, ner, file_manager, config, NER.Language.ZH)
         elif choice == 2:
-            await process_text(llm, ner, file_manager, config, NER.LANGUAGE.EN)
+            await process_text(llm, ner, file_manager, config, NER.Language.EN)
         elif choice == 3:
-            await process_text(llm, ner, file_manager, config, NER.LANGUAGE.JP)
+            await process_text(llm, ner, file_manager, config, NER.Language.JP)
         elif choice == 4:
-            await process_text(llm, ner, file_manager, config, NER.LANGUAGE.KO)
+            await process_text(llm, ner, file_manager, config, NER.Language.KO)
         elif choice == 5:
             await test_api(llm)
 

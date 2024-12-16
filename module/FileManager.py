@@ -343,7 +343,7 @@ class FileManager():
         # 将 队伍成员代码 \P[123] 替换为 teammate_123
         line = re.sub(r"\\p\[(\d+)\]", r"teammate_\1", line, flags = re.IGNORECASE)
 
-        if language == NER.LANGUAGE.EN:
+        if language == NER.Language.EN:
             line = re.sub(rf"(?:{"|".join(FileManager.CODE_PATTERN_EN + FileManager.CODE_PATTERN_COMMON)})+", "", line, flags = re.IGNORECASE)
         else:
             line = re.sub(rf"(?:{"|".join(FileManager.CODE_PATTERN_NON_EN + FileManager.CODE_PATTERN_COMMON)})+", "", line, flags = re.IGNORECASE)
@@ -520,22 +520,22 @@ class FileManager():
                 if len(line) == 0:
                     continue
 
-                if language == NER.LANGUAGE.EN:
+                if language == NER.Language.EN:
                     line = unicodedata.normalize("NFKC", line)
 
-                if language == NER.LANGUAGE.JP:
+                if language == NER.Language.JP:
                     line = jaconv.normalize(line, mode = "NFKC")
 
-                if language == NER.LANGUAGE.ZH and not TextHelper.has_any_cjk(line):
+                if language == NER.Language.ZH and not TextHelper.has_any_cjk(line):
                     continue
 
-                if language == NER.LANGUAGE.EN and not TextHelper.has_any_latin(line):
+                if language == NER.Language.EN and not TextHelper.has_any_latin(line):
                     continue
 
-                if language == NER.LANGUAGE.JP and not TextHelper.has_any_japanese(line):
+                if language == NER.Language.JP and not TextHelper.has_any_japanese(line):
                     continue
 
-                if language == NER.LANGUAGE.KO and not TextHelper.has_any_korean(line):
+                if language == NER.Language.KO and not TextHelper.has_any_korean(line):
                     continue
 
                 input_lines_filtered.append(line.strip())
@@ -554,7 +554,7 @@ class FileManager():
                     file.write(f"置信度 : {word.score:.4f}\n")
 
                 if getattr(word, "surface_romaji", "") != "":
-                    if language == NER.LANGUAGE.JP:
+                    if language == NER.Language.JP:
                         file.write(f"罗马音 : {word.surface_romaji}\n")
 
                 if getattr(word, "count", int(-1)) >= 0:
@@ -581,12 +581,10 @@ class FileManager():
                     file.write(f"{"\n".join(word.context_translation)}\n")
 
                 if LogHelper.is_debug():
-                    if word.llmresponse_summarize_context != "":
-                        file.write(f"{word.llmresponse_summarize_context}\n")
                     if word.llmresponse_translate_context != "":
                         file.write(f"{word.llmresponse_translate_context}\n")
-                    if word.llmresponse_translate_surface != "":
-                        file.write(f"{word.llmresponse_translate_surface}\n")
+                    if word.llmresponse_surface_analysis != "":
+                        file.write(f"{word.llmresponse_surface_analysis}\n")
 
                 # 多写入一个换行符，确保每段信息之间有间隔
                 file.write("\n")

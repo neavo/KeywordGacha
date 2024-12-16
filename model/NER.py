@@ -19,14 +19,15 @@ from module.LogHelper import LogHelper
 from module.TextHelper import TextHelper
 from module.ProgressHelper import ProgressHelper
 
-class Language():
-
-    ZH = 100
-    EN = 200
-    JP = 300
-    KO = 400
-
 class NER:
+
+    # 语言模式
+    class Language():
+
+        ZH = 100
+        EN = 200
+        JP = 300
+        KO = 400
 
     # 实体类型
     TYPES = {
@@ -36,9 +37,6 @@ class NER:
         "PRD": "物品实体",       # 表示产品，如"iPhone"、"Windows操作系统"等。
         "EVT": "事件实体",       # 表示事件，如"奥运会"、"地震"等。
     }
-
-    # 语言模式
-    LANGUAGE = Language()
 
     # 分割符号
     RE_SPLIT_BY_PUNCTUATION = re.compile(
@@ -243,7 +241,8 @@ class NER:
     def generate_words(self, text: str, line: str, score: float, type: str, language: int, input_lines: list[str], unique_words: set[str]) -> list[Word]:
         words = []
 
-        if type != "PER":
+        # 当语言为英语且不是人名时，不进行切分，以避免切断复合词组
+        if language == NER.Language.EN and type != "PER":
             surfaces = [text]
         else:
             surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, text)
@@ -254,25 +253,25 @@ class NER:
                 continue
 
             # 中文词语判断
-            if language == NER.LANGUAGE.ZH:
+            if language == NER.Language.ZH:
                 surface = TextHelper.strip_not_cjk(surface)
                 if not self.is_valid_cjk_word(surface, self.blacklist):
                     continue
 
             # 英文词语判断
-            if language == NER.LANGUAGE.EN:
+            if language == NER.Language.EN:
                 surface = TextHelper.strip_not_latin(surface)
                 if not self.is_valid_english_word(surface, self.blacklist, type, unique_words):
                     continue
 
             # 日文词语判断
-            if language == NER.LANGUAGE.JP:
+            if language == NER.Language.JP:
                 surface = TextHelper.strip_not_japanese(surface).strip("の")
                 if not self.is_valid_japanese_word(surface, self.blacklist):
                     continue
 
             # 韩文词语判断
-            if language == NER.LANGUAGE.KO:
+            if language == NER.Language.KO:
                 surface = TextHelper.strip_not_korean(surface)
                 if not self.is_valid_korean_word(surface, self.blacklist):
                     continue
@@ -322,7 +321,7 @@ class NER:
 
         return result
 
-    # 查找 NER 实体
+    # 查找实体词语
     def search_for_entity(self, input_lines: list[str], input_names: list[str], language: int) -> list[Word]:
         words = []
 
@@ -336,7 +335,7 @@ class NER:
             chunks = self.generate_chunks(input_lines, 512)
 
         with ProgressHelper.get_progress() as progress:
-            pid = progress.add_task("查找 NER 实体", total = None)
+            pid = progress.add_task("查找实体词语", total = None)
 
             i = 0
             unique_words = None
@@ -356,7 +355,7 @@ class NER:
                     chunk_offsets.append((start, start + len(line) + 1)) # 字符数加上换行符的长度
 
                 # 如果是英文，则抓取去重词表，再计算并添加所有词根到词表，以供后续筛选词语
-                if language == NER.LANGUAGE.EN:
+                if language == NER.Language.EN:
                     unique_words = set(re.findall(r"\b\w+\b", chunk))
                     unique_words.update(set(self.get_english_lemma(v) for v in unique_words))
 
@@ -388,8 +387,8 @@ class NER:
 
         # 打印通过模式匹配抓取的角色实体
         LogHelper.print("")
-        LogHelper.info("[查找 NER 实体] 已完成 ...")
-        LogHelper.info(f"[查找 NER 实体] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}") if len(seen) > 0 else None
+        LogHelper.info("[查找实体词语] 已完成 ...")
+        LogHelper.info(f"[查找实体词语] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}") if len(seen) > 0 else None
 
         # 释放显存
         self.release()
