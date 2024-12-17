@@ -1,6 +1,8 @@
+from dataclasses import asdict
 import os
 import json
 import asyncio
+import threading
 import urllib.request
 from types import SimpleNamespace
 from concurrent.futures import Future
@@ -62,11 +64,16 @@ class LLM:
         self.request_timeout = config.request_timeout
         self.request_frequency_threshold = config.request_frequency_threshold
 
-        # 初始化 pykakasi
+        # 初始化
         self.kakasi = pykakasi.kakasi()
+        self.client = self.load_client()
 
-        # 初始化OpenAI客户端
-        self.openai_handler = AsyncOpenAI(
+        # 线程锁
+        self.lock = threading.Lock()
+
+    # 初始化 OpenAI 客户端
+    def load_client(self) -> AsyncOpenAI:
+        return AsyncOpenAI(
             timeout = self.request_timeout,
             api_key = self.api_key,
             base_url = self.base_url,
@@ -98,11 +105,12 @@ class LLM:
                 "temperature" : llm_config.TEMPERATURE,
                 "top_p" : llm_config.TOP_P,
                 "max_tokens" : llm_config.MAX_TOKENS,
+                "max_completion_tokens" : llm_config.MAX_TOKENS,
                 "frequency_penalty" : llm_config.FREQUENCY_PENALTY + 0.2 if retry == True else llm_config.FREQUENCY_PENALTY,
                 "messages" : messages,
             }
 
-            completion = await self.openai_handler.chat.completions.create(**llm_request)
+            completion = await self.client.chat.completions.create(**llm_request)
 
             llm_response = completion
             usage = completion.usage
@@ -255,7 +263,8 @@ class LLM:
                 error = e
             finally:
                 if error == None:
-                    success.append(word)
+                    with self.lock:
+                        success.append(word)
                     LogHelper.info(f"[词义分析] 已完成 {len(success)} / {len(words)} ...")
 
     # 批量执行词义分析任务
@@ -305,7 +314,7 @@ class LLM:
                     retry
                 )
 
-                if error:
+                if error != None:
                     raise error
 
                 if usage.completion_tokens >= LLM.TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS:
@@ -322,7 +331,8 @@ class LLM:
                 error = e
             finally:
                 if error == None:
-                    success.append(word)
+                    with self.lock:
+                        success.append(word)
                     LogHelper.info(f"[上下文翻译] 已完成 {len(success)} / {len(words)} ...")
 
     # 批量执行上下文翻译任务
