@@ -360,9 +360,8 @@ class FileManager():
         return line
 
     # 读取 .txt 文件
-    def read_txt_file(self, path: str) -> tuple[list, list]:
+    def read_txt_file(self, path: str) -> list[str]:
         lines = []
-        names = []
         encodings = ["utf-8", "utf-16", "shift-jis"]
 
         for encoding in encodings:
@@ -375,12 +374,11 @@ class FileManager():
                 LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
                 break
 
-        return lines, names
+        return lines
 
     # 读取 .csv 文件
-    def read_csv_file(self, path: str) -> tuple[list, list]:
+    def read_csv_file(self, path: str) -> list[str]:
         lines = []
-        names = []
 
         try:
             with open(path, "r", newline = "", encoding = "utf-8") as file:
@@ -389,12 +387,11 @@ class FileManager():
         except Exception as e:
             LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-        return lines, names
+        return lines
 
     # 读取 .json 文件
-    def read_json_file(self, path: str) -> tuple[list, list]:
+    def read_json_file(self, path: str) -> list[str]:
         lines = []
-        names = []
 
         try:
             # 读取并加载JSON文件
@@ -425,20 +422,17 @@ class FileManager():
                             continue
 
                         if name == "":
-                            lines.append(f"{message}")
-                        else:
-                            message = f"【{name}】{message}"
-                            names.append((name, message))
                             lines.append(message)
+                        else:
+                            lines.append(f"【{name}】{message}")
         except Exception as e:
             LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-        return lines, names
+        return lines
 
     # 读取 .xlsx 文件
-    def read_xlsx_file(self, path: str) -> tuple[list, list]:
+    def read_xlsx_file(self, path: str) -> list[str]:
         lines = []
-        names = []
 
         try:
             sheet = openpyxl.load_workbook(path).active
@@ -449,23 +443,22 @@ class FileManager():
         except Exception as e:
             LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-        return lines, names
+        return lines
 
     # 读取文件
-    def read_file(self, path: str) -> tuple[list, list]:
-        lines_ex = []
-        names_ex = []
+    def read_file(self, path: str) -> list[str]:
+        lines = []
 
         if path.endswith(".txt"):
-            lines_ex, names_ex = self.read_txt_file(path)
+            lines = self.read_txt_file(path)
         elif path.endswith(".csv"):
-            lines_ex, names_ex = self.read_csv_file(path)
+            lines = self.read_csv_file(path)
         elif path.endswith(".json"):
-            lines_ex, names_ex = self.read_json_file(path)
+            lines = self.read_json_file(path)
         elif path.endswith(".xlsx"):
-            lines_ex, names_ex = self.read_xlsx_file(path)
+            lines = self.read_xlsx_file(path)
 
-        return lines_ex, names_ex
+        return lines
 
     # 从输入文件中加载数据
     def load_lines_from_input_file(self, language: int) -> tuple[list, list, str]:
@@ -503,15 +496,9 @@ class FileManager():
 
         # 依次读取每个数据文件
         with LogHelper.status("正在读取输入文件 ..."):
-            input_lines, input_names = [], []
+            input_lines = []
             for path in paths:
-                lines_ex, names_ex = self.read_file(path)
-                input_lines.extend(lines_ex)
-                input_names.extend(names_ex)
-
-            input_names_filtered = []
-            for name, message in input_names:
-                input_names_filtered.append((name, self.cleanup(message, language, names, nicknames)))
+                input_lines.extend(self.read_file(path))
 
             input_lines_filtered = []
             for line in input_lines:
@@ -539,9 +526,9 @@ class FileManager():
                     continue
 
                 input_lines_filtered.append(line.strip())
+        LogHelper.info(f"已读取到文本 {len(input_lines)} 行，其中有效文本 {len(input_lines_filtered)} 行 ...")
 
-        LogHelper.info(f"已读取到文本 {len(input_lines)} 行，其中有效文本 {len(input_lines_filtered)} 行, 角色名 {len(input_names_filtered)} 个...")
-        return input_lines_filtered, input_names_filtered
+        return input_lines_filtered
 
     # 将 词语日志 写入文件
     def write_words_log_to_file(self, words: list[Word], path: str, language: int) -> None:

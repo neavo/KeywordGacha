@@ -58,12 +58,12 @@ def remove_words_by_type(words: list[Word], type: str) -> list[Word]:
 # 开始处理文本
 async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: SimpleNamespace, language: int) -> None:
     # 读取输入文件
-    input_lines, input_names = file_manager.load_lines_from_input_file(language)
+    input_lines = file_manager.load_lines_from_input_file(language)
 
     # 查找实体词语
     LogHelper.info("即将开始执行 [查找实体词语] ...")
     words = []
-    words = ner.search_for_entity(input_lines, input_names, language)
+    words = ner.search_for_entity(input_lines, language)
 
     # 等待 还原词根任务 结果，只对日文启用
     if language == NER.Language.JP:
