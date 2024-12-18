@@ -65,13 +65,6 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     words = []
     words = ner.search_for_entity(input_lines, language)
 
-    # 等待 还原词根任务 结果，只对日文启用
-    if language == NER.Language.JP:
-        LogHelper.info("即将开始执行 [还原词根] ...")
-        words = ner.lemmatize_words_by_morphology(words)
-        words = remove_words_by_type(words, "")
-        LogHelper.info("[还原词根] 已完成 ...")
-
     # 合并相同词条
     words = merge_words(words)
 
@@ -186,7 +179,7 @@ def print_menu_main() -> int:
     LogHelper.print("\t--> 1. 开始处理 [green]中文文本[/]")
     LogHelper.print("\t--> 2. 开始处理 [green]英文文本[/]")
     LogHelper.print("\t--> 3. 开始处理 [green]日文文本[/]")
-    LogHelper.print("\t--> 4. 开始处理 [green]韩文文本（初步支持）[/]")
+    LogHelper.print("\t--> 4. 开始处理 [green]韩文文本[/]")
     LogHelper.print("\t--> 5. 开始执行 [green]接口测试[/]")
     LogHelper.print("")
     choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的功能，默认为 [green][3][/] ",
