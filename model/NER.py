@@ -338,18 +338,6 @@ class NER:
 
         return result
 
-    # 获取英语词根
-    def get_english_lemma(self, surface: str) -> str:
-        lemma_noun = getLemma(surface, upos = "NOUN")[0]
-        lemma_propn = getLemma(surface, upos = "PROPN")[0]
-
-        if lemma_propn != surface:
-            return lemma_propn
-        elif lemma_noun != surface:
-            return lemma_noun
-        else:
-            return surface
-
     # 计算字符串的实际显示长度
     def get_display_lenght(self, text: str) -> int:
         # unicodedata.east_asian_width(c) 返回字符 c 的东亚洲宽度属性。
@@ -389,7 +377,6 @@ class NER:
             pid = progress.add_task("查找实体词语", total = None)
 
             i = 0
-            unique_words = None
             for result in self.classifier(self.generator(chunks), batch_size = self.bacth_size):
                 # 获取当前文本
                 chunk = chunks[i]
@@ -404,11 +391,6 @@ class NER:
                         start = chunk_offsets[-1][1]
 
                     chunk_offsets.append((start, start + len(line) + 1)) # 字符数加上换行符的长度
-
-                # 如果是英文，则抓取去重词表，再计算并添加所有词根到词表，以供后续筛选词语
-                if language == NER.Language.EN:
-                    unique_words = set(re.findall(r"\b\w+\b", chunk))
-                    unique_words.update(set(self.get_english_lemma(v) for v in unique_words))
 
                 # 处理 NER模型 识别结果
                 for token in result:
