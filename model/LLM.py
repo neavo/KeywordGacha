@@ -333,7 +333,7 @@ class LLM:
                 if usage.completion_tokens >= LLM.TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS:
                     raise Exception("模型发生退化 ...")
 
-                context_translation = [line.strip() for line in message.content.splitelines() if line.strip() != ""]
+                context_translation = [line.strip() for line in message.content.splitlines() if line.strip() != ""]
 
                 word.context_translation = context_translation
                 word.llmresponse_translate_context = llm_response

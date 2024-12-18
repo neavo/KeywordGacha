@@ -11,7 +11,6 @@ import onnxruntime
 from optimum.onnxruntime import ORTModelForTokenClassification
 from sudachipy import tokenizer
 from sudachipy import dictionary
-from lemminflect import getLemma
 from transformers import pipeline
 from transformers import AutoTokenizer
 from transformers import PreTrainedModel
