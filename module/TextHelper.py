@@ -1,4 +1,5 @@
 import re
+import json
 
 class TextHelper:
 
@@ -191,49 +192,29 @@ class TextHelper:
 
         return text
 
-    # 修复不合规的JSON字符串
     @staticmethod
-    def fix_broken_json_string(jsonstring) -> str:
+    def safe_load_json_dict(json_str: str) -> dict:
+        result = {}
+
         # 移除首尾空白符（含空格、制表符、换行符）
-        jsonstring = jsonstring.strip()
+        json_str = json_str.strip()
 
         # 移除代码标识
-        jsonstring = jsonstring.replace("```json", "").replace("```", "").strip()
+        json_str = json_str.removeprefix("```json").removeprefix("```").strip()
 
-        # 补上缺失的 }
-        jsonstring = jsonstring if jsonstring.endswith("}") else jsonstring + "}"
+        # 先尝试使用 json.loads 解析
+        try:
+            result = json.loads(json_str)
+        except Exception as e:
+            pass
 
-        # 移除多余的 ,
-        jsonstring = jsonstring if not jsonstring.endswith(",}") else jsonstring.replace(",}", "}")
-        jsonstring = jsonstring if not jsonstring.endswith(",\n}") else jsonstring.replace(",\n}", "}")
+        # 否则使用正则表达式匹配
+        if len(result) == 0:
+            for item in re.findall(r"['\"].+?['\"]\s*\:\s*['\"].+?['\"]\s*(?=[,}])", json_str, flags = re.IGNORECASE):
+                p = item.split(":")
+                result[p[0].strip().strip("'\"").strip()] = p[1].strip().strip("'\"").strip()
 
-        # 移除单行注释
-        jsonstring = re.sub(
-            r"//.*(?=,|\s|\}|\n)",
-            "",
-            jsonstring,
-        ).strip()
-
-        # 修正值中错误的单引号
-        jsonstring = re.sub(
-            r"(?<=:').*?(?=',\n|'\n|'\})",
-            lambda matches: matches.group(0).replace("\n", "").replace("\\'", "'").replace("'", "\\'"),
-            jsonstring,
-            flags = re.DOTALL
-        ).strip()
-
-        # 修正值中错误的双引号
-        jsonstring = re.sub(
-            r'(?<=:").*?(?=",\n|"\n|"\})',
-            lambda matches: matches.group(0).replace('\n', '').replace('\\"', '"').replace('"', '\\"'),
-            jsonstring,
-            flags = re.DOTALL
-        ).strip()
-
-        # 修正错误的全角引号
-        jsonstring = jsonstring.replace('”,\n', '",\n').replace('”\n}', '"\n}').strip()
-
-        return jsonstring
+        return result
 
     # 按汉字、平假名、片假名拆开日文短语
     @staticmethod
