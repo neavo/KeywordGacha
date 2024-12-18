@@ -61,7 +61,9 @@ class NER:
         self.model = self.load_model(self.model_path, self.gpu_boost)
         self.tokenizer = self.load_tokenizer(self.model_path)
         self.classifier = self.load_classifier(self.model, self.gpu_boost)
+
         self.sudachi = dictionary.Dictionary(dict_type = "core").create(tokenizer.Tokenizer.SplitMode.C)
+        self.noun_set_cache = {}
 
     # 释放资源
     def release(self) -> None:
@@ -172,8 +174,11 @@ class NER:
         # 生成名词表
         noun_set = self.generate_noun_set(line, language)
 
-        # 生成词语列表
-        surfaces = [v.strip() for v in TextHelper.split_by_punctuation(text) if v.strip() != ""]
+        # 生成词语列表，当前文本为英文且包含 ' 时不拆分，避免误拆复合短语
+        if "'" in text and language == NER.Language.EN:
+            surfaces = [text]
+        else:
+            surfaces = [v.strip() for v in TextHelper.split_by_punctuation(text) if v.strip() != ""]
 
         # 遍历词语
         for surface in surfaces:
@@ -186,7 +191,6 @@ class NER:
 
             # 按语言验证词语
             if self.verify_by_language(surface, language) == False:
-                # LogHelper.debug(f"verify_by_language - {surface}")
                 continue
 
             # 根据名词集合对词语进行修正
@@ -205,28 +209,37 @@ class NER:
 
     # 生成名词集合
     def generate_noun_set(self, line: str, language: int) -> set[str]:
-        noun_set = set()
+        # 优先从缓存中获取
+        if line in self.noun_set_cache:
+            return self.noun_set_cache[line]
+        else:
+            # 否则重新生成
+            noun_set = set()
 
-        if language == NER.Language.JP:
-            # 获取名词集合
-            for token in self.sudachi.tokenize(line):
-                # 获取表面形态
-                surface = token.surface()
+            # 语言为日语时
+            if language == NER.Language.JP:
+                # 获取名词集合
+                for token in self.sudachi.tokenize(line):
+                    # 获取表面形态
+                    surface = token.surface()
 
-                # 跳过包含至少一个标点符号的条目
-                if TextHelper.has_any_punctuation(surface):
-                    continue
+                    # 跳过包含至少一个标点符号的条目
+                    if TextHelper.has_any_punctuation(surface):
+                        continue
 
-                # 跳过目标类型以外的条目
-                if not any(v in ",".join(token.part_of_speech()) for v in ("地名", "人名", "名詞")):
-                    continue
+                    # 跳过目标类型以外的条目
+                    if not any(v in ",".join(token.part_of_speech()) for v in ("地名", "人名", "名詞")):
+                        continue
 
-                noun_set.add(surface)
+                    noun_set.add(surface)
 
-        if language == NER.Language.EN:
-            noun_set.update(re.findall(r"\b(.+?)\b", line))
+            # 语言为英语
+            if language == NER.Language.EN:
+                noun_set.update(re.findall(r"\b(.+?)\b", line))
 
-        return noun_set
+            # 加入缓存并返回
+            self.noun_set_cache[line] = noun_set
+            return noun_set
 
     # 根据名词集合修正词语
     def fix_by_noun_set(self, text: str, line: str, noun_set: set[str], language: int) -> str:
@@ -242,7 +255,7 @@ class NER:
 
         if language == NER.Language.EN:
             if text.count(" ") == 0:
-                for noun in noun_set:
+                for noun in [v for v in noun_set if v.count(" ") == 0]:
                     if text == noun:
                         continue
 
