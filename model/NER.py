@@ -322,7 +322,7 @@ class NER:
         return result
 
     # 查找实体词语
-    def search_for_entity(self, input_lines: list[str], input_names: list[str], language: int) -> list[Word]:
+    def search_for_entity(self, input_lines: list[str], language: int) -> list[Word]:
         words = []
 
         if self.gpu_boost:
@@ -369,12 +369,6 @@ class NER:
 
                 i = i + 1
                 progress.update(pid, advance = 1, total = len(chunks))
-
-        # 后处理步骤
-        with LogHelper.status("正在对文本进行后处理 ..."):
-            # 添加输入文件中读取到的角色名
-            for name, line in input_names:
-                words.extend(self.generate_words(name, line, 65535, "PER", language, input_lines, None))
 
             # 匹配【】中的字符串
             seen = set()
