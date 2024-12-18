@@ -361,20 +361,18 @@ class FileManager():
 
     # 读取 .txt 文件
     def read_txt_file(self, path: str) -> list[str]:
-        lines = []
-        encodings = ["utf-8", "utf-16", "shift-jis"]
-
-        for encoding in encodings:
+        # 尝试使用不同的编码读取文件
+        for encoding in ("utf-8", "utf-16", "shift-jis"):
             try:
-                with open(path, "r", encoding = encoding) as file:
-                    return file.readlines(), []
+                with open(path, "r", encoding = encoding) as reader:
+                    return reader.readlines()
             except UnicodeDecodeError as e:
-                LogHelper.debug(f"使用 {encoding} 编码读取数据文件时发生错误 - {e}")
+                pass
             except Exception as e:
                 LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
-                break
 
-        return lines
+        # 如果所有编码都没有成功，则返回空列表
+        return []
 
     # 读取 .csv 文件
     def read_csv_file(self, path: str) -> list[str]:

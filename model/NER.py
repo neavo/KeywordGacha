@@ -8,11 +8,16 @@ from typing import Generator
 
 import torch
 import onnxruntime
+from optimum.onnxruntime import ORTModelForTokenClassification
+from sudachipy import tokenizer
+from sudachipy import dictionary
 from lemminflect import getLemma
 from transformers import pipeline
 from transformers import AutoTokenizer
+from transformers import PreTrainedModel
 from transformers import AutoModelForTokenClassification
-from optimum.onnxruntime import ORTModelForTokenClassification
+from transformers.pipelines.base import Pipeline
+from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from model.Word import Word
 from module.LogHelper import LogHelper
@@ -38,28 +43,8 @@ class NER:
         "EVT": "事件实体",       # 表示事件，如"奥运会"、"地震"等。
     }
 
-    # 分割符号
-    RE_SPLIT_BY_PUNCTUATION = re.compile(
-        r"[" +
-        rf"{TextHelper.GENERAL_PUNCTUATION[0]}-{TextHelper.GENERAL_PUNCTUATION[1]}" +
-        rf"{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0]}-{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]}" +
-        rf"{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]}" +
-        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_1[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_1[1]}" +
-        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_2[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_2[1]}" +
-        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_3[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_3[1]}" +
-        rf"{TextHelper.LATIN_PUNCTUATION_BASIC_4[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_4[1]}" +
-        rf"{TextHelper.LATIN_PUNCTUATION_GENERAL[0]}-{TextHelper.LATIN_PUNCTUATION_GENERAL[1]}" +
-        rf"{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]}" +
-        r"·・♥]+"
-    )
-
     def __init__(self) -> None:
         super().__init__()
-
-        # 初始化
-        self.gpu_boost = torch.cuda.is_available()
-        self.bacth_size = 32 if self.gpu_boost else 1
-        self.model_path = "resource/kg_ner_gpu" if self.gpu_boost else "resource/kg_ner_cpu"
 
         # 忽略指定的警告信息
         warnings.filterwarnings(
@@ -68,51 +53,24 @@ class NER:
             category = UserWarning,
         )
 
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_path,
-            padding = "max_length",
-            truncation = True,
-            max_length = 512,
-            model_max_length = 512,
-            local_files_only = True,
-        )
+        # 初始化
+        self.gpu_boost = torch.cuda.is_available()
+        self.bacth_size = 32 if self.gpu_boost else 1
+        self.model_path = "resource/kg_ner_gpu" if self.gpu_boost else "resource/kg_ner_cpu"
 
-        if self.gpu_boost:
-            self.model = AutoModelForTokenClassification.from_pretrained(
-                self.model_path,
-                torch_dtype = torch.float16,
-                local_files_only = True,
-            ).to(device = "cuda")
-        else:
-            session_options = onnxruntime.SessionOptions()
-            session_options.log_severity_level = 4
-            self.model = ORTModelForTokenClassification.from_pretrained(
-                self.model_path,
-                provider = "CPUExecutionProvider",
-                session_options = session_options,
-                use_io_binding = True,
-                local_files_only = True,
-            )
-
-        self.classifier = pipeline(
-            "token-classification",
-            model = self.model,
-            device = "cuda" if self.gpu_boost else "cpu",
-            tokenizer = self.tokenizer,
-            aggregation_strategy = "simple",
-        )
+        self.model = self.load_model(self.model_path, self.gpu_boost)
+        self.tokenizer = self.load_tokenizer(self.model_path)
+        self.classifier = self.load_classifier(self.model, self.gpu_boost)
+        self.sudachi = dictionary.Dictionary(dict_type = "core").create(tokenizer.Tokenizer.SplitMode.C)
 
     # 释放资源
     def release(self) -> None:
         LogHelper.debug(f"显存保留量 - {torch.cuda.memory_reserved()/1024/1024:>8.2f} MB")
         LogHelper.debug(f"显存分配量 - {torch.cuda.memory_allocated()/1024/1024:>8.2f} MB")
 
-        if self.classifier:
-            del self.classifier
-        if self.model:
-            del self.model
-        if self.tokenizer:
-            del self.tokenizer
+        del self.model
+        del self.tokenizer
+        del self.classifier
 
         gc.collect()
         torch.cuda.empty_cache()
@@ -138,75 +96,45 @@ class NER:
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
-    # 判断是否是有意义的汉字词语
-    def is_valid_cjk_word(self, surface: str, blacklist: set) -> bool:
-        flag = True
+    # 加载模型
+    def load_model(self, model_path: str, gpu_boost: bool) -> PreTrainedModel:
+        if gpu_boost == True:
+            return AutoModelForTokenClassification.from_pretrained(
+                model_path,
+                torch_dtype = torch.float16,
+                local_files_only = True,
+            ).to(device = "cuda")
+        else:
+            session_options = onnxruntime.SessionOptions()
+            session_options.log_severity_level = 4
+            return ORTModelForTokenClassification.from_pretrained(
+                model_path,
+                provider = "CPUExecutionProvider",
+                session_options = session_options,
+                use_io_binding = True,
+                local_files_only = True,
+            )
 
-        if len(surface) <= 1:
-            return False
+    # 加载分词器
+    def load_tokenizer(self, model_path: str) -> PreTrainedTokenizerFast:
+        return AutoTokenizer.from_pretrained(
+            model_path,
+            padding = "max_length",
+            truncation = True,
+            max_length = 512,
+            model_max_length = 512,
+            local_files_only = True,
+        )
 
-        if surface in blacklist:
-            return False
-
-        if not TextHelper.has_any_cjk(surface):
-            return False
-
-        return flag
-
-    # 判断是否是有意义的英文词语
-    def is_valid_english_word(self, surface: str, blacklist: set, type: str, unique_words: set[str]) -> bool:
-        flag = True
-
-        if len(surface) <= 2:
-            return False
-
-        if surface.lower() in blacklist:
-            return False
-
-        if not TextHelper.has_any_latin(surface):
-            return False
-
-        # 排除类型为角色首字母没有大写的词语
-        if type == "PER" and not surface[0].isupper():
-            return False
-
-        # 排除不是完整单词的词语
-        if unique_words != None:
-            chunks = re.findall(r"\b\w+\b", surface)
-            if len(chunks) > 0 and not all(chunk in unique_words for chunk in chunks):
-                return False
-
-        return flag
-
-    # 判断是否是有意义的日文词语
-    def is_valid_japanese_word(self, surface: str, blacklist: set) -> bool:
-        flag = True
-
-        if len(surface) <= 1:
-            return False
-
-        if surface in blacklist:
-            return False
-
-        if not TextHelper.has_any_japanese(surface):
-            return False
-
-        return flag
-
-    # 判断是否是有意义的韩文词语
-    def is_valid_korean_word(self, surface: str, blacklist: set) -> bool:
-        flag = True
-
-        if len(surface) <= 1:
-            return False
-
-        if surface in blacklist:
-            return False
-
-        if not TextHelper.has_any_korean(surface):
-            return False
-
-        return flag
+    # 加载分类器
+    def load_classifier(self, model: PreTrainedModel, gpu_boost: bool) -> Pipeline:
+        return pipeline(
+            "token-classification",
+            model = model,
+            device = "cuda" if gpu_boost else "cpu",
+            tokenizer = self.tokenizer,
+            aggregation_strategy = "simple",
+        )
 
     # 生成片段
     def generate_chunks(self, input_lines: list, chunk_size: int) -> list[str]:
@@ -238,43 +166,31 @@ class NER:
         return chunks
 
     # 生成词语
-    def generate_words(self, text: str, line: str, score: float, type: str, language: int, input_lines: list[str], unique_words: set[str]) -> list[Word]:
+    def generate_words(self, text: str, line: str, score: float, type: str, language: int, input_lines: list[str]) -> list[Word]:
         words = []
 
-        # 当语言为英语且不是人名时，不进行切分，以避免切断复合词组
-        if language == NER.Language.EN and type != "PER":
-            surfaces = [text]
-        else:
-            surfaces = re.split(self.RE_SPLIT_BY_PUNCTUATION, text)
+        # 生成名词表
+        noun_set = self.generate_noun_set(line, language)
 
+        # 生成词语列表
+        surfaces = [v.strip() for v in TextHelper.split_by_punctuation(text) if v.strip() != ""]
+
+        # 遍历词语
         for surface in surfaces:
-            # 过滤非实体
-            if type not in self.TYPES:
+            # 按语言移除首尾无效字符
+            surface = self.strip_by_language(surface, language)
+
+            # 跳过显示长度小于等于2的词语
+            if self.get_display_lenght(surface) <= 2:
                 continue
 
-            # 中文词语判断
-            if language == NER.Language.ZH:
-                surface = TextHelper.strip_not_cjk(surface)
-                if not self.is_valid_cjk_word(surface, self.blacklist):
-                    continue
+            # 按语言验证词语
+            if self.verify_by_language(surface, language) == False:
+                # LogHelper.debug(f"verify_by_language - {surface}")
+                continue
 
-            # 英文词语判断
-            if language == NER.Language.EN:
-                surface = TextHelper.strip_not_latin(surface)
-                if not self.is_valid_english_word(surface, self.blacklist, type, unique_words):
-                    continue
-
-            # 日文词语判断
-            if language == NER.Language.JP:
-                surface = TextHelper.strip_not_japanese(surface).strip("の")
-                if not self.is_valid_japanese_word(surface, self.blacklist):
-                    continue
-
-            # 韩文词语判断
-            if language == NER.Language.KO:
-                surface = TextHelper.strip_not_korean(surface)
-                if not self.is_valid_korean_word(surface, self.blacklist):
-                    continue
+            # 根据名词集合对词语进行修正
+            surface = self.fix_by_noun_set(surface, line, noun_set, language)
 
             word = Word()
             word.count = 1
@@ -286,6 +202,129 @@ class NER:
             words.append(word)
 
         return words
+
+    # 生成名词集合
+    def generate_noun_set(self, line: str, language: int) -> set[str]:
+        noun_set = set()
+
+        if language == NER.Language.JP:
+            # 获取名词集合
+            for token in self.sudachi.tokenize(line):
+                # 获取表面形态
+                surface = token.surface()
+
+                # 跳过包含至少一个标点符号的条目
+                if TextHelper.has_any_punctuation(surface):
+                    continue
+
+                # 跳过目标类型以外的条目
+                if not any(v in ",".join(token.part_of_speech()) for v in ("地名", "人名", "名詞")):
+                    continue
+
+                noun_set.add(surface)
+
+        if language == NER.Language.EN:
+            noun_set.update(re.findall(r"\b(.+?)\b", line))
+
+        return noun_set
+
+    # 根据名词集合修正词语
+    def fix_by_noun_set(self, text: str, line: str, noun_set: set[str], language: int) -> str:
+        if language == NER.Language.JP:
+            for noun in noun_set:
+                if text == noun:
+                    continue
+
+                if text not in noun:
+                    continue
+
+                text = noun
+
+        if language == NER.Language.EN:
+            if text.count(" ") == 0:
+                for noun in noun_set:
+                    if text == noun:
+                        continue
+
+                    if not (noun.startswith(text) or noun.endswith(text)):
+                        continue
+
+                    text = noun
+            else:
+                chunks = re.split(r" +", text)
+
+                # 先修第一个词
+                for noun in noun_set:
+                    if chunks[1] == noun:
+                        continue
+
+                    if not noun.endswith(chunks[1]):
+                        continue
+
+                    if " ".join([noun] + chunks[1:]) not in line:
+                        continue
+
+                    chunks[-1] = noun
+
+                # 在修最后一个词
+                for noun in noun_set:
+                    if chunks[-1] == noun:
+                        continue
+
+                    if not noun.startswith(chunks[-1]):
+                        continue
+
+                    if " ".join(chunks[:-1] + [noun]) not in line:
+                        continue
+
+                    chunks[-1] = noun
+
+                # 将列表拼回去
+                text = " ".join(chunks)
+
+        return text
+
+    # 按语言移除首尾无效字符
+    def strip_by_language(self, text: str, language: int) -> str:
+        if language == NER.Language.ZH:
+            return TextHelper.strip_not_cjk(text)
+
+        if language == NER.Language.EN:
+            return TextHelper.strip_not_latin(text)
+
+        if language == NER.Language.JP:
+            return TextHelper.strip_not_japanese(text)
+
+        if language == NER.Language.KO:
+            return TextHelper.strip_not_korean(text)
+
+    # 按语言进行验证
+    def verify_by_language(self, text: str, language: int) -> bool:
+        result = True
+
+        if text.lower() in self.blacklist:
+            result = False
+
+        if language == NER.Language.ZH:
+            if not TextHelper.has_any_cjk(text):
+                result = False
+
+        if language == NER.Language.EN:
+            if not text[0].isupper():
+                result = False
+
+            if not TextHelper.has_any_latin(text):
+                result = False
+
+        if language == NER.Language.JP:
+            if not TextHelper.has_any_japanese(text):
+                result = False
+
+        if language == NER.Language.KO:
+            if not TextHelper.has_any_korean(text):
+                result = False
+
+        return result
 
     # 获取英语词根
     def get_english_lemma(self, surface: str) -> str:
@@ -339,7 +378,7 @@ class NER:
 
             i = 0
             unique_words = None
-            for result in self.classifier(self.generator(chunks),batch_size = self.bacth_size):
+            for result in self.classifier(self.generator(chunks), batch_size = self.bacth_size):
                 # 获取当前文本
                 chunk = chunks[i]
 
@@ -365,19 +404,19 @@ class NER:
                     line = self.get_line_by_offset(text, chunk_lines, chunk_offsets, token.get("start"), token.get("end"))
                     score = token.get("score")
                     entity_group = token.get("entity_group")
-                    words.extend(self.generate_words(text, line, score, entity_group, language, input_lines, unique_words))
+                    words.extend(self.generate_words(text, line, score, entity_group, language, input_lines))
 
                 i = i + 1
                 progress.update(pid, advance = 1, total = len(chunks))
 
-            # 匹配【】中的字符串
-            seen = set()
-            for line in input_lines:
-                for name in re.findall(r"【(.*?)】", line):
-                    if self.get_display_lenght(name) <= 16:
-                        for word in self.generate_words(name, line, 65535, "PER", language, input_lines, None):
-                            seen.add(word.surface) if word.surface not in seen else None
-                            words.append(word)
+        # 匹配【】中的字符串
+        seen = set()
+        for line in input_lines:
+            for name in re.findall(r"【(.*?)】", line):
+                if self.get_display_lenght(name) <= 16:
+                    for word in self.generate_words(name, line, 65535, "PER", language, input_lines):
+                        seen.add(word.surface) if word.surface not in seen else None
+                        words.append(word)
 
         # 打印通过模式匹配抓取的角色实体
         LogHelper.print("")
@@ -386,56 +425,4 @@ class NER:
 
         # 释放显存
         self.release()
-        return words
-
-    # 通过 词语形态 校验词语
-    def lemmatize_words_by_morphology(self, words: list[Word]) -> list[Word]:
-        seen = set()
-        words_ex = []
-        for word in words:
-            # 以下步骤只对角色实体进行
-            if not word.type == "PER":
-                continue
-
-            # 前面的步骤中已经移除了首尾的 の，如果还有，那就是 AのB 的形式，跳过
-            if "の" in word.surface:
-                continue
-
-            # 如果开头结尾都是汉字，跳过
-            if TextHelper.is_cjk(word.surface[0]) and TextHelper.is_cjk(word.surface[-1]):
-                continue
-
-            # 拆分词根
-            tokens = TextHelper.extract_japanese(word.surface)
-
-            # 如果已不能再拆分，跳过
-            if len(tokens) == 1:
-                continue
-
-            # 获取词根，获取成功则更新词语
-            roots = []
-            for k, v in enumerate(tokens):
-                if self.is_valid_japanese_word(v, self.blacklist):
-                    word_ex = Word()
-                    word_ex.surface = v
-                    word_ex.count = word.count
-                    word_ex.score = word.score
-                    word_ex.context = word.context
-                    word_ex.input_lines = word.input_lines
-                    word_ex.type = word.type
-
-                    roots.append(v)
-                    words_ex.append(word_ex)
-
-            if len(roots) > 0:
-                key = (word.type, word.surface)
-
-                if key not in seen:
-                    LogHelper.info(f"通过 [green]词语形态[/] 还原词根 - {word.type} - {word.surface} [green]->[/] {" / ".join(roots)}")
-
-                seen.add(key)
-                word.type = ""
-
-        # 合并拆分出来的词语
-        words.extend(words_ex)
         return words

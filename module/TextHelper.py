@@ -38,11 +38,8 @@ class TextHelper:
 
     # 中日韩通用标点符号
     GENERAL_PUNCTUATION = ("\u2000", "\u206F")
-    CJK_SYMBOLS_AND_PUNCTUATION = ("\u3000", "\u303F")
+    CJK_SYMBOLS_AND_PUNCTUATION = ("\u3001", "\u303F") # \u3000 是半角空格
     HALFWIDTH_AND_FULLWIDTH_FORMS = ("\uFF00", "\uFFEF")
-    OTHER_CJK_PUNCTUATION = (
-        "\u30FB"    # ・ 在片假名 ["\u30A0", "\u30FF"] 范围内
-    )
 
     # 拉丁字符
     LATIN_1 = ("\u0041", "\u005A") # 大写字母 A-Z
@@ -52,42 +49,70 @@ class TextHelper:
     LATIN_SUPPLEMENTAL = ("\u00A0", "\u00FF")
 
     # 拉丁标点符号
-    LATIN_PUNCTUATION_BASIC_1 = ("\u0020", "\u002F")
+    LATIN_PUNCTUATION_BASIC_1 = ("\u0021", "\u002F") # \u0020 是半角空格
     LATIN_PUNCTUATION_BASIC_2 = ("\u003A", "\u0040")
     LATIN_PUNCTUATION_BASIC_3 = ("\u005B", "\u0060")
     LATIN_PUNCTUATION_BASIC_4 = ("\u007B", "\u007E")
     LATIN_PUNCTUATION_GENERAL = ("\u2000", "\u206F")
     LATIN_PUNCTUATION_SUPPLEMENTAL = ("\u2E00", "\u2E7F")
 
-    # 判断一个字符是否是中日韩标点符号
-    @staticmethod
-    def is_cjk_punctuation(char: str) -> bool:
-        return (
-            TextHelper.GENERAL_PUNCTUATION[0] <= char <= TextHelper.GENERAL_PUNCTUATION[1]
-            or TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0] <= char <= TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]
-            or TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0] <= char <= TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]
-            or char in TextHelper.OTHER_CJK_PUNCTUATION
-        )
+    # 特殊符号
+    SPECIAL_PUNCTUATION = (
+        "\u00b7",    # ·
+        "\u30FB",    # ・
+        "\u2665",    # ♥
+    )
 
-    # 判断一个字符是否是拉丁标点符号
-    @staticmethod
-    def is_latin_punctuation(char: str) -> bool:
+    # 分割符号
+    SPLIT_BY_PUNCTUATION_PATTERN = re.compile(""
+        + rf"["
+        + rf"{GENERAL_PUNCTUATION[0]}-{GENERAL_PUNCTUATION[1]}"
+        + rf"{CJK_SYMBOLS_AND_PUNCTUATION[0]}-{CJK_SYMBOLS_AND_PUNCTUATION[1]}"
+        + rf"{HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-{HALFWIDTH_AND_FULLWIDTH_FORMS[1]}"
+        + rf"{LATIN_PUNCTUATION_BASIC_1[0]}-{LATIN_PUNCTUATION_BASIC_1[1]}"
+        + rf"{LATIN_PUNCTUATION_BASIC_2[0]}-{LATIN_PUNCTUATION_BASIC_2[1]}"
+        + rf"{LATIN_PUNCTUATION_BASIC_3[0]}-{LATIN_PUNCTUATION_BASIC_3[1]}"
+        + rf"{LATIN_PUNCTUATION_BASIC_4[0]}-{LATIN_PUNCTUATION_BASIC_4[1]}"
+        + rf"{LATIN_PUNCTUATION_GENERAL[0]}-{LATIN_PUNCTUATION_GENERAL[1]}"
+        + rf"{LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{LATIN_PUNCTUATION_SUPPLEMENTAL[1]}"
+        + rf"{"".join(SPECIAL_PUNCTUATION)}"
+        + rf"]+",
+    )
+
+    # 判断字符是否为汉字字符
+    def is_cjk(char: str) -> bool:
+        return TextHelper.CJK[0] <= char <= TextHelper.CJK[1]
+
+    # 判断字符是否为拉丁字符
+    def is_latin(char: str) -> bool:
         return (
-            TextHelper.LATIN_PUNCTUATION_BASIC_1[0] <= char <= TextHelper.LATIN_PUNCTUATION_BASIC_1[1]
-            or TextHelper.LATIN_PUNCTUATION_BASIC_2[0] <= char <= TextHelper.LATIN_PUNCTUATION_BASIC_2[1]
-            or TextHelper.LATIN_PUNCTUATION_BASIC_3[0] <= char <= TextHelper.LATIN_PUNCTUATION_BASIC_3[1]
-            or TextHelper.LATIN_PUNCTUATION_BASIC_4[0] <= char <= TextHelper.LATIN_PUNCTUATION_BASIC_4[1]
-            or TextHelper.LATIN_PUNCTUATION_GENERAL[0] <= char <= TextHelper.LATIN_PUNCTUATION_GENERAL[1]
+            TextHelper.LATIN_1[0] <= char <= TextHelper.LATIN_1[1]
+            or TextHelper.LATIN_2[0] <= char <= TextHelper.LATIN_2[1]
+            or TextHelper.LATIN_EXTENDED_A[0] <= char <= TextHelper.LATIN_EXTENDED_A[1]
+            or TextHelper.LATIN_EXTENDED_B[0] <= char <= TextHelper.LATIN_EXTENDED_B[1]
             or TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0] <= char <= TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]
         )
 
-    # 判断一个字符是否是标点符号
-    @staticmethod
-    def is_punctuation(char: str) -> bool:
-        return TextHelper.is_cjk_punctuation(char) or TextHelper.is_latin_punctuation(char)
+    # 判断字符是否为韩文字符
+    def is_korean(char: str) -> bool:
+        return (
+            TextHelper.CJK[0] <= char <= TextHelper.CJK[1]
+            or TextHelper.HANGUL_JAMO[0] <= char <= TextHelper.HANGUL_JAMO[1]
+            or TextHelper.HANGUL_JAMO_EXTENDED_A[0] <= char <= TextHelper.HANGUL_JAMO_EXTENDED_A[1]
+            or TextHelper.HANGUL_JAMO_EXTENDED_B[0] <= char <= TextHelper.HANGUL_JAMO_EXTENDED_B[1]
+            or TextHelper.HANGUL_SYLLABLES[0] <= char <= TextHelper.HANGUL_SYLLABLES[1]
+            or TextHelper.HANGUL_COMPATIBILITY_JAMO[0] <= char <= TextHelper.HANGUL_COMPATIBILITY_JAMO[1]
+        )
+
+    # 判断字符是否为平假名
+    def is_hiragana(char: str) -> bool:
+        return TextHelper.HIRAGANA[0] <= char <= TextHelper.HIRAGANA[1]
+
+    # 判断字符是否为片假名
+    def is_katakana(char: str) -> bool:
+        return TextHelper.KATAKANA[0] <= char <= TextHelper.KATAKANA[1]
 
     # 判断字符是否为日文字符
-    @staticmethod
     def is_japanese(char: str) -> bool:
         return (
             TextHelper.CJK[0] <= char <= TextHelper.CJK[1]
@@ -98,63 +123,134 @@ class TextHelper:
             or TextHelper.VOICED_SOUND_MARKS[0] <= char <= TextHelper.VOICED_SOUND_MARKS[1]
         )
 
-    # 判断字符是否为中日韩汉字
-    @staticmethod
-    def is_cjk(char: str) -> bool:
-        return TextHelper.CJK[0] <= char <= TextHelper.CJK[1]
+    # 判断一个字符是否是标点符号
+    def is_punctuation(char: str) -> bool:
+        return TextHelper.is_cjk_punctuation(char) or TextHelper.is_latin_punctuation(char) or TextHelper.is_special_punctuation(char)
 
-    # 判断输入的字符串是否全部由中日韩汉字组成
-    @staticmethod
-    def is_all_cjk(text: str) -> bool:
-        return all(TextHelper.is_cjk(char) for char in text)
+    # 判断一个字符是否是汉字字符标点符号
+    def is_cjk_punctuation(char: str) -> bool:
+        return (
+            TextHelper.GENERAL_PUNCTUATION[0] <= char <= TextHelper.GENERAL_PUNCTUATION[1]
+            or TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0] <= char <= TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]
+            or TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0] <= char <= TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]
+        )
 
-    # 检查字符串是否包含至少一个中日韩汉字组成
-    @staticmethod
+    # 判断一个字符是否是拉丁标点符号
+    def is_latin_punctuation(char: str) -> bool:
+        return (
+            TextHelper.LATIN_PUNCTUATION_BASIC_1[0] <= char <= TextHelper.LATIN_PUNCTUATION_BASIC_1[1]
+            or TextHelper.LATIN_PUNCTUATION_BASIC_2[0] <= char <= TextHelper.LATIN_PUNCTUATION_BASIC_2[1]
+            or TextHelper.LATIN_PUNCTUATION_BASIC_3[0] <= char <= TextHelper.LATIN_PUNCTUATION_BASIC_3[1]
+            or TextHelper.LATIN_PUNCTUATION_BASIC_4[0] <= char <= TextHelper.LATIN_PUNCTUATION_BASIC_4[1]
+            or TextHelper.LATIN_PUNCTUATION_GENERAL[0] <= char <= TextHelper.LATIN_PUNCTUATION_GENERAL[1]
+            or TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0] <= char <= TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]
+        )
+
+    # 判断一个字符是否是拉丁标点符号
+    def is_special_punctuation(char: str) -> bool:
+        return char in TextHelper.SPECIAL_PUNCTUATION
+
+    # 检查字符串是否包含至少一个汉字字符组成
     def has_any_cjk(text: str) -> bool:
         return any(TextHelper.is_cjk(char) for char in text)
 
-    # 判断字符是否为片假名
-    @staticmethod
-    def is_katakana(char: str) -> bool:
-        return TextHelper.KATAKANA[0] <= char <= TextHelper.KATAKANA[1]
+    # 检查字符串是否包含至少一个拉丁字符组成
+    def has_any_latin(text: str) -> bool:
+        return any(TextHelper.is_latin(char) for char in text)
 
-    # 判断字符串是否全部为片假名
-    @staticmethod
-    def is_all_katakana(text: str) -> bool:
-        return all(TextHelper.is_katakana(char) for char in text)
-
-    # 检查字符串是否包含至少一个片假名
-    @staticmethod
-    def has_any_katakanae(text: str) -> bool:
-        return any(TextHelper.is_katakana(char) for char in text)
-
-    # 判断字符是否为平假名
-    @staticmethod
-    def is_hiragana(char: str) -> bool:
-        return TextHelper.HIRAGANA[0] <= char <= TextHelper.HIRAGANA[1]
-
-    # 判断字符串是否全部为平假名
-    @staticmethod
-    def is_all_hiragana(text: str) -> bool:
-        return all(TextHelper.is_hiragana(char) for char in text)
+    # 检查字符串是否包含至少一个韩文字符组成
+    def has_any_korean(text: str) -> bool:
+        return any(TextHelper.is_korean(char) for char in text)
 
     # 检查字符串是否包含至少一个平假名
-    @staticmethod
     def has_any_hiragana(text: str) -> bool:
         return any(TextHelper.is_hiragana(char) for char in text)
 
-    # 判断输入的字符串是否全部由日文字符（含汉字）组成
-    @staticmethod
-    def is_all_japanese(text: str) -> bool:
-        return all(TextHelper.is_japanese(char) for char in text)
+    # 检查字符串是否包含至少一个片假名
+    def has_any_katakanae(text: str) -> bool:
+        return any(TextHelper.is_katakana(char) for char in text)
 
-    # 检查字符串是否包含至少一个日文字符（含汉字）
-    @staticmethod
+    # 检查字符串是否包含至少一个日文字符（含汉字字符）
     def has_any_japanese(text: str) -> bool:
         return any(TextHelper.is_japanese(char) for char in text)
 
+    # 检查字符串是否包含至少一个标点符号
+    def has_any_punctuation(text: str) -> bool:
+        return any(TextHelper.is_punctuation(char) for char in text)
+
+    # 判断输入的字符串是否全部由汉字字符组成
+    def is_all_cjk(text: str) -> bool:
+        return all(TextHelper.is_cjk(char) for char in text)
+
+    # 判断输入的字符串是否全部由拉丁字符组成
+    def is_all_latin(text: str) -> bool:
+        return all(TextHelper.is_latin(char) for char in text)
+
+    # 判断输入的字符串是否全部由韩文字符组成
+    def is_all_korean(text: str) -> bool:
+        return all(TextHelper.is_korean(char) for char in text)
+
+    # 判断字符串是否全部为平假名
+    def is_all_hiragana(text: str) -> bool:
+        return all(TextHelper.is_hiragana(char) for char in text)
+
+    # 判断字符串是否全部为片假名
+    def is_all_katakana(text: str) -> bool:
+        return all(TextHelper.is_katakana(char) for char in text)
+
+    # 判断输入的字符串是否全部由日文字符（含汉字字符）组成
+    def is_all_japanese(text: str) -> bool:
+        return all(TextHelper.is_japanese(char) for char in text)
+
+    # 移除开头结尾的非汉字字符
+    def strip_not_cjk(text: str) -> str:
+        text = text.strip()
+
+        while text and not TextHelper.is_cjk(text[0]):
+            text = text[1:]
+
+        while text and not TextHelper.is_cjk(text[-1]):
+            text = text[:-1]
+
+        return text.strip()
+
+    # 移除开头结尾的非拉丁字符
+    def strip_not_latin(text: str) -> str:
+        text = text.strip()
+
+        while text and not TextHelper.is_latin(text[0]):
+            text = text[1:]
+
+        while text and not TextHelper.is_latin(text[-1]):
+            text = text[:-1]
+
+        return text.strip()
+
+    # 移除开头结尾的非韩文字符
+    def strip_not_korean(text: str) -> str:
+        text = text.strip()
+
+        while text and not TextHelper.is_korean(text[0]):
+            text = text[1:]
+
+        while text and not TextHelper.is_korean(text[-1]):
+            text = text[:-1]
+
+        return text.strip()
+
+    # 移除开头结尾的非日文字符
+    def strip_not_japanese(text: str) -> str:
+        text = text.strip()
+
+        while text and not TextHelper.is_japanese(text[0]):
+            text = text[1:]
+
+        while text and not TextHelper.is_japanese(text[-1]):
+            text = text[:-1]
+
+        return text.strip()
+
     # 移除开头结尾的标点符号
-    @staticmethod
     def strip_punctuation(text: str) -> str:
         text = text.strip()
 
@@ -167,32 +263,14 @@ class TextHelper:
         return text.strip()
 
     # 移除开头结尾的阿拉伯数字
-    @staticmethod
     def strip_arabic_numerals(text: str) -> str:
         return re.sub(r"^\d+|\d+$", "", text)
 
-    # 移除开头结尾的非日文字符
-    @staticmethod
-    def strip_not_japanese(text: str) -> str:
-        text = text.strip()
+    # 按标点符号分割字符串
+    def split_by_punctuation(text: str) -> list[str]:
+        return re.split(TextHelper.SPLIT_BY_PUNCTUATION_PATTERN, text)
 
-        while text and not TextHelper.is_japanese(text[0]):
-            text = text[1:]
-
-        while text and not TextHelper.is_japanese(text[-1]):
-            text = text[:-1]
-
-        return text.strip()
-
-    # 移除结尾的汉字字符
-    @staticmethod
-    def remove_suffix_cjk(text: str) -> str:
-        while text and TextHelper.is_cjk(text[-1]):
-            text = text[:-1]
-
-        return text
-
-    @staticmethod
+    # 安全加载 JSON 字典
     def safe_load_json_dict(json_str: str) -> dict:
         result = {}
 
@@ -215,97 +293,3 @@ class TextHelper:
                 result[p[0].strip().strip("'\"").strip()] = p[1].strip().strip("'\"").strip()
 
         return result
-
-    # 按汉字、平假名、片假名拆开日文短语
-    @staticmethod
-    def extract_japanese(text: str) -> list[str]:
-        return re.findall(
-            (
-                rf"(?:[{TextHelper.CJK[0]}-{TextHelper.CJK[1]}]+)|"                 # 汉字
-                + rf"(?:[{TextHelper.HIRAGANA[0]}-{TextHelper.HIRAGANA[1]}]+)|"     # 平假名
-                + rf"(?:[{TextHelper.KATAKANA[0]}-{TextHelper.KATAKANA[1]}]+)"      # 片假名
-            ),
-            text
-        )
-
-    # 移除开头结尾的非汉字字符
-    @staticmethod
-    def strip_not_cjk(text: str) -> str:
-        text = text.strip()
-
-        while text and not TextHelper.is_cjk(text[0]):
-            text = text[1:]
-
-        while text and not TextHelper.is_cjk(text[-1]):
-            text = text[:-1]
-
-        return text.strip()
-
-    # 判断字符是否为拉丁字符
-    @staticmethod
-    def is_latin(char: str) -> bool:
-        return (
-            TextHelper.LATIN_1[0] <= char <= TextHelper.LATIN_1[1]
-            or TextHelper.LATIN_2[0] <= char <= TextHelper.LATIN_2[1]
-            or TextHelper.LATIN_EXTENDED_A[0] <= char <= TextHelper.LATIN_EXTENDED_A[1]
-            or TextHelper.LATIN_EXTENDED_B[0] <= char <= TextHelper.LATIN_EXTENDED_B[1]
-            or TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0] <= char <= TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]
-        )
-
-    # 判断输入的字符串是否全部由拉丁字符组成
-    @staticmethod
-    def is_all_latin(text: str) -> bool:
-        return all(TextHelper.is_latin(char) for char in text)
-
-    # 检查字符串是否包含至少一个拉丁字符组成
-    @staticmethod
-    def has_any_latin(text: str) -> bool:
-        return any(TextHelper.is_latin(char) for char in text)
-
-    # 移除开头结尾的非拉丁字符
-    @staticmethod
-    def strip_not_latin(text: str) -> str:
-        text = text.strip()
-
-        while text and not TextHelper.is_latin(text[0]):
-            text = text[1:]
-
-        while text and not TextHelper.is_latin(text[-1]):
-            text = text[:-1]
-
-        return text.strip()
-
-    # 判断字符是否为韩文字符
-    @staticmethod
-    def is_korean(char: str) -> bool:
-        return (
-            TextHelper.CJK[0] <= char <= TextHelper.CJK[1]
-            or TextHelper.HANGUL_JAMO[0] <= char <= TextHelper.HANGUL_JAMO[1]
-            or TextHelper.HANGUL_JAMO_EXTENDED_A[0] <= char <= TextHelper.HANGUL_JAMO_EXTENDED_A[1]
-            or TextHelper.HANGUL_JAMO_EXTENDED_B[0] <= char <= TextHelper.HANGUL_JAMO_EXTENDED_B[1]
-            or TextHelper.HANGUL_SYLLABLES[0] <= char <= TextHelper.HANGUL_SYLLABLES[1]
-            or TextHelper.HANGUL_COMPATIBILITY_JAMO[0] <= char <= TextHelper.HANGUL_COMPATIBILITY_JAMO[1]
-        )
-
-    # 判断输入的字符串是否全部由韩文字符组成
-    @staticmethod
-    def is_all_korean(text: str) -> bool:
-        return all(TextHelper.is_korean(char) for char in text)
-
-    # 检查字符串是否包含至少一个韩文字符组成
-    @staticmethod
-    def has_any_korean(text: str) -> bool:
-        return any(TextHelper.is_korean(char) for char in text)
-
-    # 移除开头结尾的非韩文字符
-    @staticmethod
-    def strip_not_korean(text: str) -> str:
-        text = text.strip()
-
-        while text and not TextHelper.is_korean(text[0]):
-            text = text[1:]
-
-        while text and not TextHelper.is_korean(text[-1]):
-            text = text[:-1]
-
-        return text.strip()

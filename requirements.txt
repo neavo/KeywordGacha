@@ -5,8 +5,9 @@ openai
 openpyxl
 tiktoken
 pykakasi
+sudachipy
+sudachidict-core
 aiolimiter
-lemminflect
 
 onnx==1.16.1
 optimum
