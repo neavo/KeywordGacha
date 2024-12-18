@@ -152,7 +152,7 @@ class LLM:
     async def api_test(self) -> bool:
         async with self.semaphore, self.async_limiter:
             try:
-                result = False
+                success = False
 
                 usage, message, llm_request, llm_response, error = await self.do_request(
                     [
@@ -162,27 +162,34 @@ class LLM:
                         },
                         {
                             "role": "user",
-                            "content": "目标词语：ダリヤ" + "\n" + "参考文本：\n魔導具師ダリヤはうつむかない",
+                            "content": (
+                                "目标词语：ダリヤ"
+                                + "\n" + "参考文本：\n魔導具師ダリヤはうつむかない"
+                            ),
                         },
                     ],
                     LLM.API_TEST_CONFIG,
                     True
                 )
 
-                if error:
+                # 检查错误
+                if error != None:
                     raise error
 
+                # 检查是否超过最大 token 限制
                 if usage.completion_tokens >= LLM.API_TEST_CONFIG.MAX_TOKENS:
-                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
+                    raise Exception("模型发生退化 ...")
 
-                data = json.loads(
-                    TextHelper.fix_broken_json_string(message.content.strip())
-                )
+                # 反序列化 JSON
+                result = TextHelper.safe_load_json_dict(message.content.strip())
+                if len(result) == 0:
+                    raise Exception("反序列化失败 ...")
 
-                result = True
-                LogHelper.info(f"{data}")
+                # 输出结果
+                success = True
+                LogHelper.info(f"{result}")
 
-                return result
+                return success
             except Exception as e:
                 LogHelper.warning(f"{LogHelper.get_trackback(e)}")
                 LogHelper.warning(f"llm_request - {llm_request}")
@@ -205,22 +212,28 @@ class LLM:
                         },
                         {
                             "role": "user",
-                            "content": f"目标词语：{word.surface}" + "\n" + f"参考文本：\n{word.get_context_str_for_surface_analysis(self.language)}",
+                            "content": (
+                                f"目标词语：{word.surface}"
+                                + "\n" + f"参考文本：\n{word.get_context_str_for_surface_analysis(self.language)}"
+                            ),
                         },
                     ],
                     LLM.SURFACE_ANALYSIS_CONFIG,
                     retry
                 )
 
+                # 检查错误
                 if error != None:
                     raise error
 
+                # 检查是否超过最大 token 限制
                 if usage.completion_tokens >= LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS:
-                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
+                    raise Exception("模型发生退化 ...")
 
-                result = json.loads(
-                    TextHelper.fix_broken_json_string(message.content.strip())
-                )
+                # 反序列化 JSON
+                result = TextHelper.safe_load_json_dict(message.content.strip())
+                if len(result) == 0:
+                    raise Exception("反序列化失败 ...")
 
                 # 获取结果
                 word.gender = result.get("gender", "").replace("性别判断：", "").strip()
@@ -231,26 +244,26 @@ class LLM:
 
                 if any(v for v in ("姓名", "家族") if v in result.get("entity_type", "")):
                     if word.type != "PER":
-                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> PER） - {word.surface} - {message.content.strip()}")
+                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> PER） - {word.surface} - {result}")
                         word.type = "PER"
                 elif "组织" in result.get("entity_type", ""):
                     if word.type != "ORG":
-                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> ORG） - {word.surface} - {message.content.strip()}")
+                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> ORG） - {word.surface} - {result}")
                         word.type = "ORG"
                 elif "地点" in result.get("entity_type", ""):
                     if word.type != "LOC":
-                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> LOC） - {word.surface} - {message.content.strip()}")
+                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> LOC） - {word.surface} - {result}")
                         word.type = "LOC"
                 elif "物品" in result.get("entity_type", ""):
                     if word.type != "PRD":
-                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> PRD） - {word.surface} - {message.content.strip()}")
+                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> PRD） - {word.surface} - {result}")
                         word.type = "PRD"
                 elif "事件" in result.get("entity_type", ""):
                     if word.type != "EVT":
-                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> EVT） - {word.surface} - {message.content.strip()}")
+                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> EVT） - {word.surface} - {result}")
                         word.type = "EVT"
                 else:
-                    LogHelper.info(f"[词义分析] 已剔除 - {word.type} - {word.surface} - {message.content.strip()}")
+                    LogHelper.info(f"[词义分析] 已剔除 - {word.type} - {word.surface} - {result}")
                     word.type = ""
 
                 # 生成罗马音，汉字有时候会生成重复的罗马音，所以需要去重
@@ -318,9 +331,9 @@ class LLM:
                     raise error
 
                 if usage.completion_tokens >= LLM.TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS:
-                    raise Exception("usage.completion_tokens >= MAX_TOKENS")
+                    raise Exception("模型发生退化 ...")
 
-                context_translation = [line.strip() for line in message.content.split("\n") if line.strip() != ""]
+                context_translation = [line.strip() for line in message.content.splitelines() if line.strip() != ""]
 
                 word.context_translation = context_translation
                 word.llmresponse_translate_context = llm_response
