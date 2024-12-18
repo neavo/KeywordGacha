@@ -49,6 +49,7 @@
 - 20241218 v0.8.0
   - 重新设计了工作流程，得益于此：
     - 英文与韩文分析能力强化
+    - 非角色类实体分析能力显著强化
     - 较大幅度的减少了 `时间` 与 `Token` 消耗
   - 配套本地模型切换至 `Qwen2.5-7B`，使用本地模型的同学请配套更新 -> [KeywordGachaServer](https://github.com/neavo/KeywordGachaServer)
 
