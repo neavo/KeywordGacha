@@ -1,3 +1,5 @@
+import json
+
 from model.Word import Word
 
 class TestHelper:
@@ -166,7 +168,6 @@ class TestHelper:
         0.95,
     )
 
-    @staticmethod
     def check_score_threshold(words: list[Word], path: str) -> None:
         with open(path, "w", encoding = "utf-8") as writer:
             for threshold in TestHelper.THRESHOLDS:
@@ -186,7 +187,6 @@ class TestHelper:
                 writer.write("\n")
                 writer.write("\n")
 
-    @staticmethod
     def check_result_duplication(words: list[Word], path: str) -> None:
         with open(path, "w", encoding = "utf-8") as writer:
             x = {k for k in TestHelper.DATA.keys()}
@@ -203,3 +203,35 @@ class TestHelper:
             writer.write(f"{x & y}\n")
             writer.write("\n")
             writer.write("\n")
+
+    def save_surface_analysis_log(words: list[Word], path: str) -> None:
+        with open(path, "w", encoding = "utf-8") as writer:
+            writer.write(
+                json.dumps(
+                    [
+                        {
+                            "request": word.llmrequest_surface_analysis,
+                            "response": word.llmresponse_surface_analysis,
+                        }
+                        for word in words
+                    ],
+                    indent = 4,
+                    ensure_ascii = False,
+                )
+            )
+
+    def save_context_translate_log(words: list[Word], path: str) -> None:
+        with open(path, "w", encoding = "utf-8") as writer:
+            writer.write(
+                json.dumps(
+                    [
+                        {
+                            "request": word.llmrequest_context_translate,
+                            "response": word.llmresponse_context_translate,
+                        }
+                        for word in words
+                    ],
+                    indent = 4,
+                    ensure_ascii = False,
+                )
+            )

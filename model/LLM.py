@@ -1,11 +1,10 @@
-from dataclasses import asdict
 import os
+import re
 import json
 import asyncio
 import threading
 import urllib.request
 from types import SimpleNamespace
-from concurrent.futures import Future
 
 import pykakasi
 from openai import AsyncOpenAI
@@ -94,6 +93,34 @@ class LLM:
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
+    # 设置请求限制器
+    def set_request_limiter(self) -> None:
+            # 获取 llama.cpp 响应数据
+            try:
+                response_json = None
+                with urllib.request.urlopen(f"{re.sub(r"/v1$", "", self.base_url)}/slots") as response:
+                    response_json = json.loads(response.read().decode("utf-8"))
+            except Exception:
+                LogHelper.debug("无法获取 [green]llama.cpp[/] 响应数据 ...")
+
+            # 如果响应数据有效，则设置请求频率阈值为 slots 数量
+            if isinstance(response_json, list) and len(response_json) > 0:
+                self.request_frequency_threshold = len(response_json)
+                LogHelper.info("")
+                LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(response_json)}[/] 次/秒 ...")
+                LogHelper.info("")
+
+            # 设置请求限制器
+            if self.request_frequency_threshold > 1:
+                self.semaphore = asyncio.Semaphore(self.request_frequency_threshold)
+                self.async_limiter = AsyncLimiter(max_rate = self.request_frequency_threshold, time_period = 1)
+            elif self.request_frequency_threshold > 0:
+                self.semaphore = asyncio.Semaphore(1)
+                self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1 / self.request_frequency_threshold)
+            else:
+                self.semaphore = asyncio.Semaphore(1)
+                self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
+
     # 异步发送请求到 OpenAI 获取模型回复
     async def do_request(self, messages: list, llm_config: LLMConfig, retry: bool) -> tuple[dict, dict, dict, dict, Exception]:
         try:
@@ -112,7 +139,9 @@ class LLM:
 
             completion = await self.client.chat.completions.create(**llm_request)
 
-            llm_response = completion
+            # OpenAI 的 API 返回的对象通常是 OpenAIObject 类型
+            # 该类有一个内置方法可以将其转换为字典
+            llm_response = completion.to_dict()
             usage = completion.usage
             message = completion.choices[0].message
         except Exception as e:
@@ -120,33 +149,6 @@ class LLM:
         finally:
             return usage, message, llm_request, llm_response, error
 
-    # 设置请求限制器
-    def set_request_limiter(self) -> None:
-            try:
-                num = -1
-                url = self.base_url.replace("/v1", "") if self.base_url.endswith("/v1") else self.base_url
-                with urllib.request.urlopen(f"{url}/slots") as response:
-                    data = json.loads(response.read().decode("utf-8"))
-                    num = len(data) if data != None and len(data) > 0 else num
-            except Exception as e:
-                LogHelper.debug(f"{LogHelper.get_trackback(e)}")
-            finally:
-                if num > 0:
-                    LogHelper.info("")
-                    LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(data)}[/] 次/秒 ...")
-                    LogHelper.info("")
-                    self.request_frequency_threshold = len(data)
-
-                # 设置请求限制器
-                if self.request_frequency_threshold > 1:
-                    self.semaphore = asyncio.Semaphore(self.request_frequency_threshold)
-                    self.async_limiter = AsyncLimiter(max_rate = self.request_frequency_threshold, time_period = 1)
-                elif self.request_frequency_threshold > 0:
-                    self.semaphore = asyncio.Semaphore(1)
-                    self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1 / self.request_frequency_threshold)
-                else:
-                    self.semaphore = asyncio.Semaphore(1)
-                    self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
 
     # 接口测试任务
     async def api_test(self) -> bool:
@@ -240,6 +242,7 @@ class LLM:
                 word.context_summary = result.get("summary", "").replace("故事梗概：", "").strip()
                 word.surface_translation = result.get("translation", "").replace("翻译结果：", "").strip()
                 word.surface_translation_description = result.get("analysis", "").replace("特征分析：", "").strip()
+                word.llmrequest_surface_analysis = llm_request
                 word.llmresponse_surface_analysis = llm_response
 
                 if any(v for v in ("姓名", "家族") if v in result.get("entity_type", "")):
@@ -310,17 +313,18 @@ class LLM:
         return words
 
     # 上下文翻译任务
-    async def translate_context(self, word: Word, words: list[Word], success: list[Word], retry: bool) -> None:
+    async def context_translate(self, word: Word, words: list[Word], success: list[Word], retry: bool) -> None:
         async with self.semaphore, self.async_limiter:
             try:
                 usage, message, llm_request, llm_response, error = await self.do_request(
                     [
                         {
+                            "role": "system",
+                            "content": self.prompt_context_translate,
+                        },
+                        {
                             "role": "user",
-                            "content": self.prompt_translate_context.replace(
-                                "{context}",
-                                word.get_context_str_for_translate(self.language)
-                            ),
+                            "content": f"轻小说文本：\n{word.get_context_str_for_translate(self.language)}",
                         },
                     ],
                     LLM.TRANSLATE_CONTEXT_CONFIG,
@@ -336,7 +340,8 @@ class LLM:
                 context_translation = [line.strip() for line in message.content.splitlines() if line.strip() != ""]
 
                 word.context_translation = context_translation
-                word.llmresponse_translate_context = llm_response
+                word.llmrequest_context_translate = llm_request
+                word.llmresponse_context_translate = llm_response
             except Exception as e:
                 LogHelper.warning(f"[上下文翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
                 LogHelper.debug(f"llm_request - {llm_request}")
@@ -349,7 +354,7 @@ class LLM:
                     LogHelper.info(f"[上下文翻译] 已完成 {len(success)} / {len(words)} ...")
 
     # 批量执行上下文翻译任务
-    async def translate_context_batch(self, words: list[Word]) -> list[Word]:
+    async def context_translate_batch(self, words: list[Word]) -> list[Word]:
         failure = []
         success = []
 
@@ -366,7 +371,7 @@ class LLM:
 
             # 执行异步任务
             tasks = [
-                asyncio.create_task(self.translate_context(word, words, success, retry))
+                asyncio.create_task(self.context_translate(word, words, success, retry))
                 for word in words_this_round
             ]
             await asyncio.gather(*tasks, return_exceptions = True)

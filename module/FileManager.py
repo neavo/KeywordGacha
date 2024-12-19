@@ -530,49 +530,50 @@ class FileManager():
 
     # 将 词语日志 写入文件
     def write_words_log_to_file(self, words: list[Word], path: str, language: int) -> None:
-        with open(path, "w", encoding = "utf-8") as file:
+        with open(path, "w", encoding = "utf-8") as writer:
             for k, word in enumerate(words):
                 if getattr(word, "surface", "") != "":
-                    file.write(f"词语原文 : {word.surface}\n")
+                    writer.write(f"词语原文 : {word.surface}" + "\n")
 
-                if getattr(word, "score", float(-1)) >= 0:
-                    file.write(f"置信度 : {word.score:.4f}\n")
+                if getattr(word, "score", 0.0) >= 0:
+                    writer.write(f"置信度 : {word.score:.4f}" + "\n")
 
                 if getattr(word, "surface_romaji", "") != "":
-                    if language == NER.Language.JP:
-                        file.write(f"罗马音 : {word.surface_romaji}\n")
+                    writer.write(f"罗马音 : {word.surface_romaji}" + "\n")
 
-                if getattr(word, "count", int(-1)) >= 0:
-                    file.write(f"出现次数 : {word.count}\n")
+                if getattr(word, "count", 0) >= 0:
+                    writer.write(f"出现次数 : {word.count}" + "\n")
 
-                if len(getattr(word, "surface_translation", "")) > 0:
-                    if word.surface_translation_description == "":
-                        file.write(f"词语翻译 : {word.surface_translation}\n")
-                    else:
-                        file.write(f"词语翻译 : {word.surface_translation}, {word.surface_translation_description}\n")
+                if getattr(word, "surface_translation", "") != "":
+                    writer.write(f"词语翻译 : {word.surface_translation}, {word.surface_translation_description}" + "\n")
 
                 if getattr(word, "gender", "") != "":
-                    file.write(f"角色性别 : {word.gender}\n")
+                    writer.write(f"角色性别 : {word.gender}" + "\n")
 
                 if getattr(word, "context_summary", "") != "":
-                    file.write(f"语义分析 : {word.context_summary}\n")
+                    writer.write(f"语义分析 : {word.context_summary}" + "\n")
 
                 if len(getattr(word, "context", [])) > 0:
-                    file.write("上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                    file.write(f"{word.get_context_str_for_translate(language)}\n")
+                    writer.write("上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※" + "\n")
+                    writer.write(f"{word.get_context_str_for_translate(language)}" + "\n")
 
                 if len(getattr(word, "context_translation", [])) > 0:
-                    file.write("上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※\n")
-                    file.write(f"{"\n".join(word.context_translation)}\n")
+                    writer.write("上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※" + "\n")
+                    writer.write(f"{"\n".join(word.context_translation)}" + "\n")
 
                 if LogHelper.is_debug():
-                    if word.llmresponse_translate_context != "":
-                        file.write(f"{word.llmresponse_translate_context}\n")
+                    writer.write("调试信息 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※" + "\n")
+                    if word.llmrequest_surface_analysis != "":
+                        writer.write(f"llmrequest_surface_analysis - {word.llmrequest_surface_analysis}" + "\n")
                     if word.llmresponse_surface_analysis != "":
-                        file.write(f"{word.llmresponse_surface_analysis}\n")
+                        writer.write(f"llmresponse_surface_analysis - {word.llmresponse_surface_analysis}" + "\n")
+                    if word.llmrequest_context_translate != "":
+                        writer.write(f"llmrequest_context_translate - {word.llmrequest_context_translate}" + "\n")
+                    if word.llmresponse_context_translate != "":
+                        writer.write(f"llmresponse_context_translate - {word.llmresponse_context_translate}" + "\n")
 
                 # 多写入一个换行符，确保每段信息之间有间隔
-                file.write("\n")
+                writer.write("\n")
 
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
@@ -647,7 +648,7 @@ class FileManager():
                 else:
                     line = line + f"\t{type_map.get(word.type)}的名字"
 
-                file.write(f"{line}\n")
+                file.write(f"{line}" + "\n")
             LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
     # 将结果写入文件
