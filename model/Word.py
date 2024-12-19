@@ -99,14 +99,20 @@ class Word:
 
         # 如果句子长度不足 75%，则尝试全文匹配中补充
         if context_token_count < token_threshold * 0.75:
-            context_ex, context_token_count_ex = self.clip_lines(
-                sorted([line for line in self.input_lines if self.surface in line], key = lambda line: self.get_token_count(line), reverse = True),
+            context_set = set(self.context)
+            context_ex, _ = self.clip_lines(
+                sorted(
+                    # 筛选出未包含在当前上下文中且包含关键词的文本以避免重复
+                    [line for line in self.input_lines if self.surface in line and line not in context_set],
+                    key = lambda line: self.get_token_count(line),
+                    reverse = True
+                ),
                 line_threshold - len(context),
                 token_threshold - context_token_count,
             )
 
+            # 追加上下文
             context.extend(context_ex)
-            context_token_count = context_token_count + context_token_count_ex
 
         return context
 
