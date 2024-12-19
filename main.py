@@ -1,5 +1,4 @@
 import os
-import copy
 import json
 import asyncio
 from types import SimpleNamespace
@@ -68,11 +67,6 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     # 合并相同词条
     words = merge_words(words)
 
-    # 调试模式时，检查置信度阈值
-    if LogHelper.is_debug():
-        with LogHelper.status("正在检查置信度阈值 ..."):
-            TestHelper.check_score_threshold(words, "check_score_threshold.log")
-
     # 按出现次数阈值进行筛选
     LogHelper.info(f"即将开始执行 [阈值过滤] ... 当前出现次数的阈值设置为 {config.count_threshold} ...")
     words = filter_words_by_score(words, SCORE_THRESHOLD)
@@ -85,28 +79,40 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     # 设置请求限制器
     llm.set_request_limiter()
 
+    # 调试功能
+    if LogHelper.is_debug():
+        with LogHelper.status("正在检查置信度阈值 ..."):
+            TestHelper.check_score_threshold(words, "log_score_threshold.log")
+
     # 等待词义分析任务结果
     LogHelper.info("即将开始执行 [词义分析] ...")
     words = await llm.surface_analysis_batch(words)
     words = remove_words_by_type(words, "")
 
-    # 调试模式时，后置检查结果重复度
+    # 调试功能
     if LogHelper.is_debug():
-        with LogHelper.status("正在检查结果重复度..."):
-            TestHelper.check_result_duplication(words, "check_result_duplication.log")
+        with LogHelper.status("正在保存请求记录 ..."):
+            TestHelper.save_surface_analysis_log(words, "log_surface_analysis.log")
+        with LogHelper.status("正在检查结果重复度 ..."):
+            TestHelper.check_result_duplication(words, "log_result_duplication.log")
 
     # 等待 上下文翻译 任务结果
     if language in (NER.Language.EN, NER.Language.JP, NER.Language.KO):
         for k, v in NER.TYPES.items():
-            if k == "PER" and config.translate_context_per != 1:
+            if k == "PER" and config.context_translate_per != 1:
                 continue
 
-            if k != "PER" and config.translate_context_other != 1:
+            if k != "PER" and config.context_translate_other != 1:
                 continue
 
             LogHelper.info(f"即将开始执行 [上下文翻译 - {v}] ...")
             word_type = get_words_by_type(words, k)
-            word_type = await llm.translate_context_batch(word_type)
+            word_type = await llm.context_translate_batch(word_type)
+
+    # 调试功能
+    if LogHelper.is_debug():
+        with LogHelper.status("正在保存请求记录 ..."):
+            TestHelper.save_context_translate_log(words, "log_context_translate.log")
 
     # 将结果写入文件
     LogHelper.info("")
@@ -137,12 +143,32 @@ async def test_api(llm: LLM) -> None:
     os.system("cls")
 
 # 打印应用信息
-def print_app_info(config: SimpleNamespace) -> None:
+def print_app_info(config: SimpleNamespace, version: str) -> None:
     LogHelper.print()
     LogHelper.print()
-    LogHelper.rule("KeywordGacha", style = "light_goldenrod2")
+    LogHelper.rule(f"KeywordGacha {version}", style = "light_goldenrod2")
     LogHelper.rule("[blue]https://github.com/neavo/KeywordGacha", style = "light_goldenrod2")
-    LogHelper.rule("使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等任意文本中的词语表的翻译辅助工具", style = "light_goldenrod2")
+    LogHelper.rule("使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等内容文本中实体词语表的翻译辅助工具", style = "light_goldenrod2")
+    LogHelper.print()
+
+    table = Table(
+        box = box.ASCII2,
+        expand = True,
+        highlight = True,
+        show_lines = True,
+        show_header = False,
+        border_style = "light_goldenrod2"
+    )
+
+    rows = [
+        ("模型名称", str(config.model_name)),
+        ("接口密钥", str(config.api_key)),
+        ("接口地址", str(config.base_url)),
+    ]
+
+    for row in rows:
+        table.add_row(*row)
+    LogHelper.print(table)
     LogHelper.print()
 
     table = Table(
@@ -158,16 +184,14 @@ def print_app_info(config: SimpleNamespace) -> None:
     table.add_column("当前值", style = "white", ratio = 1, overflow = "fold")
 
     rows = [
-        ("接口密钥", str(config.api_key), "模型名称", str(config.model_name)),
-        ("接口地址", str(config.base_url)),
-        ("是否翻译角色实体上下文", "是" if config.translate_context_per == 1 else "否", "是否翻译其他实体上下文", "是" if config.translate_context_other == 1 else "否"),
+        ("是否翻译角色实体上下文", "是" if config.context_translate_per == 1 else "否", "是否翻译其他实体上下文", "是" if config.context_translate_other == 1 else "否"),
         ("网络请求超时时间", f"{config.request_timeout} 秒" , "网络请求频率阈值", f"{config.request_frequency_threshold} 次/秒"),
     ]
 
     for row in rows:
         table.add_row(*row)
-
     LogHelper.print(table)
+
     LogHelper.print()
     LogHelper.print("请编辑 [green]config.json[/] 文件来修改应用设置 ...")
     LogHelper.print()
@@ -192,28 +216,11 @@ def print_menu_main() -> int:
 
     return choice
 
-# 打印处理模式菜单
-def print_menu_process_mode() -> int:
-    LogHelper.print("请选择处理模式：")
-    LogHelper.print("")
-    LogHelper.print("\t--> 1. [green]普通模式[/]：速度较慢，通过语义分析对结果进行确认，理论上可以提供最为精确的处理结果")
-    LogHelper.print("\t--> 2. [green]快速模式[/]：跳过语义分析步骤，速度快，消耗 Token 少，结果中将不包含角色性别与故事总结信息")
-    LogHelper.print("")
-    choice = int(Prompt.ask("请输入选项前的 [green]数字序号[/] 来使用对应的处理模式，默认为 [green][1][/] ",
-        choices = [f"{LLM.PROCESS_MODE.NORMAL}", f"{LLM.PROCESS_MODE.QUICK}"],
-        default = f"{LLM.PROCESS_MODE.NORMAL}",
-        show_choices = False,
-        show_default = False
-    ))
-    LogHelper.print("")
-
-    return choice
-
 # 主函数
-async def begin(llm: LLM, ner: NER, file_manager: FileManager, config: SimpleNamespace) -> None:
+async def begin(llm: LLM, ner: NER, file_manager: FileManager, config: SimpleNamespace, version: str) -> None:
     choice = -1
-    while choice not in [1, 2, 3, 4]:
-        print_app_info(config)
+    while choice not in (1, 2, 3, 4):
+        print_app_info(config, version)
 
         choice = print_menu_main()
         if choice == 1:
@@ -228,18 +235,28 @@ async def begin(llm: LLM, ner: NER, file_manager: FileManager, config: SimpleNam
             await test_api(llm)
 
 # 一些初始化步骤
-def load_config() -> tuple[LLM, NER, FileManager, SimpleNamespace]:
+def load_config() -> tuple[LLM, NER, FileManager, SimpleNamespace, str]:
     with LogHelper.status("正在初始化 [green]KG[/] 引擎 ..."):
+        config = SimpleNamespace()
+        version = ""
+
         try:
-            config = SimpleNamespace()
-            config_file = "config_dev.json" if os.path.exists("config_dev.json") else "config.json"
-            with open(config_file, "r", encoding = "utf-8") as file:
-                for k, v in json.load(file).items():
+            # 优先使用开发环境配置文件
+            if not os.path.isfile("config_dev.json"):
+                path = "config.json"
+            else:
+                path = "config_dev.json"
+
+            # 读取配置文件
+            with open(path, "r", encoding = "utf-8") as reader:
+                for k, v in json.load(reader).items():
                     setattr(config, k, v[0])
-        except FileNotFoundError:
-            LogHelper.error(f"文件 {config_file} 未找到.")
-        except json.JSONDecodeError:
-            LogHelper.error(f"文件 {config_file} 不是有效的JSON格式.")
+
+            # 读取版本号文件
+            with open("version.txt", "r", encoding = "utf-8") as reader:
+                version = reader.read().strip()
+        except Exception:
+            LogHelper.error("配置文件读取失败 ...")
 
         # 初始化 LLM 对象
         llm = LLM(config)
@@ -252,7 +269,7 @@ def load_config() -> tuple[LLM, NER, FileManager, SimpleNamespace]:
         # 初始化 FileManager 对象
         file_manager = FileManager()
 
-    return llm, ner, file_manager, config
+    return llm, ner, file_manager, config, version
 
 # 确保程序出错时可以捕捉到错误日志
 async def main() -> None:
@@ -261,10 +278,10 @@ async def main() -> None:
         install()
 
         # 加载配置
-        llm, ner, file_manager, config = load_config()
+        llm, ner, file_manager, config, version = load_config()
 
         # 开始处理
-        await begin(llm, ner, file_manager, config)
+        await begin(llm, ner, file_manager, config, version)
     except EOFError:
         LogHelper.error("EOFError - 程序即将退出 ...")
     except KeyboardInterrupt:

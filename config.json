@@ -25,11 +25,11 @@
         "使用 llama.cpp 运行的本地模型时，将根据 llama.cpp 的配置调整自动设置，无需手动调整这个值。",
         "使用 DeepSeek 等不限制并发数的在线接口时可以调大这个值。"
     ],
-    "translate_context_per": [
+    "context_translate_per": [
         1,
         "是否翻译人名实体上下文，1 - 翻译，0 - 不翻译，比较慢，根据需求自己决定是否开启。"
     ],
-    "translate_context_other": [
+    "context_translate_other": [
         0,
         "是否翻译其他实体上下文，1 - 翻译，0 - 不翻译，比较慢，根据需求自己决定是否开启。"
     ]

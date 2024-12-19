@@ -22,8 +22,12 @@ class Word:
         self.type: str = ""
         self.gender: str = ""
         self.input_lines: list[str] = []
-        self.llmresponse_surface_analysis: str = ""
-        self.llmresponse_translate_context: str = ""
+
+        # 调试信息
+        self.llmrequest_surface_analysis: dict = {}
+        self.llmrequest_context_translate: dict = {}
+        self.llmresponse_surface_analysis: dict = {}
+        self.llmresponse_context_translate: dict = {}
 
         # 类变量
         Word.cache = {} if not hasattr(Word, "cache") else Word.cache
@@ -87,7 +91,6 @@ class Word:
             context_token_count = self.get_token_count(line)
 
         return context, context_token_count
-
 
     # 按长度截取上下文并返回，
     def clip_context(self, line_threshold: int, token_threshold: int) -> list[str]:

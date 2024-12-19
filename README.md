@@ -20,7 +20,7 @@
 
 ## 特别说明 ⚠️
 - 如您在翻译过程中使用了 [KeywordGacha](https://github.com/neavo/KeywordGacha)，请在作品信息或发布页面的显要位置进行说明！
-  
+
 ## 配置要求 🖥️
 - 兼容 OpenAI 标准的 AI 大模型接口
 - 注意，`SakuraLLM` 系列模型只具有翻译功能，无法进行文本分析，不能与 `KG` 配合使用
@@ -60,7 +60,7 @@
 
 - 20241129 v0.6.1
   - 调整 - 兼容 AiNiee 词典新旧字段
-  
+
 - 20241121 v0.6.0
   - 新增 - [角色代码还原](https://github.com/neavo/KeywordGacha/wiki/%E8%A7%92%E8%89%B2%E4%BB%A3%E7%A0%81%E8%BF%98%E5%8E%9F) 功能
 
@@ -113,11 +113,11 @@
         "使用 llama.cpp 运行的本地模型时，将根据 llama.cpp 的配置调整自动设置，无需手动调整这个值。",
         "使用 DeepSeek 等不限制并发数的在线接口时可以调大这个值。"
     ],
-    "translate_context_per": [
+    "context_translate_per": [
         1,
         "是否翻译人名实体上下文，1 - 翻译，0 - 不翻译，比较慢，根据需求自己决定是否开启。"
     ],
-    "translate_context_other": [
+    "context_translate_other": [
         0,
         "是否翻译其他实体上下文，1 - 翻译，0 - 不翻译，比较慢，根据需求自己决定是否开启。"
     ]
