@@ -29,7 +29,7 @@
 - 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 或 [百度网盘](https://pan.baidu.com/s/1_JXmKvnar6PGHlIbl0Mi2Q?pwd=9e54) 下载应用
 - 打开配置文件 `config.json`，填入 API 信息，推荐在以下两种方式中选择其一：
   - [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)，需付费但很便宜，速度快，无显卡要求 `👈👈 推荐`
-  - [本地接口 - 点击查看教程](https://github.com/neavo/KeywordGachaServer)，完全免费，速度较慢，需要 8G+ 显存的 Nvidia 显卡
+  - [本地接口 - 点击查看教程](https://github.com/neavo/KeywordGachaServer)，完全免费，速度较慢，理论上支持所有 4G 以上显存的显卡
 - 双击 `01_启动.bat` 启动应用，处理流程结束后，结果会保存在 `output` 文件夹内
 - 其中：
   - `*_日志.txt` - 抓取到的词语的原文、上下文、翻译建议、角色信息总结等详细信息，用于人工确认
