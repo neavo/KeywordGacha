@@ -56,27 +56,11 @@ class TextHelper:
     LATIN_PUNCTUATION_GENERAL = ("\u2000", "\u206F")
     LATIN_PUNCTUATION_SUPPLEMENTAL = ("\u2E00", "\u2E7F")
 
-    # 特殊符号
+    # 不属于标点符号范围但是一般也认为是标点符号
     SPECIAL_PUNCTUATION = (
-        "\u00b7",    # ·
-        "\u30FB",    # ・
-        "\u2665",    # ♥
-    )
-
-    # 分割符号
-    SPLIT_BY_PUNCTUATION_PATTERN = re.compile(""
-        + rf"["
-        + rf"{GENERAL_PUNCTUATION[0]}-{GENERAL_PUNCTUATION[1]}"
-        + rf"{CJK_SYMBOLS_AND_PUNCTUATION[0]}-{CJK_SYMBOLS_AND_PUNCTUATION[1]}"
-        + rf"{HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-{HALFWIDTH_AND_FULLWIDTH_FORMS[1]}"
-        + rf"{LATIN_PUNCTUATION_BASIC_1[0]}-{LATIN_PUNCTUATION_BASIC_1[1]}"
-        + rf"{LATIN_PUNCTUATION_BASIC_2[0]}-{LATIN_PUNCTUATION_BASIC_2[1]}"
-        + rf"{LATIN_PUNCTUATION_BASIC_3[0]}-{LATIN_PUNCTUATION_BASIC_3[1]}"
-        + rf"{LATIN_PUNCTUATION_BASIC_4[0]}-{LATIN_PUNCTUATION_BASIC_4[1]}"
-        + rf"{LATIN_PUNCTUATION_GENERAL[0]}-{LATIN_PUNCTUATION_GENERAL[1]}"
-        + rf"{LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{LATIN_PUNCTUATION_SUPPLEMENTAL[1]}"
-        + rf"{"".join(SPECIAL_PUNCTUATION)}"
-        + rf"]+",
+        "\u00b7", # \u00b7 = ·
+        "\u30FB", # \u30FB = ・
+        "\u2665", # \u2665 = ♥
     )
 
     # 判断字符是否为汉字字符
@@ -267,8 +251,40 @@ class TextHelper:
         return re.sub(r"^\d+|\d+$", "", text)
 
     # 按标点符号分割字符串
-    def split_by_punctuation(text: str) -> list[str]:
-        return re.split(TextHelper.SPLIT_BY_PUNCTUATION_PATTERN, text)
+    def split_by_punctuation(text: str, with_space: bool) -> list[str]:
+        if with_space == False:
+            return re.split(""
+                + rf"["
+                + rf"{TextHelper.GENERAL_PUNCTUATION[0]}-{TextHelper.GENERAL_PUNCTUATION[1]}"
+                + rf"{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0]}-{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]}"
+                + rf"{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_BASIC_1[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_1[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_BASIC_2[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_2[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_BASIC_3[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_3[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_BASIC_4[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_4[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_GENERAL[0]}-{TextHelper.LATIN_PUNCTUATION_GENERAL[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]}"
+                + rf"{"".join(TextHelper.SPECIAL_PUNCTUATION)}"
+                + rf"]+",
+                text,
+            )
+        else:
+            return re.split(""
+                + rf"["
+                + rf"{TextHelper.GENERAL_PUNCTUATION[0]}-{TextHelper.GENERAL_PUNCTUATION[1]}"
+                + rf"{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0]}-{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]}"
+                + rf"{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_BASIC_1[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_1[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_BASIC_2[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_2[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_BASIC_3[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_3[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_BASIC_4[0]}-{TextHelper.LATIN_PUNCTUATION_BASIC_4[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_GENERAL[0]}-{TextHelper.LATIN_PUNCTUATION_GENERAL[1]}"
+                + rf"{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]}"
+                + rf"{"".join(TextHelper.SPECIAL_PUNCTUATION)}"
+                + rf"\u0020\u3000" # \u0020 = 半角空格 \u3000 = 全角空格
+                + rf"]+",
+                text,
+            )
 
     # 安全加载 JSON 字典
     def safe_load_json_dict(json_str: str) -> dict:
