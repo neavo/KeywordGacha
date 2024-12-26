@@ -1,4 +1,5 @@
 import os
+import copy
 import json
 import asyncio
 from types import SimpleNamespace
@@ -12,13 +13,14 @@ from model.LLM import LLM
 from model.NER import NER
 from model.Word import Word
 from module.LogHelper import LogHelper
+from module.ProgressHelper import ProgressHelper
 from module.TestHelper import TestHelper
 from module.FileManager import FileManager
 
 # 定义常量
 SCORE_THRESHOLD = 0.80
 
-# 合并词语，并按出现次数排序
+# 合并词语
 def merge_words(words: list[Word]) -> list[Word]:
     words_unique = {}
     for word in words:
@@ -30,18 +32,42 @@ def merge_words(words: list[Word]) -> list[Word]:
     words_merged = []
     for v in words_unique.values():
         word = v[0]
-
-        # 合并上下文，并去重
-        for w in v:
-            word.context.extend(w.context)
-        word.context = sorted(list(set(word.context)), key = lambda x: len(x), reverse = True)
-
-        # 合并其他属性
-        word.count = len(word.context)
         word.score = min(0.9999, sum(w.score for w in v) / len(v))
         words_merged.append(word)
 
     return sorted(words_merged, key = lambda x: x.count, reverse = True)
+
+# 搜索上下文，并按出现次数排序
+def search_for_context(words: list[Word], input_lines: list[str]) -> list[Word]:
+    # 复制一份，避免后续的修改影响原始数据
+    input_lines_ex = copy.copy(input_lines)
+
+    # 按实体词语的长度降序排序
+    words = sorted(words, key = lambda v: len(v.surface), reverse = True)
+
+    LogHelper.print(f"")
+    with ProgressHelper.get_progress() as progress:
+        pid = progress.add_task("搜索上下文", total = len(words))
+
+        # 搜索上下文
+        for word in words:
+            # 找出匹配的行
+            index = {i for i, line in enumerate(input_lines_ex) if word.surface in line}
+
+            # 获取匹配的上下文
+            word.context = [line for i, line in enumerate(input_lines_ex) if i in index]
+            word.context = sorted(list(set(word.context)), key = lambda v: len(v), reverse = True)
+            word.count = len(word.context)
+
+            # 掩盖已命中的实体词语文本，避免其子串错误的与父串匹配
+            [line.replace(word.surface, len(word.surface) * "#") for i, line in enumerate(input_lines_ex) if i in index]
+
+            # 更新进度条
+            progress.update(pid, advance = 1, total = len(words))
+    LogHelper.print(f"")
+
+    # 按出现次数降序排序
+    return sorted(words, key = lambda x: x.count, reverse = True)
 
 # 按置信度过滤词语
 def filter_words_by_score(words: list[Word], threshold: float) -> list[Word]:
@@ -72,19 +98,14 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     # 合并相同词条
     words = merge_words(words)
 
-    # 按出现次数阈值进行筛选
-    LogHelper.info(f"即将开始执行 [阈值过滤] ... 当前出现次数的阈值设置为 {config.count_threshold} ...")
-    words = filter_words_by_score(words, SCORE_THRESHOLD)
-    words = filter_words_by_count(words, config.count_threshold)
-    LogHelper.info("[阈值过滤] 已完成 ...")
+    # 调试功能
+    if LogHelper.is_debug():
+        TestHelper.check_score_threshold(words, "log_score_threshold.log")
 
-    # 等待重复词检测任务结果
-    # LogHelper.info("即将开始执行 [重复词检测] ...")
-    # for key in NER.TYPES.keys():
-    #     words_type = get_words_by_type(words, key)
-    #     words_type = ner.check_for_duplication(words_type, input_lines)
-    # words = remove_words_by_type(words, "")
-    # LogHelper.info("[重复词检测] 已完成 ...")
+    # 置信度阈值过滤
+    LogHelper.info(f"即将开始执行 [置信度阈值]，当前置信度的阈值为 {SCORE_THRESHOLD:.4f} ...")
+    words = filter_words_by_score(words, SCORE_THRESHOLD)
+    LogHelper.info("[置信度阈值] 已完成 ...")
 
     # 等待重复词检测任务结果
     LogHelper.info("即将开始执行 [重复词检测] ...")
@@ -92,14 +113,17 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     words = remove_words_by_type(words, "")
     LogHelper.info("[重复词检测] 已完成 ...")
 
+    # 搜索上下文
+    words = search_for_context(words, input_lines)
+
+    # 出现次数阈值过滤
+    LogHelper.info(f"即将开始执行 [出现次数阈值]，当前出现次数的阈值为 {config.count_threshold} ...")
+    words = filter_words_by_count(words, config.count_threshold)
+    LogHelper.info("[出现次数阈值] 已完成 ...")
+
     # 设置 LLM 对象
     llm.set_language(language)
     llm.set_request_limiter()
-
-    # 调试功能
-    if LogHelper.is_debug():
-        with LogHelper.status("正在检查置信度阈值 ..."):
-            TestHelper.check_score_threshold(words, "log_score_threshold.log")
 
     # 等待词义分析任务结果
     LogHelper.info("即将开始执行 [词义分析] ...")
@@ -117,10 +141,8 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
 
     # 调试功能
     if LogHelper.is_debug():
-        with LogHelper.status("正在保存请求记录 ..."):
-            TestHelper.save_surface_analysis_log(words, "log_surface_analysis.log")
-        with LogHelper.status("正在检查结果重复度 ..."):
-            TestHelper.check_result_duplication(words, "log_result_duplication.log")
+        TestHelper.save_surface_analysis_log(words, "log_surface_analysis.log")
+        TestHelper.check_result_duplication(words, "log_result_duplication.log")
 
     # 等待 上下文翻译 任务结果
     if language in (NER.Language.EN, NER.Language.JP, NER.Language.KO):
