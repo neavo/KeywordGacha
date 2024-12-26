@@ -454,8 +454,8 @@ class NER:
                 if surface_j not in surface_i:
                     continue
 
-                # 跳过出现次数不一样的条目，在插值的比例和绝对值上分别给与一定冗余
-                if min(count_i, count_j) / max(1, count_i, count_j) < 0.95 and abs(count_i - count_j) > 1:
+                # 跳过出现次数不一样的条目
+                if count_i != count_j:
                     continue
 
                 # 对角色类型进行保护，跳过
@@ -464,8 +464,5 @@ class NER:
 
                 LogHelper.info(f"[重复词检测] 已合并 - {surface_j}/{type_j}/{count_j} [green]->[/] {surface_i}/{type_i}/{count_i}")
                 words[j].type = ""
-                words[i].context.extend(words[j].context)
-                words[i].context = sorted(list(set(words[i].context)), key = lambda x: len(x), reverse = True)
-                words[i].context = [line for line in words[i].context if words[i].surface in line]
 
         return sorted(words, key = lambda v: v.count, reverse = True)
