@@ -129,11 +129,11 @@ class LLM:
             llm_request = {
                 "model" : self.model_name,
                 "stream" : False,
-                "temperature" : llm_config.TEMPERATURE,
+                "temperature" : max(llm_config.TEMPERATURE, 0.50) if retry == True else llm_config.TEMPERATURE,
                 "top_p" : llm_config.TOP_P,
                 "max_tokens" : llm_config.MAX_TOKENS,
                 "max_completion_tokens" : llm_config.MAX_TOKENS,
-                "frequency_penalty" : llm_config.FREQUENCY_PENALTY + 0.2 if retry == True else llm_config.FREQUENCY_PENALTY,
+                "frequency_penalty" : max(llm_config.FREQUENCY_PENALTY, 0.2) if retry == True else llm_config.FREQUENCY_PENALTY,
                 "messages" : messages,
             }
 
@@ -148,7 +148,6 @@ class LLM:
             error = e
         finally:
             return usage, message, llm_request, llm_response, error
-
 
     # 接口测试任务
     async def api_test(self) -> bool:
