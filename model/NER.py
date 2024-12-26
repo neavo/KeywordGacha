@@ -61,7 +61,9 @@ class NER:
         self.tokenizer = self.load_tokenizer(self.model_path)
         self.classifier = self.load_classifier(self.model, self.gpu_boost)
 
-        self.sudachi = dictionary.Dictionary(dict_type = "core").create(tokenizer.Tokenizer.SplitMode.C)
+        self.sudachi = dictionary.Dictionary(
+            dict_type = "full" if LogHelper.is_debug() else "core"
+        ).create(tokenizer.Tokenizer.SplitMode.C)
         self.noun_set_cache = {}
 
     # 释放资源
@@ -102,8 +104,9 @@ class NER:
         if gpu_boost == True:
             return AutoModelForTokenClassification.from_pretrained(
                 model_path,
-                torch_dtype = torch.float16,
                 local_files_only = True,
+                attn_implementation = "sdpa",
+                torch_dtype = torch.bfloat16,
             ).to(device = "cuda")
         else:
             session_options = onnxruntime.SessionOptions()
@@ -173,11 +176,16 @@ class NER:
         # 生成名词表
         noun_set = self.generate_noun_set(line, language)
 
-        # 生成词语列表，当前文本为英文且包含 ' 时不拆分，避免误拆复合短语
-        if "'" in text and language == NER.Language.EN:
+        # 生成词语列表
+        # 当文本为英文且包含 ' 时不拆分，避免误拆复合短语
+        # 当文本为中文时，使用包含空格的拆分规则
+        # 否则使用不包含空格的拆分规则
+        if language == NER.Language.EN and "'" in text:
             surfaces = [text]
+        elif language in (NER.Language.ZH, NER.Language.JP):
+            surfaces = [v.strip() for v in TextHelper.split_by_punctuation(text, True) if v.strip() != ""]
         else:
-            surfaces = [v.strip() for v in TextHelper.split_by_punctuation(text) if v.strip() != ""]
+            surfaces = [v.strip() for v in TextHelper.split_by_punctuation(text, False) if v.strip() != ""]
 
         # 遍历词语
         for surface in surfaces:
@@ -203,7 +211,6 @@ class NER:
             word.input_lines = input_lines
             word.context.append(line)
             words.append(word)
-
         return words
 
     # 生成名词集合
@@ -414,9 +421,51 @@ class NER:
 
         # 打印通过模式匹配抓取的角色实体
         LogHelper.print("")
-        LogHelper.info("[查找实体词语] 已完成 ...")
+        LogHelper.info(f"[查找实体词语] 已完成 ...")
         LogHelper.info(f"[查找实体词语] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}") if len(seen) > 0 else None
 
         # 释放显存
         self.release()
         return words
+
+    # 重复词检测
+    def check_for_duplication(self, words: list[Word], input_lines: list[str]) -> list[Word]:
+        words = sorted(words, key = lambda v: len(v.surface), reverse = True)
+        counts = ["\n".join(input_lines).count(word.surface) for word in words]
+
+        for i in range(len(words)):
+            for j in range(i + 1, len(words)):
+                type_i = words[i].type
+                type_j = words[j].type
+                count_i = counts[i]
+                count_j = counts[j]
+                surface_i = words[i].surface
+                surface_j = words[j].surface
+
+                # 跳过没有出现过的条目，注意：不应该有这样的条目
+                if count_i == 0:
+                    continue
+
+                # 跳过已被合并的条目
+                if type_j == "":
+                    continue
+
+                # 跳过没有包含关系的条目
+                if surface_j not in surface_i:
+                    continue
+
+                # 跳过出现次数不一样的条目，在插值的比例和绝对值上分别给与一定冗余
+                if min(count_i, count_j) / max(1, count_i, count_j) < 0.95 and abs(count_i - count_j) > 1:
+                    continue
+
+                # 对角色类型进行保护，跳过
+                if type_j == "PER" and type_i != "PER":
+                    continue
+
+                LogHelper.info(f"[重复词检测] 已合并 - {surface_j}/{type_j}/{count_j} [green]->[/] {surface_i}/{type_i}/{count_i}")
+                words[j].type = ""
+                words[i].context.extend(words[j].context)
+                words[i].context = sorted(list(set(words[i].context)), key = lambda x: len(x), reverse = True)
+                words[i].context = [line for line in words[i].context if words[i].surface in line]
+
+        return sorted(words, key = lambda v: v.count, reverse = True)

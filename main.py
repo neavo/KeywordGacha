@@ -30,8 +30,13 @@ def merge_words(words: list[Word]) -> list[Word]:
     words_merged = []
     for v in words_unique.values():
         word = v[0]
-        word.context = list(set([word.context[0] for word in v if word.context[0] != ""]))
-        word.context.sort(key = lambda x: len(x), reverse = True)
+
+        # 合并上下文，并去重
+        for w in v:
+            word.context.extend(w.context)
+        word.context = sorted(list(set(word.context)), key = lambda x: len(x), reverse = True)
+
+        # 合并其他属性
         word.count = len(word.context)
         word.score = min(0.9999, sum(w.score for w in v) / len(v))
         words_merged.append(word)
@@ -73,10 +78,22 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     words = filter_words_by_count(words, config.count_threshold)
     LogHelper.info("[阈值过滤] 已完成 ...")
 
-    # 设置 LLM 语言
-    llm.set_language(language)
+    # 等待重复词检测任务结果
+    # LogHelper.info("即将开始执行 [重复词检测] ...")
+    # for key in NER.TYPES.keys():
+    #     words_type = get_words_by_type(words, key)
+    #     words_type = ner.check_for_duplication(words_type, input_lines)
+    # words = remove_words_by_type(words, "")
+    # LogHelper.info("[重复词检测] 已完成 ...")
 
-    # 设置请求限制器
+    # 等待重复词检测任务结果
+    LogHelper.info("即将开始执行 [重复词检测] ...")
+    words = ner.check_for_duplication(words, input_lines)
+    words = remove_words_by_type(words, "")
+    LogHelper.info("[重复词检测] 已完成 ...")
+
+    # 设置 LLM 对象
+    llm.set_language(language)
     llm.set_request_limiter()
 
     # 调试功能
@@ -88,6 +105,15 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     LogHelper.info("即将开始执行 [词义分析] ...")
     words = await llm.surface_analysis_batch(words)
     words = remove_words_by_type(words, "")
+
+    # 合并相同词条
+    words = merge_words(words)
+
+    # 等待重复词检测任务结果
+    LogHelper.info("即将开始执行 [重复词检测] ...")
+    words = ner.check_for_duplication(words, input_lines)
+    words = remove_words_by_type(words, "")
+    LogHelper.info("[重复词检测] 已完成 ...")
 
     # 调试功能
     if LogHelper.is_debug():
