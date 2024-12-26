@@ -106,7 +106,7 @@ class NER:
                 model_path,
                 local_files_only = True,
                 attn_implementation = "sdpa",
-                torch_dtype = torch.bfloat16,
+                torch_dtype = torch.bfloat16 if torch.cuda.get_device_capability("cuda") >= (8, 0) else torch.float16,
             ).to(device = "cuda")
         else:
             session_options = onnxruntime.SessionOptions()
