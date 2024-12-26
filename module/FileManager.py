@@ -561,17 +561,6 @@ class FileManager():
                     writer.write("上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※" + "\n")
                     writer.write(f"{"\n".join(word.context_translation)}" + "\n")
 
-                if LogHelper.is_debug():
-                    writer.write("调试信息 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※" + "\n")
-                    if word.llmrequest_surface_analysis != "":
-                        writer.write(f"llmrequest_surface_analysis - {word.llmrequest_surface_analysis}" + "\n")
-                    if word.llmresponse_surface_analysis != "":
-                        writer.write(f"llmresponse_surface_analysis - {word.llmresponse_surface_analysis}" + "\n")
-                    if word.llmrequest_context_translate != "":
-                        writer.write(f"llmrequest_context_translate - {word.llmrequest_context_translate}" + "\n")
-                    if word.llmresponse_context_translate != "":
-                        writer.write(f"llmresponse_context_translate - {word.llmresponse_context_translate}" + "\n")
-
                 # 多写入一个换行符，确保每段信息之间有间隔
                 writer.write("\n")
 
