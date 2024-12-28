@@ -99,8 +99,7 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     words = merge_words(words)
 
     # 调试功能
-    if LogHelper.is_debug():
-        TestHelper.check_score_threshold(words, "log_score_threshold.log")
+    TestHelper.check_score_threshold(words, "log_score_threshold.log")
 
     # 置信度阈值过滤
     LogHelper.info(f"即将开始执行 [置信度阈值]，当前置信度的阈值为 {SCORE_THRESHOLD:.4f} ...")
@@ -140,9 +139,8 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     LogHelper.info("[重复词检测] 已完成 ...")
 
     # 调试功能
-    if LogHelper.is_debug():
-        TestHelper.save_surface_analysis_log(words, "log_surface_analysis.log")
-        TestHelper.check_result_duplication(words, "log_result_duplication.log")
+    TestHelper.save_surface_analysis_log(words, "log_surface_analysis.log")
+    TestHelper.check_result_duplication(words, "log_result_duplication.log")
 
     # 等待 上下文翻译 任务结果
     if language in (NER.Language.EN, NER.Language.JP, NER.Language.KO):
@@ -158,9 +156,7 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
             word_type = await llm.context_translate_batch(word_type)
 
     # 调试功能
-    if LogHelper.is_debug():
-        with LogHelper.status("正在保存请求记录 ..."):
-            TestHelper.save_context_translate_log(words, "log_context_translate.log")
+    TestHelper.save_context_translate_log(words, "log_context_translate.log")
 
     # 将结果写入文件
     LogHelper.info("")
