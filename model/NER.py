@@ -45,13 +45,6 @@ class NER:
     def __init__(self) -> None:
         super().__init__()
 
-        # 忽略指定的警告信息
-        warnings.filterwarnings(
-            "ignore",
-            message = "1Torch was not compiled with flash attention",
-            category = UserWarning,
-        )
-
         # 初始化
         self.gpu_boost = torch.cuda.is_available()
         self.bacth_size = 32 if self.gpu_boost else 1
@@ -306,13 +299,13 @@ class NER:
     # 按语言移除首尾无效字符
     def strip_by_language(self, text: str, language: int) -> str:
         if language == NER.Language.ZH:
-            return TextHelper.strip_not_cjk(text)
+            return TextHelper.strip_not_cjk(text).strip("的")
 
         if language == NER.Language.EN:
-            return TextHelper.strip_not_latin(text)
+            return TextHelper.strip_not_latin(text).removeprefix("a ").removeprefix("an ").removeprefix("the ").strip()
 
         if language == NER.Language.JP:
-            return TextHelper.strip_not_japanese(text)
+            return TextHelper.strip_not_japanese(text).strip("の")
 
         if language == NER.Language.KO:
             return TextHelper.strip_not_korean(text)
@@ -454,8 +447,8 @@ class NER:
                 if surface_j not in surface_i:
                     continue
 
-                # 跳过出现次数不一样的条目
-                if count_i != count_j:
+                # 跳过出现次数不一样的条目，给予一定的比例冗余，以消除超长文本中错别字的干扰
+                if min(count_i, count_j) > 0 and min(count_i, count_j) / max(count_i, count_j) < 0.98:
                     continue
 
                 # 对角色类型进行保护，跳过
