@@ -179,7 +179,7 @@ class TestHelper:
                 x = {k for k in TestHelper.DATA.keys()}
                 y = {
                     word.surface
-                    for word in words if word.type == "PER" and word.score > threshold
+                    for word in words if word.score > threshold
                 }
 
                 writer.write(f"当置信度阈值设置为 {threshold:.4f} 时：\n")
