@@ -54,16 +54,19 @@ def search_for_context(words: list[Word], input_lines: list[str]) -> list[Word]:
             # 找出匹配的行
             index = {i for i, line in enumerate(input_lines_ex) if word.surface in line}
 
-            # 获取匹配的上下文
-            word.context = [line for i, line in enumerate(input_lines_ex) if i in index]
-            word.context = sorted(list(set(word.context)), key = lambda v: len(v), reverse = True)
+            # 获取匹配的上下文，去重，并按长度降序排序
+            word.context = {line for i, line in enumerate(input_lines_ex) if i in index}
+            word.context = sorted(list(word.context), key = lambda v: len(v), reverse = True)
             word.count = len(word.context)
 
             # 掩盖已命中的实体词语文本，避免其子串错误的与父串匹配
-            [line.replace(word.surface, len(word.surface) * "#") for i, line in enumerate(input_lines_ex) if i in index]
+            input_lines_ex = [
+                line.replace(word.surface, len(word.surface) * "#")  if i in index else line
+                for i, line in enumerate(input_lines_ex)
+            ]
 
             # 更新进度条
-            progress.update(pid, advance = 1, total = len(words))
+            progress.update(pid, advance = 1)
     LogHelper.print(f"")
 
     # 按出现次数降序排序
@@ -87,12 +90,14 @@ def remove_words_by_type(words: list[Word], type: str) -> list[Word]:
 
 # 开始处理文本
 async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: SimpleNamespace, language: int) -> None:
+    # 初始化
+    words = []
+
     # 读取输入文件
     input_lines = file_manager.load_lines_from_input_file(language)
 
     # 查找实体词语
     LogHelper.info("即将开始执行 [查找实体词语] ...")
-    words = []
     words = ner.search_for_entity(input_lines, language)
 
     # 合并相同词条
@@ -106,13 +111,8 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     words = filter_words_by_score(words, SCORE_THRESHOLD)
     LogHelper.info("[置信度阈值] 已完成 ...")
 
-    # 等待重复词检测任务结果
-    LogHelper.info("即将开始执行 [重复词检测] ...")
-    words = ner.check_for_duplication(words, input_lines)
-    words = remove_words_by_type(words, "")
-    LogHelper.info("[重复词检测] 已完成 ...")
-
     # 搜索上下文
+    LogHelper.info("即将开始执行 [搜索上下文] ...")
     words = search_for_context(words, input_lines)
 
     # 出现次数阈值过滤
@@ -131,12 +131,6 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
 
     # 合并相同词条
     words = merge_words(words)
-
-    # 等待重复词检测任务结果
-    LogHelper.info("即将开始执行 [重复词检测] ...")
-    words = ner.check_for_duplication(words, input_lines)
-    words = remove_words_by_type(words, "")
-    LogHelper.info("[重复词检测] 已完成 ...")
 
     # 调试功能
     TestHelper.save_surface_analysis_log(words, "log_surface_analysis.log")
