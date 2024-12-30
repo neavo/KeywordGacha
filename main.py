@@ -24,10 +24,8 @@ SCORE_THRESHOLD = 0.80
 def merge_words(words: list[Word]) -> list[Word]:
     words_unique = {}
     for word in words:
-        key = (word.surface, word.type) # 只有文字和类型都一样才视为相同条目，避免跨类词条目合并
-        if key not in words_unique:
-            words_unique[key] = []
-        words_unique[key].append(word)
+        # key = (word.surface, word.type) # 只有文字和类型都一样才视为相同条目，避免跨类词条目合并
+        words_unique.setdefault(word.surface, []).append(word)
 
     words_merged = []
     for v in words_unique.values():
@@ -55,7 +53,7 @@ def search_for_context(words: list[Word], input_lines: list[str]) -> list[Word]:
             index = {i for i, line in enumerate(input_lines_ex) if word.surface in line}
 
             # 获取匹配的上下文，去重，并按长度降序排序
-            word.context = {line for i, line in enumerate(input_lines_ex) if i in index}
+            word.context = {line for i, line in enumerate(input_lines) if i in index}
             word.context = sorted(list(word.context), key = lambda v: len(v), reverse = True)
             word.count = len(word.context)
 
@@ -128,9 +126,6 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     LogHelper.info("即将开始执行 [词义分析] ...")
     words = await llm.surface_analysis_batch(words)
     words = remove_words_by_type(words, "")
-
-    # 合并相同词条
-    words = merge_words(words)
 
     # 调试功能
     TestHelper.save_surface_analysis_log(words, "log_surface_analysis.log")
