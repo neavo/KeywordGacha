@@ -244,26 +244,22 @@ class LLM:
                 word.llmrequest_surface_analysis = llm_request
                 word.llmresponse_surface_analysis = llm_response
 
-                if any(v for v in ("姓名", "家族") if v in result.get("entity_type", "")):
+                if any(v for v in ("姓名", "姓氏", "名字", "头衔", "身份", "职位", "家族", "怪物") if v in result.get("entity_type", "")):
                     if word.type != "PER":
-                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> PER） - {word.surface} - {result}")
+                        LogHelper.info(f"[词义分析] 类型修正 {word.type} -> PER - {word.surface} - {result}")
                         word.type = "PER"
-                elif "组织" in result.get("entity_type", ""):
+                elif any(v for v in ("组织", ) if v in result.get("entity_type", "")):
                     if word.type != "ORG":
-                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> ORG） - {word.surface} - {result}")
+                        LogHelper.info(f"[词义分析] 类型修正 {word.type} -> ORG - {word.surface} - {result}")
                         word.type = "ORG"
                 elif "地点" in result.get("entity_type", ""):
                     if word.type != "LOC":
-                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> LOC） - {word.surface} - {result}")
+                        LogHelper.info(f"[词义分析] 类型修正 {word.type} -> LOC - {word.surface} - {result}")
                         word.type = "LOC"
                 elif "物品" in result.get("entity_type", ""):
                     if word.type != "PRD":
-                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> PRD） - {word.surface} - {result}")
+                        LogHelper.info(f"[词义分析] 类型修正 {word.type} -> PRD - {word.surface} - {result}")
                         word.type = "PRD"
-                elif "事件" in result.get("entity_type", ""):
-                    if word.type != "EVT":
-                        LogHelper.info(f"[词义分析] 类型修正（{word.type} -> EVT） - {word.surface} - {result}")
-                        word.type = "EVT"
                 else:
                     LogHelper.info(f"[词义分析] 已剔除 - {word.type} - {word.surface} - {result}")
                     word.type = ""
