@@ -132,7 +132,8 @@ class LLM:
                 "temperature" : max(llm_config.TEMPERATURE, 0.50) if retry == True else llm_config.TEMPERATURE,
                 "top_p" : llm_config.TOP_P,
                 "max_tokens" : llm_config.MAX_TOKENS,
-                "max_completion_tokens" : llm_config.MAX_TOKENS,
+                # 同时设置 max_tokens 和 max_completion_tokens 时 OpenAI 接口会报错
+                # "max_completion_tokens" : llm_config.MAX_TOKENS,
                 "frequency_penalty" : max(llm_config.FREQUENCY_PENALTY, 0.2) if retry == True else llm_config.FREQUENCY_PENALTY,
                 "messages" : messages,
             }
