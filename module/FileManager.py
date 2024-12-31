@@ -598,13 +598,13 @@ class FileManager():
                 data["dst"] = word.surface_translation
 
                 if word.type == "PER" and "男" in word.gender:
-                    data["info"] = "男性的名字"
+                    data["info"] = "男性名字"
                 elif word.type == "PER" and "女" in word.gender:
-                    data["info"] = "女性的名字"
+                    data["info"] = "女性名字"
                 elif word.type == "PER":
                     data["info"] = "名字"
                 else:
-                    data["info"] = f"{type_map.get(word.type)}的名字"
+                    data["info"] = f"{type_map.get(word.type)}"
 
                 datas.append(data)
 
