@@ -18,8 +18,7 @@ class Word:
         self.surface: str = ""
         self.surface_romaji: str = ""
         self.surface_translation: str = ""
-        self.surface_translation_description: str = ""
-        self.type: str = ""
+        self.group: str = ""
         self.gender: str = ""
         self.input_lines: list[str] = []
 
@@ -75,7 +74,7 @@ class Word:
             if line_token_count > token_threshold:
                 continue
 
-            # 更新上下文与计数
+            # 更新参考文本与计数
             context.append(line)
             context_token_count = context_token_count + line_token_count
 
@@ -92,9 +91,9 @@ class Word:
 
         return context, context_token_count
 
-    # 按长度截取上下文并返回，
+    # 按长度截取参考文本并返回，
     def clip_context(self, line_threshold: int, token_threshold: int) -> list[str]:
-        # 先从上下文中截取
+        # 先从参考文本中截取
         context, context_token_count = self.clip_lines(self.context, line_threshold, token_threshold)
 
         # 如果句子长度不足 75%，则尝试全文匹配中补充
@@ -102,7 +101,7 @@ class Word:
             context_set = set(self.context)
             context_ex, _ = self.clip_lines(
                 sorted(
-                    # 筛选出未包含在当前上下文中且包含关键词的文本以避免重复
+                    # 筛选出未包含在当前参考文本中且包含关键词的文本以避免重复
                     [line for line in self.input_lines if self.surface in line and line not in context_set],
                     key = lambda line: self.get_token_count(line),
                     reverse = True
@@ -111,12 +110,12 @@ class Word:
                 token_threshold - context_token_count,
             )
 
-            # 追加上下文
+            # 追加参考文本
             context.extend(context_ex)
 
         return context
 
-    # 获取用于上下文翻译任务的上下文文本
+    # 获取用于参考文本翻译任务的参考文本文本
     def get_context_str_for_translate(self, language: int) -> str:
         from model.NER import NER
         return "\n".join(
@@ -126,7 +125,7 @@ class Word:
             )
         ).replace("\n\n", "\n").strip()
 
-    # 获取用于词义分析任务的上下文文本
+    # 获取用于词义分析任务的参考文本文本
     def get_context_str_for_surface_analysis(self, language: int) -> str:
         from model.NER import NER
         return "\n".join(

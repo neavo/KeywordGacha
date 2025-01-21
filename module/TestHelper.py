@@ -195,10 +195,7 @@ class TestHelper:
     def check_result_duplication(words: list[Word], path: str) -> None:
         with open(path, "w", encoding = "utf-8") as writer:
             x = {k for k in TestHelper.DATA.keys()}
-            y = {
-                word.surface
-                for word in words if word.type == "PER"
-            }
+            y = {word.surface for word in words if word.group == "角色"}
 
             writer.write(f"第一个词典独有的键 - {len(x - y)}\n")
             writer.write(f"{x - y}\n")

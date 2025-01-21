@@ -309,3 +309,26 @@ class TextHelper:
                 result[p[0].strip().strip("'\"").strip()] = p[1].strip().strip("'\"").strip()
 
         return result
+
+    # 安全加载 JSON 列表
+    def safe_load_json_list(json_str: str) -> list:
+        result = []
+
+        # 移除首尾空白符（含空格、制表符、换行符）
+        json_str = json_str.strip()
+
+        # 移除代码标识
+        json_str = json_str.removeprefix("```json").removeprefix("```").strip()
+
+        # 先尝试使用 json.loads 解析
+        try:
+            result = json.loads(json_str)
+        except Exception:
+            pass
+
+        # 否则使用正则表达式匹配
+        if len(result) == 0:
+            for item in re.findall(r"\{.+?\}", json_str, flags = re.IGNORECASE):
+                result.append(TextHelper.safe_load_json_dict(item))
+
+        return result

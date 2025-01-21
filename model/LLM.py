@@ -22,7 +22,7 @@ class LLM:
 
         API_TEST = 100                  # 语义分析
         SURFACE_ANALYSIS = 200          # 语义分析
-        TRANSLATE_CONTEXT = 300         # 翻译上下文
+        TRANSLATE_CONTEXT = 300         # 翻译参考文本
 
     # LLM 配置参数
     class LLMConfig():
@@ -38,23 +38,42 @@ class LLM:
     # 请求参数配置 - 接口测试
     API_TEST_CONFIG = LLMConfig()
     API_TEST_CONFIG.TEMPERATURE = 0.05
-    API_TEST_CONFIG.TOP_P = 0.85
+    API_TEST_CONFIG.TOP_P = 0.95
     API_TEST_CONFIG.MAX_TOKENS = 768
     API_TEST_CONFIG.FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 词义分析
     SURFACE_ANALYSIS_CONFIG = LLMConfig()
     SURFACE_ANALYSIS_CONFIG.TEMPERATURE = 0.05
-    SURFACE_ANALYSIS_CONFIG.TOP_P = 0.85
+    SURFACE_ANALYSIS_CONFIG.TOP_P = 0.95
     SURFACE_ANALYSIS_CONFIG.MAX_TOKENS = 768
     SURFACE_ANALYSIS_CONFIG.FREQUENCY_PENALTY = 0
 
-    # 请求参数配置 - 翻译上下文
+    # 请求参数配置 - 翻译参考文本
     TRANSLATE_CONTEXT_CONFIG = LLMConfig()
     TRANSLATE_CONTEXT_CONFIG.TEMPERATURE = 0.95
-    TRANSLATE_CONTEXT_CONFIG.TOP_P = 0.85
+    TRANSLATE_CONTEXT_CONFIG.TOP_P = 0.95
     TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS = 768
     TRANSLATE_CONTEXT_CONFIG.FREQUENCY_PENALTY = 0
+
+    # 类型映射表
+    GROUP_MAPPING = {
+        "角色" : ["姓氏", "名字"],
+        "组织" : ["组织", "群体", "家族", "种族"],
+        "地点" : ["地点", "建筑", "设施"],
+        "物品" : ["物品", "食品", "工具"],
+        "生物" : ["生物",],
+    }
+    GROUP_MAPPING_BANNED = {
+        "黑名单" : ["行为", "活动", "其他", "无法判断"],
+    }
+    GROUP_MAPPING_ADDITIONAL = {
+        "角色" : ["角色", "人", "人物", "人名"],
+        "组织" : [],
+        "地点" : [],
+        "物品" : ["食物", "饮品",],
+        "生物" : ["植物", "动物", "怪物", "魔物",],
+    }
 
     def __init__(self, config: SimpleNamespace) -> None:
         self.api_key = config.api_key
@@ -160,7 +179,7 @@ class LLM:
                     [
                         {
                             "role": "system",
-                            "content": self.prompt_surface_analysis_with_translation,
+                            "content": self.prompt_surface_analysis_with_translation.replace("{PROMPT_GROUPS}", "、".join(("角色", "其他"))),
                         },
                         {
                             "role": "user",
@@ -201,6 +220,11 @@ class LLM:
     async def surface_analysis(self, word: Word, words: list[Word], success: list[Word], retry: bool) -> None:
         async with self.semaphore, self.async_limiter:
             try:
+                if not hasattr(self, "prompt_groups"):
+                    x = [v for group in LLM.GROUP_MAPPING.values() for v in group]
+                    y = [v for group in LLM.GROUP_MAPPING_BANNED.values() for v in group]
+                    self.prompt_groups = x + y
+
                 if self.language != NER.Language.ZH:
                     prompt = self.prompt_surface_analysis_with_translation
                 else:
@@ -210,7 +234,7 @@ class LLM:
                     [
                         {
                             "role": "system",
-                            "content": prompt,
+                            "content": prompt.replace("{PROMPT_GROUPS}", "、".join(self.prompt_groups)),
                         },
                         {
                             "role": "user",
@@ -237,37 +261,43 @@ class LLM:
                 if len(result) == 0:
                     raise Exception("反序列化失败 ...")
 
+                # 清理一下格式
+                for k, v in result.items():
+                    result[k] = re.sub(r".*[:：]+", "", TextHelper.strip_punctuation(v))
+
                 # 获取结果
-                word.gender = result.get("gender", "").replace("性别判断：", "").strip()
-                word.context_summary = result.get("summary", "").replace("故事梗概：", "").strip()
-                word.surface_translation = result.get("translation", "").replace("翻译结果：", "").strip()
-                word.surface_translation_description = result.get("analysis", "").replace("特征分析：", "").strip()
+                word.group = result.get("group", "")
+                word.gender = result.get("gender", "")
+                word.context_summary = result.get("summary", "")
+                word.surface_translation = result.get("translation", "")
                 word.llmrequest_surface_analysis = llm_request
                 word.llmresponse_surface_analysis = llm_response
-
-                if any(v for v in ("姓名", "姓氏", "名字", "头衔", "身份", "职位", "家族", "怪物") if v in result.get("entity_type", "")):
-                    if word.type != "PER":
-                        LogHelper.info(f"[词义分析] 类型修正 {word.type} -> PER - {word.surface} - {result}")
-                        word.type = "PER"
-                elif any(v for v in ("组织", ) if v in result.get("entity_type", "")):
-                    if word.type != "ORG":
-                        LogHelper.info(f"[词义分析] 类型修正 {word.type} -> ORG - {word.surface} - {result}")
-                        word.type = "ORG"
-                elif "地点" in result.get("entity_type", ""):
-                    if word.type != "LOC":
-                        LogHelper.info(f"[词义分析] 类型修正 {word.type} -> LOC - {word.surface} - {result}")
-                        word.type = "LOC"
-                elif "物品" in result.get("entity_type", ""):
-                    if word.type != "PRD":
-                        LogHelper.info(f"[词义分析] 类型修正 {word.type} -> PRD - {word.surface} - {result}")
-                        word.type = "PRD"
-                else:
-                    LogHelper.info(f"[词义分析] 已剔除 - {word.type} - {word.surface} - {result}")
-                    word.type = ""
 
                 # 生成罗马音，汉字有时候会生成重复的罗马音，所以需要去重
                 results = list(set([item.get("hepburn", "") for item in self.kakasi.convert(word.surface)]))
                 word.surface_romaji = (" ".join(results)).strip()
+
+                # 如果性别有效，则直接判断为角色类型
+                if word.gender in ("男", "女"):
+                    word.group = "角色"
+                    LogHelper.debug(f"[词义分析] 性别有效 - {word.surface} [green]->[/] {word.group} ...")
+                else:
+                    # 匹配实体类型
+                    matched = False
+                    for k, v in LLM.GROUP_MAPPING.items():
+                        if word.group in set(v):
+                            word.group = k
+                            matched = True
+                            break
+                    for k, v in LLM.GROUP_MAPPING_ADDITIONAL.items():
+                        if word.group in set(v):
+                            LogHelper.debug(f"[词义分析] 命中额外类型 - {word.surface} [green]->[/] {word.group} ...")
+                            word.group = k
+                            matched = True
+                            break
+                    if matched == False:
+                        LogHelper.warning(f"[词义分析] 无法匹配的实体类型 - {word.surface} [green]->[/] {word.group} ...")
+                        word.group = ""
             except Exception as e:
                 LogHelper.warning(f"[词义分析] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
                 LogHelper.debug(f"llm_request - {llm_request}")
@@ -284,14 +314,14 @@ class LLM:
         failure = []
         success = []
 
-        for i in range(self.MAX_RETRY + 1):
+        for i in range(LLM.MAX_RETRY + 1):
             if i == 0:
                 retry = False
                 words_this_round = words
             elif len(failure) > 0:
                 retry = True
                 words_this_round = failure
-                LogHelper.warning(f"[词义分析] 即将开始第 {i} / {self.MAX_RETRY} 轮重试...")
+                LogHelper.warning(f"[词义分析] 即将开始第 {i} / {LLM.MAX_RETRY} 轮重试...")
             else:
                 break
 
@@ -303,12 +333,12 @@ class LLM:
             await asyncio.gather(*tasks, return_exceptions = True)
 
             # 获得失败任务的列表
-            success_pairs = {(word.surface, word.type) for word in success}
-            failure = [word for word in words if (word.surface, word.type) not in success_pairs]
+            success_pairs = {(word.surface, word.group) for word in success}
+            failure = [word for word in words if (word.surface, word.group) not in success_pairs]
 
         return words
 
-    # 上下文翻译任务
+    # 参考文本翻译任务
     async def context_translate(self, word: Word, words: list[Word], success: list[Word], retry: bool) -> None:
         async with self.semaphore, self.async_limiter:
             try:
@@ -339,7 +369,7 @@ class LLM:
                 word.llmrequest_context_translate = llm_request
                 word.llmresponse_context_translate = llm_response
             except Exception as e:
-                LogHelper.warning(f"[上下文翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
+                LogHelper.warning(f"[参考文本翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
                 LogHelper.debug(f"llm_request - {llm_request}")
                 LogHelper.debug(f"llm_response - {llm_response}")
                 error = e
@@ -347,21 +377,21 @@ class LLM:
                 if error == None:
                     with self.lock:
                         success.append(word)
-                    LogHelper.info(f"[上下文翻译] 已完成 {len(success)} / {len(words)} ...")
+                    LogHelper.info(f"[参考文本翻译] 已完成 {len(success)} / {len(words)} ...")
 
-    # 批量执行上下文翻译任务
+    # 批量执行参考文本翻译任务
     async def context_translate_batch(self, words: list[Word]) -> list[Word]:
         failure = []
         success = []
 
-        for i in range(self.MAX_RETRY + 1):
+        for i in range(LLM.MAX_RETRY + 1):
             if i == 0:
                 retry = False
                 words_this_round = words
             elif len(failure) > 0:
                 retry = True
                 words_this_round = failure
-                LogHelper.warning(f"[上下文翻译] 即将开始第 {i} / {self.MAX_RETRY} 轮重试...")
+                LogHelper.warning(f"[参考文本翻译] 即将开始第 {i} / {LLM.MAX_RETRY} 轮重试...")
             else:
                 break
 
@@ -373,7 +403,7 @@ class LLM:
             await asyncio.gather(*tasks, return_exceptions = True)
 
             # 获得失败任务的列表
-            success_pairs = {(word.surface, word.type) for word in success}
-            failure = [word for word in words if (word.surface, word.type) not in success_pairs]
+            success_pairs = {(word.surface, word.group) for word in success}
+            failure = [word for word in words if (word.surface, word.group) not in success_pairs]
 
         return words
