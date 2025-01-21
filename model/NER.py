@@ -2,7 +2,6 @@ import os
 import re
 import gc
 import json
-import warnings
 import unicodedata
 from typing import Generator
 
@@ -15,6 +14,7 @@ from transformers import pipeline
 from transformers import AutoTokenizer
 from transformers import PreTrainedModel
 from transformers import AutoModelForTokenClassification
+from transformers.utils import is_torch_bf16_gpu_available
 from transformers.pipelines.base import Pipeline
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
@@ -30,17 +30,11 @@ class NER:
 
         ZH = 100
         EN = 200
-        JP = 300
+        JA = 300
         KO = 400
 
-    # 实体类型
-    TYPES = {
-        "PER": "角色实体",       # 表示人名，如"张三"、"约翰·多伊"等。
-        "ORG": "组织实体",       # 表示组织，如"联合国"、"苹果公司"等。
-        "LOC": "地点实体",       # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
-        "PRD": "物品实体",       # 表示产品，如"iPhone"、"Windows操作系统"等。
-        "EVT": "事件实体",       # 表示事件，如"奥运会"、"地震"等。
-    }
+    # 片段长度
+    MAX_LENGTH = 512
 
     def __init__(self) -> None:
         super().__init__()
@@ -54,9 +48,7 @@ class NER:
         self.tokenizer = self.load_tokenizer(self.model_path)
         self.classifier = self.load_classifier(self.model, self.gpu_boost)
 
-        self.sudachi = dictionary.Dictionary(
-            dict_type = "full" if LogHelper.is_debug() else "core"
-        ).create(tokenizer.Tokenizer.SplitMode.C)
+        self.sudachi = dictionary.Dictionary().create(tokenizer.Tokenizer.SplitMode.C)
         self.noun_set_cache = {}
 
     # 释放资源
@@ -98,8 +90,7 @@ class NER:
             return AutoModelForTokenClassification.from_pretrained(
                 model_path,
                 local_files_only = True,
-                attn_implementation = "sdpa",
-                torch_dtype = torch.bfloat16 if torch.cuda.get_device_capability("cuda") >= (8, 0) else torch.float16,
+                torch_dtype = torch.bfloat16 if is_torch_bf16_gpu_available() else torch.float16,
             ).to(device = "cuda")
         else:
             session_options = onnxruntime.SessionOptions()
@@ -118,8 +109,8 @@ class NER:
             model_path,
             padding = "max_length",
             truncation = True,
-            max_length = 512,
-            model_max_length = 512,
+            max_length = NER.MAX_LENGTH,
+            model_max_length = NER.MAX_LENGTH,
             local_files_only = True,
         )
 
@@ -163,7 +154,7 @@ class NER:
         return chunks
 
     # 生成词语
-    def generate_words(self, text: str, line: str, score: float, type: str, language: int, input_lines: list[str]) -> list[Word]:
+    def generate_words(self, text: str, line: str, score: float, group: str, language: int, input_lines: list[str]) -> list[Word]:
         words = []
 
         # 生成名词表
@@ -175,7 +166,7 @@ class NER:
         # 否则使用不包含空格的拆分规则
         if language == NER.Language.EN and "'" in text:
             surfaces = [text]
-        elif language in (NER.Language.ZH, NER.Language.JP):
+        elif language in (NER.Language.ZH, NER.Language.JA):
             surfaces = [v.strip() for v in TextHelper.split_by_punctuation(text, True) if v.strip() != ""]
         else:
             surfaces = [v.strip() for v in TextHelper.split_by_punctuation(text, False) if v.strip() != ""]
@@ -200,7 +191,7 @@ class NER:
             word.count = 1
             word.score = score
             word.surface = surface
-            word.type = type
+            word.group = group
             word.input_lines = input_lines
             word.context.append(line)
             words.append(word)
@@ -216,7 +207,7 @@ class NER:
             noun_set = set()
 
             # 语言为日语时
-            if language == NER.Language.JP:
+            if language == NER.Language.JA:
                 # 获取名词集合
                 for token in self.sudachi.tokenize(line):
                     # 获取表面形态
@@ -242,7 +233,7 @@ class NER:
 
     # 根据名词集合修正词语
     def fix_by_noun_set(self, text: str, line: str, noun_set: set[str], language: int) -> str:
-        if language == NER.Language.JP:
+        if language == NER.Language.JA:
             for noun in noun_set:
                 if text == noun:
                     continue
@@ -304,7 +295,7 @@ class NER:
         if language == NER.Language.EN:
             return TextHelper.strip_not_latin(text).removeprefix("a ").removeprefix("an ").removeprefix("the ").strip()
 
-        if language == NER.Language.JP:
+        if language == NER.Language.JA:
             return TextHelper.strip_not_japanese(text).strip("の")
 
         if language == NER.Language.KO:
@@ -328,7 +319,7 @@ class NER:
             if not TextHelper.has_any_latin(text):
                 result = False
 
-        if language == NER.Language.JP:
+        if language == NER.Language.JA:
             if not TextHelper.has_any_japanese(text):
                 result = False
 
@@ -371,7 +362,7 @@ class NER:
 
         LogHelper.print("")
         with LogHelper.status("正在对文本进行预处理 ..."):
-            chunks = self.generate_chunks(input_lines, 512)
+            chunks = self.generate_chunks(input_lines, NER.MAX_LENGTH)
 
         with ProgressHelper.get_progress() as progress:
             pid = progress.add_task("查找实体词语", total = None)
@@ -414,7 +405,7 @@ class NER:
 
         # 打印通过模式匹配抓取的角色实体
         LogHelper.print("")
-        LogHelper.info(f"[查找实体词语] 已完成 ...")
+        LogHelper.info("[查找实体词语] 已完成 ...")
         LogHelper.info(f"[查找实体词语] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}") if len(seen) > 0 else None
 
         # 释放显存

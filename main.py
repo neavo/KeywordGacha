@@ -24,18 +24,17 @@ SCORE_THRESHOLD = 0.75
 def merge_words(words: list[Word]) -> list[Word]:
     words_unique = {}
     for word in words:
-        # key = (word.surface, word.type) # 只有文字和类型都一样才视为相同条目，避免跨类词条目合并
         words_unique.setdefault(word.surface, []).append(word)
 
     words_merged = []
     for v in words_unique.values():
         word = v[0]
-        word.score = min(0.9999, sum(w.score for w in v) / len(v))
+        word.score = min(0.9999, max(w.score for w in v))
         words_merged.append(word)
 
     return sorted(words_merged, key = lambda x: x.count, reverse = True)
 
-# 搜索上下文，并按出现次数排序
+# 搜索参考文本，并按出现次数排序
 def search_for_context(words: list[Word], input_lines: list[str]) -> list[Word]:
     # 复制一份，避免后续的修改影响原始数据
     input_lines_ex = copy.copy(input_lines)
@@ -45,14 +44,14 @@ def search_for_context(words: list[Word], input_lines: list[str]) -> list[Word]:
 
     LogHelper.print(f"")
     with ProgressHelper.get_progress() as progress:
-        pid = progress.add_task("搜索上下文", total = len(words))
+        pid = progress.add_task("搜索参考文本", total = len(words))
 
-        # 搜索上下文
+        # 搜索参考文本
         for word in words:
             # 找出匹配的行
             index = {i for i, line in enumerate(input_lines_ex) if word.surface in line}
 
-            # 获取匹配的上下文，去重，并按长度降序排序
+            # 获取匹配的参考文本，去重，并按长度降序排序
             word.context = {line for i, line in enumerate(input_lines) if i in index}
             word.context = sorted(list(word.context), key = lambda v: len(v), reverse = True)
             word.count = len(word.context)
@@ -79,12 +78,12 @@ def filter_words_by_count(words: list[Word], threshold: float) -> list[Word]:
     return [word for word in words if word.count >= max(1, threshold)]
 
 # 获取指定类型的词
-def get_words_by_type(words: list[Word], type: str) -> list[Word]:
-    return [word for word in words if word.type == type]
+def get_words_by_type(words: list[Word], group: str) -> list[Word]:
+    return [word for word in words if word.group == group]
 
 # 移除指定类型的词
-def remove_words_by_type(words: list[Word], type: str) -> list[Word]:
-    return [word for word in words if word.type != type]
+def remove_words_by_type(words: list[Word], group: str) -> list[Word]:
+    return [word for word in words if word.group != group]
 
 # 开始处理文本
 async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: SimpleNamespace, language: int) -> None:
@@ -109,8 +108,8 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     words = filter_words_by_score(words, SCORE_THRESHOLD)
     LogHelper.info("[置信度阈值] 已完成 ...")
 
-    # 搜索上下文
-    LogHelper.info("即将开始执行 [搜索上下文] ...")
+    # 搜索参考文本
+    LogHelper.info("即将开始执行 [搜索参考文本] ...")
     words = search_for_context(words, input_lines)
 
     # 出现次数阈值过滤
@@ -122,7 +121,7 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     llm.set_language(language)
     llm.set_request_limiter()
 
-    # 等待词义分析任务结果
+    # 等待 词义分析 任务结果
     LogHelper.info("即将开始执行 [词义分析] ...")
     words = await llm.surface_analysis_batch(words)
     words = remove_words_by_type(words, "")
@@ -131,25 +130,25 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     TestHelper.save_surface_analysis_log(words, "log_surface_analysis.log")
     TestHelper.check_result_duplication(words, "log_result_duplication.log")
 
-    # 等待 上下文翻译 任务结果
-    if language in (NER.Language.EN, NER.Language.JP, NER.Language.KO):
-        for k, v in NER.TYPES.items():
-            if k == "PER" and config.context_translate_per != 1:
-                continue
+    # 等待 参考文本翻译 任务结果
+    if language != NER.Language.ZH and config.context_translate_mode != 0:
+        if config.context_translate_mode == 2:
+            groups = ("角色",)
+        elif config.context_translate_mode == 1:
+            groups = {word.group for word in words}
 
-            if k != "PER" and config.context_translate_other != 1:
-                continue
-
-            LogHelper.info(f"即将开始执行 [上下文翻译 - {v}] ...")
-            word_type = get_words_by_type(words, k)
-            word_type = await llm.context_translate_batch(word_type)
+        # 翻译参考文本
+        for group in groups:
+            LogHelper.info(f"即将开始执行 [参考文本翻译 - {group}] ...")
+            word_by_group = get_words_by_type(words, group)
+            word_by_group = await llm.context_translate_batch(word_by_group)
 
     # 调试功能
     TestHelper.save_context_translate_log(words, "log_context_translate.log")
 
     # 将结果写入文件
     LogHelper.info("")
-    file_manager.save_result_to_file(words, language)
+    file_manager.write_result_to_file(words, language)
 
     # 等待用户退出
     LogHelper.info("")
@@ -190,36 +189,24 @@ def print_app_info(config: SimpleNamespace, version: str) -> None:
         highlight = True,
         show_lines = True,
         show_header = False,
-        border_style = "light_goldenrod2"
+        border_style = "light_goldenrod2",
     )
+    table.add_column("", style = "white", ratio = 2, overflow = "fold")
+    table.add_column("", style = "white", ratio = 5, overflow = "fold")
 
-    rows = [
-        ("模型名称", str(config.model_name)),
-        ("接口密钥", str(config.api_key)),
-        ("接口地址", str(config.base_url)),
-    ]
+    rows = []
+    rows.append(("模型名称", str(config.model_name)))
+    rows.append(("接口密钥", str(config.api_key)))
+    rows.append(("接口地址", str(config.base_url)))
+    rows.append(("网络请求超时时间", f"{config.request_timeout} 秒"))
+    rows.append(("网络请求频率阈值", f"{config.request_frequency_threshold} 次/秒"))
 
-    for row in rows:
-        table.add_row(*row)
-    LogHelper.print(table)
-    LogHelper.print()
-
-    table = Table(
-        box = box.ASCII2,
-        expand = True,
-        highlight = True,
-        show_lines = True,
-        border_style = "light_goldenrod2"
-    )
-    table.add_column("设置", style = "white", ratio = 1, overflow = "fold")
-    table.add_column("当前值", style = "white", ratio = 1, overflow = "fold")
-    table.add_column("设置", style = "white", ratio = 1, overflow = "fold")
-    table.add_column("当前值", style = "white", ratio = 1, overflow = "fold")
-
-    rows = [
-        ("是否翻译角色实体上下文", "是" if config.context_translate_per == 1 else "否", "是否翻译其他实体上下文", "是" if config.context_translate_other == 1 else "否"),
-        ("网络请求超时时间", f"{config.request_timeout} 秒" , "网络请求频率阈值", f"{config.request_frequency_threshold} 次/秒"),
-    ]
+    if config.context_translate_mode == 0:
+        rows.append(("参考文本翻译模式", "不翻译"))
+    elif config.context_translate_mode == 1:
+        rows.append(("参考文本翻译模式", "翻译全部类型"))
+    elif config.context_translate_mode == 2:
+        rows.append(("参考文本翻译模式", "只翻译角色类型"))
 
     for row in rows:
         table.add_row(*row)
@@ -261,7 +248,7 @@ async def begin(llm: LLM, ner: NER, file_manager: FileManager, config: SimpleNam
         elif choice == 2:
             await process_text(llm, ner, file_manager, config, NER.Language.EN)
         elif choice == 3:
-            await process_text(llm, ner, file_manager, config, NER.Language.JP)
+            await process_text(llm, ner, file_manager, config, NER.Language.JA)
         elif choice == 4:
             await process_text(llm, ner, file_manager, config, NER.Language.KO)
         elif choice == 5:

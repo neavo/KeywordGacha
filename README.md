@@ -2,6 +2,7 @@
 <div align=center><img src="https://img.shields.io/github/v/release/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/license/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/stars/neavo/KeywordGacha"/></div>
 <p align='center'>使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等内容文本中实体词语表的翻译辅助工具</p>
 
+
 &ensp;
 &ensp;
 
@@ -32,7 +33,7 @@
   - [本地接口 - 点击查看教程](https://github.com/neavo/KeywordGachaServer)，免费，速度较慢，质量稍差，理论上支持所有 8G 以上显存的显卡
 - 双击 `01_启动.bat` 启动应用，处理流程结束后，结果会保存在 `output` 文件夹内
 - 其中：
-  - `*_日志.txt` - 抓取到的词语的原文、上下文、翻译建议、角色信息总结等详细信息，用于人工确认
+  - `*_日志.txt` - 抓取到的词语的原文、参考文本、翻译建议、角色信息总结等详细信息，用于人工确认
   - `*_列表.json` - 通用词表，可以导入 [AiNiee - 替换词典](https://github.com/NEKOparapa/AiNiee)、[绿站 - 术语表](https://books.fishhawk.top/workspace/katakana) 等处使用
   - `*_ainiee.json` - [AiNiee - 提示字典](https://github.com/NEKOparapa/AiNiee) 功能专用词语表
   - `*_galtransl.json` - [GalTransl - GPT 字典](https://github.com/xd2333/GalTransl) 功能专用词语表
@@ -53,7 +54,7 @@
 
 - 20241226 v0.8.2
   - 一些细节优化
-  
+
 - 20241218 v0.8.1
   - 重新设计了工作流程，得益于此：
     - 英文与韩文分析能力强化
@@ -78,7 +79,7 @@
         "模型名称，从接口平台方获取，使用在线接口时一定要设置正确。"
     ],
     "count_threshold": [
-        1,
+        2,
         "出现次数阈值，出现次数低于此值的词语会被过滤掉以节约时间。"
     ],
     "request_timeout": [
@@ -91,13 +92,9 @@
         "使用 llama.cpp 运行的本地模型时，将根据 llama.cpp 的配置调整自动设置，无需手动调整这个值。",
         "使用 DeepSeek 等不限制并发数的在线接口时可以调大这个值。"
     ],
-    "context_translate_per": [
-        1,
-        "是否翻译人名实体上下文，1 - 翻译，0 - 不翻译，比较慢，根据需求自己决定是否开启。"
-    ],
-    "context_translate_other": [
-        0,
-        "是否翻译其他实体上下文，1 - 翻译，0 - 不翻译，比较慢，根据需求自己决定是否开启。"
+    "context_translate_mode": [
+        2,
+        "是否翻译参考文本，0 - 不翻译，1 - 全部翻译，2 - 只翻译角色实体"
     ]
 }
 ```

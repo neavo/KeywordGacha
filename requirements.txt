@@ -1,5 +1,11 @@
+transformers
+torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+onnx==1.16.1
+onnxruntime
+optimum
+
 rich
-jaconv
 loguru
 openai
 openpyxl
@@ -8,7 +14,3 @@ pykakasi
 sudachipy
 sudachidict-core
 aiolimiter
-
-onnx==1.16.1
-optimum
-onnxruntime

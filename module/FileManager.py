@@ -2,14 +2,13 @@ import os
 import re
 import csv
 import json
-import unicodedata
 
-import jaconv
 import openpyxl
 
 from model.NER import NER
 from model.Word import Word
 from module.LogHelper import LogHelper
+from module.Normalizer import Normalizer
 from module.TextHelper import TextHelper
 
 class FileManager():
@@ -366,7 +365,7 @@ class FileManager():
             try:
                 with open(path, "r", encoding = encoding) as reader:
                     return reader.readlines()
-            except UnicodeDecodeError as e:
+            except UnicodeDecodeError:
                 pass
             except Exception as e:
                 LogHelper.error(f"读取数据文件时发生错误 - {LogHelper.get_trackback(e)}")
@@ -505,25 +504,23 @@ class FileManager():
                 if len(line) == 0:
                     continue
 
-                if language == NER.Language.EN:
-                    line = unicodedata.normalize("NFKC", line)
-
-                if language == NER.Language.JP:
-                    line = jaconv.normalize(line, mode = "NFKC")
-
                 if language == NER.Language.ZH and not TextHelper.has_any_cjk(line):
                     continue
 
                 if language == NER.Language.EN and not TextHelper.has_any_latin(line):
                     continue
 
-                if language == NER.Language.JP and not TextHelper.has_any_japanese(line):
+                if language == NER.Language.JA and not TextHelper.has_any_japanese(line):
                     continue
 
                 if language == NER.Language.KO and not TextHelper.has_any_korean(line):
                     continue
 
-                input_lines_filtered.append(line.strip())
+                # 文本规范化
+                line = Normalizer.normalize(line, merge_space = True)
+
+                # 添加结果
+                input_lines_filtered.append(line)
         LogHelper.info(f"已读取到文本 {len(input_lines)} 行，其中有效文本 {len(input_lines_filtered)} 行 ...")
 
         return input_lines_filtered
@@ -545,7 +542,7 @@ class FileManager():
                     writer.write(f"出现次数 : {word.count}" + "\n")
 
                 if getattr(word, "surface_translation", "") != "":
-                    writer.write(f"词语翻译 : {word.surface_translation}, {word.surface_translation_description}" + "\n")
+                    writer.write(f"词语翻译 : {word.surface_translation}" + "\n")
 
                 if getattr(word, "gender", "") != "":
                     writer.write(f"角色性别 : {word.gender}" + "\n")
@@ -554,11 +551,11 @@ class FileManager():
                     writer.write(f"语义分析 : {word.context_summary}" + "\n")
 
                 if len(getattr(word, "context", [])) > 0:
-                    writer.write("上下文原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※" + "\n")
+                    writer.write("参考文本原文 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※" + "\n")
                     writer.write(f"{word.get_context_str_for_translate(language)}" + "\n")
 
                 if len(getattr(word, "context_translation", [])) > 0:
-                    writer.write("上下文翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※" + "\n")
+                    writer.write("参考文本翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※" + "\n")
                     writer.write(f"{"\n".join(word.context_translation)}" + "\n")
 
                 # 多写入一个换行符，确保每段信息之间有间隔
@@ -597,14 +594,14 @@ class FileManager():
                 data["srt"] = word.surface
                 data["dst"] = word.surface_translation
 
-                if word.type == "PER" and "男" in word.gender:
+                if word.group == "PER" and "男" in word.gender:
                     data["info"] = "男性名字"
-                elif word.type == "PER" and "女" in word.gender:
+                elif word.group == "PER" and "女" in word.gender:
                     data["info"] = "女性名字"
-                elif word.type == "PER":
+                elif word.group == "PER":
                     data["info"] = "名字"
                 else:
-                    data["info"] = f"{type_map.get(word.type)}"
+                    data["info"] = f"{type_map.get(word.group)}"
 
                 datas.append(data)
 
@@ -628,20 +625,20 @@ class FileManager():
 
                 line = f"{word.surface}\t{word.surface_translation}"
 
-                if word.type == "PER" and "男" in word.gender:
+                if word.group == "PER" and "男" in word.gender:
                     line = line + "\t男性的名字"
-                elif word.type == "PER" and "女" in word.gender:
+                elif word.group == "PER" and "女" in word.gender:
                     line = line + "\t女性的名字"
-                elif word.type == "PER":
+                elif word.group == "PER":
                     line = line + "\t名字"
                 else:
-                    line = line + f"\t{type_map.get(word.type)}的名字"
+                    line = line + f"\t{type_map.get(word.group)}的名字"
 
                 file.write(f"{line}" + "\n")
             LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
     # 将结果写入文件
-    def save_result_to_file(self, words: list[Word], language: int) -> None:
+    def write_result_to_file(self, words: list[Word], language: int) -> None:
         # 获取输出路径
         os.makedirs("output", exist_ok = True)
         file_name, _ = os.path.splitext(os.path.basename(self.input_path))
@@ -653,20 +650,20 @@ class FileManager():
             if entry.is_file() and f"{file_name}_" in entry.path
         ]
 
-        for k, v in NER.TYPES.items():
-            words_by_type = [word for word in words if word.type == k]
+        for group in {word.group for word in words}:
+            words_by_type = [word for word in words if word.group == group]
 
             # 检查数据有效性
             if len(words_by_type) == 0:
-                return
+                continue
 
             # 将角色名字还原为角色代码
             # for word in words_by_type:
-            #     for key in ("context", "context_summary", "context_translation", "surface", "surface_translation", "surface_translation_description"):
+            #     for key in ("context", "context_summary", "context_translation", "surface", "surface_translation"):
             #         setattr(word, key, self.restore_name_to_code(getattr(word, key), FileManager.NAMES, FileManager.NICKNAMES))
 
             # 写入文件
-            self.write_words_log_to_file(words_by_type, f"output/{file_name}_{v}_日志.txt", language)
-            self.write_words_list_to_file(words_by_type, f"output/{file_name}_{v}_列表.json", language)
-            self.write_ainiee_dict_to_file(words_by_type, f"output/{file_name}_{v}_ainiee.json", language)
-            self.write_galtransl_dict_to_file(words_by_type, f"output/{file_name}_{v}_galtransl.txt", language)
+            self.write_words_log_to_file(words_by_type, f"output/{file_name}_{group}_日志.txt", language)
+            self.write_words_list_to_file(words_by_type, f"output/{file_name}_{group}_列表.json", language)
+            self.write_ainiee_dict_to_file(words_by_type, f"output/{file_name}_{group}_ainiee.json", language)
+            self.write_galtransl_dict_to_file(words_by_type, f"output/{file_name}_{group}_galtransl.txt", language)
