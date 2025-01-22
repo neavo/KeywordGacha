@@ -603,13 +603,13 @@ class FileManager():
                 line = f"{word.surface}\t{word.surface_translation}"
 
                 if word.group == "角色" and "男" in word.gender:
-                    line = line + "\t男性的名字"
+                    line = line + "\t男性名字"
                 elif word.group == "角色" and "女" in word.gender:
-                    line = line + "\t女性的名字"
+                    line = line + "\t女性名字"
                 elif word.group == "角色":
                     line = line + "\t名字"
                 else:
-                    line = line + f"\t{word.group}的名字"
+                    line = line + f"\t{word.group}"
 
                 file.write(f"{line}" + "\n")
             LogHelper.info(f"结果已写入 - [green]{path}[/]")
