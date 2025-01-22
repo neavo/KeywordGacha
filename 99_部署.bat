@@ -21,7 +21,7 @@
     @REM 安装依赖
     .\env\python.exe -m pip install --upgrade pip
     .\env\python.exe -m pip install --upgrade setuptools
-    .\env\python.exe -m pip install -r requirements.txt
+    .\env\python.exe -m pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu124
     .\env\python.exe -m pip cache purge
 
     @REM 部署模型
