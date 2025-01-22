@@ -575,33 +575,21 @@ class FileManager():
 
     # 将 AiNiee 词典写入文件
     def write_ainiee_dict_to_file(self, words: list[Word], path: str, language: int) -> None:
-        type_map = {
-            "PER": "角色",      # 表示人名，如"张三"、"约翰·多伊"等。
-            "ORG": "组织",      # 表示组织，如"联合国"、"苹果公司"等。
-            "LOC": "地点",      # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
-            "PRD": "物品",      # 表示产品，如"iPhone"、"Windows操作系统"等。
-            "EVT": "事件",      # 表示事件，如"奥运会"、"地震"等。
-        }
-
         with open(path, "w", encoding = "utf-8") as file:
             datas = []
             for word in words:
-                if word.surface_translation == "":
-                    continue
-
                 data = {}
                 data["src"] = word.surface
-                data["srt"] = word.surface
                 data["dst"] = word.surface_translation
 
-                if word.group == "PER" and "男" in word.gender:
+                if word.group == "角色" and "男" in word.gender:
                     data["info"] = "男性名字"
-                elif word.group == "PER" and "女" in word.gender:
+                elif word.group == "角色" and "女" in word.gender:
                     data["info"] = "女性名字"
-                elif word.group == "PER":
+                elif word.group == "角色":
                     data["info"] = "名字"
                 else:
-                    data["info"] = f"{type_map.get(word.group)}"
+                    data["info"] = f"{word.group}"
 
                 datas.append(data)
 
@@ -610,29 +598,18 @@ class FileManager():
 
     # 将 GalTransl 词典写入文件
     def write_galtransl_dict_to_file(self, words: list[Word], path: str, language: int) -> None:
-        type_map = {
-            "PER": "角色",      # 表示人名，如"张三"、"约翰·多伊"等。
-            "ORG": "组织",      # 表示组织，如"联合国"、"苹果公司"等。
-            "LOC": "地点",      # 表示地点，通常指非地理政治实体的地点，如"房间"、"街道"等。
-            "PRD": "物品",      # 表示产品，如"iPhone"、"Windows操作系统"等。
-            "EVT": "事件",      # 表示事件，如"奥运会"、"地震"等。
-        }
-
         with open(path, "w", encoding = "utf-8") as file:
             for word in words:
-                if word.surface_translation == "":
-                    continue
-
                 line = f"{word.surface}\t{word.surface_translation}"
 
-                if word.group == "PER" and "男" in word.gender:
+                if word.group == "角色" and "男" in word.gender:
                     line = line + "\t男性的名字"
-                elif word.group == "PER" and "女" in word.gender:
+                elif word.group == "角色" and "女" in word.gender:
                     line = line + "\t女性的名字"
-                elif word.group == "PER":
+                elif word.group == "角色":
                     line = line + "\t名字"
                 else:
-                    line = line + f"\t{type_map.get(word.group)}的名字"
+                    line = line + f"\t{word.group}的名字"
 
                 file.write(f"{line}" + "\n")
             LogHelper.info(f"结果已写入 - [green]{path}[/]")
