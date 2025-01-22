@@ -2,7 +2,6 @@ import os
 import re
 import gc
 import json
-import unicodedata
 from typing import Generator
 
 import torch
@@ -177,7 +176,7 @@ class NER:
             surface = self.strip_by_language(surface, language)
 
             # 跳过显示长度小于等于2的词语
-            if self.get_display_lenght(surface) <= 2:
+            if TextHelper.get_display_lenght(surface) <= 2:
                 continue
 
             # 按语言验证词语
@@ -329,13 +328,6 @@ class NER:
 
         return result
 
-    # 计算字符串的实际显示长度
-    def get_display_lenght(self, text: str) -> int:
-        # unicodedata.east_asian_width(c) 返回字符 c 的东亚洲宽度属性。
-        # NaH 表示窄（Narrow）、中立（Neutral）和半宽（Halfwidth）字符，这些字符通常被认为是半角字符。
-        # 其他字符（如全宽字符）的宽度属性为 W 或 F，这些字符被认为是全角字符。
-        return sum(1 if unicodedata.east_asian_width(c) in "NaH" else 2 for c in text)
-
     # 查找 Token 所在的行
     def get_line_by_offset(self, text: str, lines: list[str], offsets: list[tuple[int]], start: int, end: int) -> str:
         result = ""
@@ -398,7 +390,7 @@ class NER:
         seen = set()
         for line in input_lines:
             for name in re.findall(r"【(.*?)】", line):
-                if self.get_display_lenght(name) <= 16:
+                if TextHelper.get_display_lenght(name) <= 16:
                     for word in self.generate_words(name, line, 65535, "PER", language, input_lines):
                         seen.add(word.surface) if word.surface not in seen else None
                         words.append(word)

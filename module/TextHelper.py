@@ -1,5 +1,6 @@
 import re
 import json
+import unicodedata
 
 class TextHelper:
 
@@ -254,7 +255,7 @@ class TextHelper:
     def split_by_punctuation(text: str, with_space: bool) -> list[str]:
         if with_space == False:
             return re.split(""
-                + rf"["
+                + r"["
                 + rf"{TextHelper.GENERAL_PUNCTUATION[0]}-{TextHelper.GENERAL_PUNCTUATION[1]}"
                 + rf"{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0]}-{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]}"
                 + rf"{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]}"
@@ -265,12 +266,12 @@ class TextHelper:
                 + rf"{TextHelper.LATIN_PUNCTUATION_GENERAL[0]}-{TextHelper.LATIN_PUNCTUATION_GENERAL[1]}"
                 + rf"{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]}"
                 + rf"{"".join(TextHelper.SPECIAL_PUNCTUATION)}"
-                + rf"]+",
+                + r"]+",
                 text,
             )
         else:
             return re.split(""
-                + rf"["
+                + r"["
                 + rf"{TextHelper.GENERAL_PUNCTUATION[0]}-{TextHelper.GENERAL_PUNCTUATION[1]}"
                 + rf"{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[0]}-{TextHelper.CJK_SYMBOLS_AND_PUNCTUATION[1]}"
                 + rf"{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[0]}-{TextHelper.HALFWIDTH_AND_FULLWIDTH_FORMS[1]}"
@@ -281,10 +282,17 @@ class TextHelper:
                 + rf"{TextHelper.LATIN_PUNCTUATION_GENERAL[0]}-{TextHelper.LATIN_PUNCTUATION_GENERAL[1]}"
                 + rf"{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[0]}-{TextHelper.LATIN_PUNCTUATION_SUPPLEMENTAL[1]}"
                 + rf"{"".join(TextHelper.SPECIAL_PUNCTUATION)}"
-                + rf"\u0020\u3000" # \u0020 = 半角空格 \u3000 = 全角空格
-                + rf"]+",
+                + r"\u0020\u3000" # \u0020 = 半角空格 \u3000 = 全角空格
+                + r"]+",
                 text,
             )
+
+    # 计算字符串的实际显示长度
+    def get_display_lenght(text: str) -> int:
+        # unicodedata.east_asian_width(c) 返回字符 c 的东亚洲宽度属性。
+        # NaH 表示窄（Narrow）、中立（Neutral）和半宽（Halfwidth）字符，这些字符通常被认为是半角字符。
+        # 其他字符（如全宽字符）的宽度属性为 W 或 F，这些字符被认为是全角字符。
+        return sum(1 if unicodedata.east_asian_width(c) in "NaH" else 2 for c in text)
 
     # 安全加载 JSON 字典
     def safe_load_json_dict(json_str: str) -> dict:
@@ -299,7 +307,7 @@ class TextHelper:
         # 先尝试使用 json.loads 解析
         try:
             result = json.loads(json_str)
-        except Exception as e:
+        except Exception:
             pass
 
         # 否则使用正则表达式匹配
