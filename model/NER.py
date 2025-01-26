@@ -3,9 +3,11 @@ import re
 import gc
 import json
 from typing import Generator
+import warnings
 
 import torch
 import onnxruntime
+from pecab import PeCab
 from optimum.onnxruntime import ORTModelForTokenClassification
 from sudachipy import tokenizer
 from sudachipy import dictionary
@@ -43,12 +45,10 @@ class NER:
         self.bacth_size = 32 if self.gpu_boost else 1
         self.model_path = "resource/kg_ner_gpu" if self.gpu_boost else "resource/kg_ner_cpu"
 
+        # 加载模型
         self.model = self.load_model(self.model_path, self.gpu_boost)
         self.tokenizer = self.load_tokenizer(self.model_path)
         self.classifier = self.load_classifier(self.model, self.gpu_boost)
-
-        self.sudachi = dictionary.Dictionary().create(tokenizer.Tokenizer.SplitMode.C)
-        self.noun_set_cache = {}
 
     # 释放资源
     def release(self) -> None:
@@ -157,7 +157,7 @@ class NER:
         words = []
 
         # 生成名词表
-        noun_set = self.generate_noun_set(line, language)
+        nouns = self.generate_nouns(line, language)
 
         # 生成词语列表
         # 当文本为英文且包含 ' 时不拆分，避免误拆复合短语
@@ -183,8 +183,8 @@ class NER:
             if self.verify_by_language(surface, language) == False:
                 continue
 
-            # 根据名词集合对词语进行修正
-            surface = self.fix_by_noun_set(surface, line, noun_set, language)
+            # 根据名词表对词语进行修正
+            surface = self.fix_by_noun_set(surface, line, nouns, language)
 
             word = Word()
             word.count = 1
@@ -196,93 +196,55 @@ class NER:
             words.append(word)
         return words
 
-    # 生成名词集合
-    def generate_noun_set(self, line: str, language: int) -> set[str]:
-        # 优先从缓存中获取
-        if line in self.noun_set_cache:
-            return self.noun_set_cache[line]
-        else:
-            # 否则重新生成
-            noun_set = set()
+    # 生成名词表
+    def generate_nouns(self, line: str, language: int) -> set[str]:
+        nouns = {}
 
-            # 语言为日语时
-            if language == NER.Language.JA:
-                # 获取名词集合
-                for token in self.sudachi.tokenize(line):
-                    # 获取表面形态
-                    surface = token.surface()
-
-                    # 跳过包含至少一个标点符号的条目
-                    if TextHelper.has_any_punctuation(surface):
-                        continue
-
-                    # 跳过目标类型以外的条目
-                    if not any(v in ",".join(token.part_of_speech()) for v in ("地名", "人名", "名詞")):
-                        continue
-
-                    noun_set.add(surface)
-
-            # 语言为英语
-            if language == NER.Language.EN:
-                noun_set.update(re.findall(r"\b(.+?)\b", line))
-
-            # 加入缓存并返回
-            self.noun_set_cache[line] = noun_set
-            return noun_set
-
-    # 根据名词集合修正词语
-    def fix_by_noun_set(self, text: str, line: str, noun_set: set[str], language: int) -> str:
-        if language == NER.Language.JA:
-            for noun in noun_set:
-                if text == noun:
-                    continue
-
-                if text not in noun:
-                    continue
-
-                text = noun
-
+        # 语言为英语
         if language == NER.Language.EN:
-            if text.count(" ") == 0:
-                for noun in [v for v in noun_set if v.count(" ") == 0]:
-                    if text == noun:
-                        continue
+            nouns = {surface: line.count(surface) for surface in re.findall(r"\b(.+?)\b", line)}
+        # 语言为日语时
+        elif language == NER.Language.JA:
+            # 获取名词表
+            for token in self.sudachi.tokenize(line):
+                # 获取表面形态
+                surface = token.surface()
 
-                    if not (noun.startswith(text) or noun.endswith(text)):
-                        continue
+                # 跳过包含至少一个标点符号的条目
+                if TextHelper.has_any_punctuation(surface):
+                    continue
 
+                # 跳过目标类型以外的条目
+                if not any(v in ",".join(token.part_of_speech()) for v in ("地名", "人名", "名詞")):
+                    continue
+
+                nouns[surface] = line.count(surface)
+        elif language == NER.Language.KO:
+            nouns = {surface: line.count(surface) for surface in self.pecab.nouns(line)}
+
+        return nouns
+
+    # 根据名词表修正词语
+    def fix_by_noun_set(self, text: str, line: str, nouns: dict, language: int) -> str:
+        if language not in (NER.Language.EN, NER.Language.JA, NER.Language.KO):
+            return text
+
+        if " " not in text:
+            for noun, count in nouns.items():
+                if text in noun and text != noun and line.count(text) == count:
                     text = noun
-            else:
-                chunks = re.split(r" +", text)
-
-                # 先修第一个词
-                for noun in noun_set:
-                    if chunks[1] == noun:
-                        continue
-
-                    if not noun.endswith(chunks[1]):
-                        continue
-
-                    if " ".join([noun] + chunks[1:]) not in line:
-                        continue
-
-                    chunks[-1] = noun
-
-                # 在修最后一个词
-                for noun in noun_set:
-                    if chunks[-1] == noun:
-                        continue
-
-                    if not noun.startswith(chunks[-1]):
-                        continue
-
-                    if " ".join(chunks[:-1] + [noun]) not in line:
-                        continue
-
-                    chunks[-1] = noun
-
-                # 将列表拼回去
-                text = " ".join(chunks)
+                    break
+        else:
+            splited = text.split(" ")
+            for i, t in enumerate((splited[0], splited[-1])):
+                for noun, count in nouns.items():
+                    if t in noun and t != noun and line.count(t) == count:
+                        if i == 0:
+                            splited[0] = noun
+                        elif i == 1:
+                            splited[-1] = noun
+                        break
+            text = " ".join(splited)
 
         return text
 
@@ -346,6 +308,12 @@ class NER:
     # 查找实体词语
     def search_for_entity(self, input_lines: list[str], language: int) -> list[Word]:
         words = []
+
+        if language == NER.Language.JA:
+            self.sudachi = dictionary.Dictionary().create(tokenizer.Tokenizer.SplitMode.C)
+        elif language == NER.Language.KO:
+            self.pecab = PeCab()
+            warnings.filterwarnings("ignore", message = "overflow encountered in scalar add")
 
         if self.gpu_boost:
             LogHelper.info("检测到有效的 [green]GPU[/] 环境，已启用 [green]GPU[/] 加速 ...")
