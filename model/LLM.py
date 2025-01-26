@@ -28,8 +28,8 @@ class LLM:
     class LLMConfig():
 
         TEMPERATURE = 0.05
-        TOP_P = 0.85
-        MAX_TOKENS = 768
+        TOP_P = 0.95
+        MAX_TOKENS = 1024
         FREQUENCY_PENALTY = 0
 
     # 最大重试次数
@@ -39,21 +39,21 @@ class LLM:
     API_TEST_CONFIG = LLMConfig()
     API_TEST_CONFIG.TEMPERATURE = 0.05
     API_TEST_CONFIG.TOP_P = 0.95
-    API_TEST_CONFIG.MAX_TOKENS = 768
+    API_TEST_CONFIG.MAX_TOKENS = 1024
     API_TEST_CONFIG.FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 词义分析
     SURFACE_ANALYSIS_CONFIG = LLMConfig()
     SURFACE_ANALYSIS_CONFIG.TEMPERATURE = 0.05
     SURFACE_ANALYSIS_CONFIG.TOP_P = 0.95
-    SURFACE_ANALYSIS_CONFIG.MAX_TOKENS = 768
+    SURFACE_ANALYSIS_CONFIG.MAX_TOKENS = 1024
     SURFACE_ANALYSIS_CONFIG.FREQUENCY_PENALTY = 0
 
     # 请求参数配置 - 翻译参考文本
     TRANSLATE_CONTEXT_CONFIG = LLMConfig()
     TRANSLATE_CONTEXT_CONFIG.TEMPERATURE = 0.95
     TRANSLATE_CONTEXT_CONFIG.TOP_P = 0.95
-    TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS = 768
+    TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS = 1024
     TRANSLATE_CONTEXT_CONFIG.FREQUENCY_PENALTY = 0
 
     # 类型映射表
@@ -122,12 +122,17 @@ class LLM:
             except Exception:
                 LogHelper.debug("无法获取 [green]llama.cpp[/] 响应数据 ...")
 
-            # 如果响应数据有效，则设置请求频率阈值为 slots 数量
+            # 如果响应数据有效，则是 llama.cpp 接口
             if isinstance(response_json, list) and len(response_json) > 0:
                 self.request_frequency_threshold = len(response_json)
                 LogHelper.info("")
                 LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(response_json)}[/] 次/秒 ...")
                 LogHelper.info("")
+            # 否则，按在线接口设置
+            else:
+                LLM.API_TEST_CONFIG.MAX_TOKENS = 8 * 1024
+                LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS = 8 * 1024
+                LLM.TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS = 8 * 1024
 
             # 设置请求限制器
             if self.request_frequency_threshold > 1:
@@ -178,13 +183,10 @@ class LLM:
                 usage, message, llm_request, llm_response, error = await self.do_request(
                     [
                         {
-                            "role": "system",
-                            "content": self.prompt_surface_analysis_with_translation.replace("{PROMPT_GROUPS}", "、".join(("角色", "其他"))),
-                        },
-                        {
                             "role": "user",
                             "content": (
-                                "目标词语：ダリヤ"
+                                self.prompt_surface_analysis_with_translation.replace("{PROMPT_GROUPS}", "、".join(("角色", "其他")))
+                                + "\n" + "目标词语：ダリヤ"
                                 + "\n" + "参考文本：\n魔導具師ダリヤはうつむかない"
                             ),
                         },
@@ -233,13 +235,10 @@ class LLM:
                 usage, message, llm_request, llm_response, error = await self.do_request(
                     [
                         {
-                            "role": "system",
-                            "content": prompt.replace("{PROMPT_GROUPS}", "、".join(self.prompt_groups)),
-                        },
-                        {
                             "role": "user",
                             "content": (
-                                f"目标词语：{word.surface}"
+                                prompt.replace("{PROMPT_GROUPS}", "、".join(self.prompt_groups))
+                                + "\n" + f"目标词语：{word.surface}"
                                 + "\n" + f"参考文本：\n{word.get_context_str_for_surface_analysis(self.language)}"
                             ),
                         },
@@ -345,12 +344,11 @@ class LLM:
                 usage, message, llm_request, llm_response, error = await self.do_request(
                     [
                         {
-                            "role": "system",
-                            "content": self.prompt_context_translate,
-                        },
-                        {
                             "role": "user",
-                            "content": f"轻小说文本：\n{word.get_context_str_for_translate(self.language)}",
+                            "content": (
+                                self.prompt_context_translate
+                                + "\n" + f"轻小说文本：\n{word.get_context_str_for_translate(self.language)}"
+                            ),
                         },
                     ],
                     LLM.TRANSLATE_CONTEXT_CONFIG,
