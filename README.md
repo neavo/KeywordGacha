@@ -21,6 +21,7 @@
 
 ## 特别说明 ⚠️
 - 如您在翻译过程中使用了 [KeywordGacha](https://github.com/neavo/KeywordGacha)，请在作品信息或发布页面的显要位置进行说明！
+- 如您的项目涉及任何商业行为或者商业收益，在使用 [KeywordGacha](https://github.com/neavo/KeywordGacha) 前，请先与作者联系以获得授权！
 
 ## 配置要求 🖥️
 - 兼容 OpenAI 标准的 AI 大模型接口
