@@ -48,6 +48,12 @@
 - 具体可见 [支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
 
 ## 近期更新 📅
+- 20250131 v0.11.0
+  - 优化 韩文 分析能力
+  - 优化 CPU 模式的兼容性
+  - 优化 兼容 DeepSeek-R1 等思考模型
+  - 感谢不愿透露姓名的 @PiDanShouRouZhouXD 同学提供本次模型更新的训练算力支持
+
 - 20250122 v0.10.0
   - 新增生物分类
   - 词义分析任务速度优化
