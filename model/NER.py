@@ -38,7 +38,7 @@ class NER:
     MAX_LENGTH = 512
 
     # 模型路径
-    MODEL_PATH = "resource/kg_ner_gpu"
+    MODEL_PATH = "resource/kg_ner_bf16"
 
     def __init__(self) -> None:
         super().__init__()

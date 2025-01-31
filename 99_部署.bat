@@ -21,18 +21,13 @@
     @REM 安装依赖
     .\env\python.exe -m pip install --upgrade pip
     .\env\python.exe -m pip install --upgrade setuptools
-    .\env\python.exe -m pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu124
+    .\env\python.exe -m pip install https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20250131/triton-3.1.0.post9-cp312-cp312-win_amd64.whl
+    .\env\python.exe -m pip install -r requirements.txt
     .\env\python.exe -m pip cache purge
 
     @REM 部署模型
-    .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20250122/kg_ner_cpu.zip -o kg_ner_cpu.zip
-    powershell -Command "Remove-Item -Path 'resource\kg_ner_cpu' -Recurse -Force -ErrorAction SilentlyContinue"
-    powershell -Command "Expand-Archive -Path 'kg_ner_cpu.zip' -DestinationPath 'resource\kg_ner_cpu'"
-    powershell -Command "Remove-Item -Path 'kg_ner_cpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
-
-    .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20250122/kg_ner_gpu.zip -o kg_ner_gpu.zip
-    powershell -Command "Remove-Item -Path 'resource\kg_ner_gpu' -Recurse -Force -ErrorAction SilentlyContinue"
-    powershell -Command "Expand-Archive -Path 'kg_ner_gpu.zip' -DestinationPath 'resource\kg_ner_gpu'"
-    powershell -Command "Remove-Item -Path 'kg_ner_gpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
+    .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20250131/kg_ner_bf16.zip -o kg_ner_bf16.zip
+    powershell -Command "Expand-Archive -Path 'kg_ner_bf16.zip' -DestinationPath 'resource\kg_ner_bf16'"
+    powershell -Command "Remove-Item -Path 'kg_ner_bf16.zip' -Recurse -Force -ErrorAction SilentlyContinue"
 
 pause

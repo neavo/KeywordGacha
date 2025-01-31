@@ -18,7 +18,7 @@ from module.TestHelper import TestHelper
 from module.FileManager import FileManager
 
 # 定义常量
-SCORE_THRESHOLD = 0.70
+SCORE_THRESHOLD = 0.65
 
 # 合并词语
 def merge_words(words: list[Word]) -> list[Word]:
