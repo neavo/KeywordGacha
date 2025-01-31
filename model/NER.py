@@ -1,17 +1,17 @@
+import logging
 import os
 import re
 import gc
 import json
-from typing import Generator
 import warnings
+from typing import Generator
 
 import torch
-import onnxruntime
 from pecab import PeCab
-from optimum.onnxruntime import ORTModelForTokenClassification
 from sudachipy import tokenizer
 from sudachipy import dictionary
 from transformers import pipeline
+from transformers import AutoConfig
 from transformers import AutoTokenizer
 from transformers import PreTrainedModel
 from transformers import AutoModelForTokenClassification
@@ -37,17 +37,22 @@ class NER:
     # 片段长度
     MAX_LENGTH = 512
 
+    # 模型路径
+    MODEL_PATH = "resource/kg_ner_gpu"
+
     def __init__(self) -> None:
         super().__init__()
+
+        # 设置日志过滤器
+        logging.getLogger("transformers.pipelines.base").filter = lambda record: "Device set to use" not in record.msg
 
         # 初始化
         self.gpu_boost = torch.cuda.is_available()
         self.bacth_size = 32 if self.gpu_boost else 1
-        self.model_path = "resource/kg_ner_gpu" if self.gpu_boost else "resource/kg_ner_cpu"
 
         # 加载模型
-        self.model = self.load_model(self.model_path, self.gpu_boost)
-        self.tokenizer = self.load_tokenizer(self.model_path)
+        self.model = self.load_model(NER.MODEL_PATH, self.gpu_boost)
+        self.tokenizer = self.load_tokenizer(NER.MODEL_PATH)
         self.classifier = self.load_classifier(self.model, self.gpu_boost)
 
     # 释放资源
@@ -85,22 +90,29 @@ class NER:
 
     # 加载模型
     def load_model(self, model_path: str, gpu_boost: bool) -> PreTrainedModel:
-        if gpu_boost == True:
-            return AutoModelForTokenClassification.from_pretrained(
-                model_path,
-                local_files_only = True,
-                torch_dtype = torch.bfloat16 if is_torch_bf16_gpu_available() else torch.float16,
-            ).to(device = "cuda")
+        # 根据配置选择使用数据类型
+        if gpu_boost == False:
+            torch_dtype = torch.float32
+        elif is_torch_bf16_gpu_available() == True:
+            torch_dtype = torch.bfloat16
         else:
-            session_options = onnxruntime.SessionOptions()
-            session_options.log_severity_level = 4
-            return ORTModelForTokenClassification.from_pretrained(
-                model_path,
-                provider = "CPUExecutionProvider",
-                session_options = session_options,
-                use_io_binding = True,
-                local_files_only = True,
-            )
+            torch_dtype = torch.float16
+
+        # 创建配置，并关闭 reference_compile
+        config = AutoConfig.from_pretrained(
+            model_path,
+            local_files_only = True,
+            trust_remote_code = True,
+        )
+        config.reference_compile = False
+
+        return AutoModelForTokenClassification.from_pretrained(
+            model_path,
+            config = config,
+            attn_implementation = "sdpa",
+            torch_dtype = torch_dtype,
+            local_files_only = True,
+        )
 
     # 加载分词器
     def load_tokenizer(self, model_path: str) -> PreTrainedTokenizerFast:
@@ -369,5 +381,6 @@ class NER:
         LogHelper.info(f"[查找实体词语] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}") if len(seen) > 0 else None
 
         # 释放显存
-        self.release()
+        self.release() if self.gpu_boost else None
+
         return words
