@@ -7,8 +7,6 @@ __pycache__
 /output*
 
 /*log*
-/debug*
-/gpuboost*
-/words_all*
-/config_dev*
-/resource/*ner_*
+/*dev*
+/*debug*
+/resource/*ner*

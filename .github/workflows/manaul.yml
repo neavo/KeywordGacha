@@ -36,19 +36,16 @@ jobs:
         run: |
           .\env\python.exe -m pip install --upgrade pip
           .\env\python.exe -m pip install --upgrade setuptools
-          .\env\python.exe -m pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu124
+          .\env\python.exe -m pip install https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20250131/triton-3.1.0.post9-cp312-cp312-win_amd64.whl
+          .\env\python.exe -m pip install -r requirements.txt
           .\env\python.exe -m pip cache purge
 
       - name: Install Model
         shell: cmd
         run: |
-          .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20250122/kg_ner_cpu.zip -o kg_ner_cpu.zip
-          powershell -Command "Expand-Archive -Path 'kg_ner_cpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_cpu'"
-          powershell -Command "Remove-Item -Path 'kg_ner_cpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
-
-          .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20250122/kg_ner_gpu.zip -o kg_ner_gpu.zip
-          powershell -Command "Expand-Archive -Path 'kg_ner_gpu.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_gpu'"
-          powershell -Command "Remove-Item -Path 'kg_ner_gpu.zip' -Recurse -Force -ErrorAction SilentlyContinue"
+          .\resource\aria2c.exe https://github.com/neavo/KeywordGachaModel/releases/download/kg_ner_20250131/kg_ner_bf16.zip -o kg_ner_bf16.zip
+          powershell -Command "Expand-Archive -Path 'kg_ner_bf16.zip' -DestinationPath 'dist\KeywordGacha\resource\kg_ner_bf16'"
+          powershell -Command "Remove-Item -Path 'kg_ner_bf16.zip' -Recurse -Force -ErrorAction SilentlyContinue"
 
       - name: Copy Files
         shell: cmd
@@ -68,7 +65,7 @@ jobs:
       - name: Compress Archive NV
         shell: cmd
         run: |
-          .\resource\7zr.exe a -y -bt -mx3 -mqs -t7z -v2000M KeywordGacha_NV_${{ steps.check_version.outputs.version }}.7z .\dist\*
+          .\resource\7zr.exe a -y -bt -mx3 -mqs -t7z -v2000M KeywordGacha_${{ steps.check_version.outputs.version }}.7z .\dist\*
 
       - name: Create Release
         id: create_release
@@ -87,8 +84,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_NV_${{ steps.check_version.outputs.version }}.7z.001
-          asset_name: KeywordGacha_NV_${{ steps.check_version.outputs.version }}.7z.001
+          asset_path: ./KeywordGacha_${{ steps.check_version.outputs.version }}.7z.001
+          asset_name: KeywordGacha_${{ steps.check_version.outputs.version }}.7z.001
           asset_content_type: application/zip
 
       - name: Upload Release NV 002
@@ -97,6 +94,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./KeywordGacha_NV_${{ steps.check_version.outputs.version }}.7z.002
-          asset_name: KeywordGacha_NV_${{ steps.check_version.outputs.version }}.7z.002
+          asset_path: ./KeywordGacha_${{ steps.check_version.outputs.version }}.7z.002
+          asset_name: KeywordGacha_${{ steps.check_version.outputs.version }}.7z.002
           asset_content_type: application/zip
