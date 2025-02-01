@@ -130,9 +130,9 @@ class LLM:
                 LogHelper.info("")
             # 否则，按在线接口设置
             else:
-                LLM.API_TEST_CONFIG.MAX_TOKENS = 8 * 1024
-                LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS = 8 * 1024
-                LLM.TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS = 8 * 1024
+                LLM.API_TEST_CONFIG.MAX_TOKENS = 4 * 1024
+                LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS = 4 * 1024
+                LLM.TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS = 4 * 1024
 
             # 设置请求限制器
             if self.request_frequency_threshold > 1:
@@ -206,7 +206,7 @@ class LLM:
                 # 反序列化 JSON
                 result = TextHelper.safe_load_json_dict(message.content.strip())
                 if len(result) == 0:
-                    raise Exception("反序列化失败 ...")
+                    raise Exception("未解析到有效数据 ...")
 
                 # 输出结果
                 success = True
@@ -258,7 +258,7 @@ class LLM:
                 # 反序列化 JSON
                 result = TextHelper.safe_load_json_dict(message.content.strip())
                 if len(result) == 0:
-                    raise Exception("反序列化失败 ...")
+                    raise Exception("未解析到有效数据 ...")
 
                 # 清理一下格式
                 for k, v in result.items():
