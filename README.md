@@ -31,7 +31,7 @@
 - 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 或 [百度网盘](https://pan.baidu.com/s/1_JXmKvnar6PGHlIbl0Mi2Q?pwd=9e54) 下载应用
 - 打开配置文件 `config.json`，填入 API 信息，推荐在以下两种方式中选择其一：
   - [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)，需付费但便宜，速度快，质量高，无显卡要求 `👈👈 推荐`
-  - [本地接口 - 点击查看教程](https://github.com/neavo/KeywordGachaServer)，免费，速度较慢，质量稍差，理论上支持所有 8G 以上显存的显卡
+  - [本地接口 - 点击查看教程](https://github.com/neavo/OneClickLLAMA)，免费，速度较慢，质量稍差，理论上支持所有 8G 以上显存的显卡
 - 双击 `01_启动.bat` 启动应用，处理流程结束后，结果会保存在 `output` 文件夹内
 - 其中：
   - `*_日志.txt` - 抓取到的词语的原文、参考文本、翻译建议、角色信息总结等详细信息，用于人工确认
@@ -48,11 +48,11 @@
 - 具体可见 [支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
 
 ## 近期更新 📅
-- 20250131 v0.11.1
+- 20250201 v0.11.2
   - 优化 韩文 分析能力
   - 优化 CPU 模式的兼容性
   - 优化 支持 DeepSeek-R1 等思考模型
-  - 修正 部分设备上无法应用的问题
+  - 修正 一些兼容性问题
   - 感谢不愿透露姓名的 @PiDanShouRouZhouXD 同学提供本次模型更新的训练算力支持
 
 - 20250122 v0.10.0
