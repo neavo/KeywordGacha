@@ -218,49 +218,53 @@ class FileManager():
         99: "邵四八",
     }
 
-    # 可能存在的空字符
-    SPACE_PATTERN = r""
-
     # 用于英文的代码段规则
     CODE_PATTERN_EN = (
-        SPACE_PATTERN + r"if\(.{0,5}[vs]\[\d+\].{0,10}\)" + SPACE_PATTERN,            # if(!s[982]) if(s[1623]) if(v[982] >= 1)
-        SPACE_PATTERN + r"en\(.{0,5}[vs]\[\d+\].{0,10}\)" + SPACE_PATTERN,            # en(!s[982]) en(v[982] >= 1)
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}<[\d]{0,10}>" + SPACE_PATTERN,               # /C<1> \FS<12>
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}\[[\d]{0,10}\]" + SPACE_PATTERN,             # /C[1] \FS[12]
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=<[^\d]{0,10}>)" + SPACE_PATTERN,          # /C<非数字> \FS<非数字> 中的前半部分
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=\[[^\d]{0,10}\])" + SPACE_PATTERN,        # /C[非数字] \FS[非数字] 中的前半部分
+        r"if\(.{0,5}[vs]\[\d+\].{0,10}\)",                  # if(!s[982]) if(s[1623]) if(v[982] >= 1)
+        r"en\(.{0,5}[vs]\[\d+\].{0,10}\)",                  # en(!s[982]) en(v[982] >= 1)
+        r"[/\\][a-z]{1,5}<[\d]{0,10}>",                     # /C<1> \FS<12>
+        r"[/\\][a-z]{1,5}\[[\d]{0,10}\]",                   # /C[1] \FS[12]
+        r"[/\\][a-z]{1,5}(?=<[^\d]{0,10}>)",                # /C<非数字> \FS<非数字> 中的前半部分
+        r"[/\\][a-z]{1,5}(?=\[[^\d]{0,10}\])",              # /C[非数字] \FS[非数字] 中的前半部分
     )
 
     # 用于非英文的代码段规则
     CODE_PATTERN_NON_EN = (
-        SPACE_PATTERN + r"if\(.{0,5}[vs]\[\d+\].{0,10}\)" + SPACE_PATTERN,            # if(!s[982]) if(v[982] >= 1) if(v[982] >= 1)
-        SPACE_PATTERN + r"en\(.{0,5}[vs]\[\d+\].{0,10}\)" + SPACE_PATTERN,            # en(!s[982]) en(v[982] >= 1)
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}<[a-z\d]{0,10}>" + SPACE_PATTERN,            # /C<y> /C<1> \FS<xy> \FS<12>
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}\[[a-z\d]{0,10}\]" + SPACE_PATTERN,          # /C[x] /C[1] \FS[xy] \FS[12]
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=<[^a-z\d]{0,10}>)" + SPACE_PATTERN,       # /C<非数字非字母> \FS<非数字非字母> 中的前半部分
-        SPACE_PATTERN + r"[/\\][a-z]{1,5}(?=\[[^a-z\d]{0,10}\])" + SPACE_PATTERN,     # /C[非数字非字母] \FS[非数字非字母] 中的前半部分
+        r"if\(.{0,5}[vs]\[\d+\].{0,10}\)",                  # if(!s[982]) if(v[982] >= 1) if(v[982] >= 1)
+        r"en\(.{0,5}[vs]\[\d+\].{0,10}\)",                  # en(!s[982]) en(v[982] >= 1)
+        r"[/\\][a-z]{1,5}<[a-z\d]{0,10}>",                  # /C<y> /C<1> \FS<xy> \FS<12>
+        r"[/\\][a-z]{1,5}\[[a-z\d]{0,10}\]",                # /C[x] /C[1] \FS[xy] \FS[12]
+        r"[/\\][a-z]{1,5}(?=<[^a-z\d]{0,10}>)",             # /C<非数字非字母> \FS<非数字非字母> 中的前半部分
+        r"[/\\][a-z]{1,5}(?=\[[^a-z\d]{0,10}\])",           # /C[非数字非字母] \FS[非数字非字母] 中的前半部分
     )
 
     # 同时作用于英文于非英文的代码段规则
     CODE_PATTERN_COMMON = (
-        SPACE_PATTERN + r"\\fr" + SPACE_PATTERN,                                      # 重置文本的改变
-        SPACE_PATTERN + r"\\fb" + SPACE_PATTERN,                                      # 加粗
-        SPACE_PATTERN + r"\\fi" + SPACE_PATTERN,                                      # 倾斜
-        SPACE_PATTERN + r"\\\{" + SPACE_PATTERN,                                      # 放大字体 \{
-        SPACE_PATTERN + r"\\\}" + SPACE_PATTERN,                                      # 缩小字体 \}
-        SPACE_PATTERN + r"\\g" + SPACE_PATTERN,                                       # 显示货币 \G
-        SPACE_PATTERN + r"\\\$" + SPACE_PATTERN,                                      # 打开金币框 \$
-        SPACE_PATTERN + r"\\\." + SPACE_PATTERN,                                      # 等待0.25秒 \.
-        SPACE_PATTERN + r"\\\|" + SPACE_PATTERN,                                      # 等待1秒 \|
-        SPACE_PATTERN + r"\\!" + SPACE_PATTERN,                                       # 等待按钮按下 \!
-        SPACE_PATTERN + r"\\>" + SPACE_PATTERN,                                       # 在同一行显示文字 \>
-        # SPACE_PATTERN + r"\\<" + SPACE_PATTERN,                                     # 取消显示所有文字 \<
-        SPACE_PATTERN + r"\\\^" + SPACE_PATTERN,                                      # 显示文本后不需要等待 \^
-        # SPACE_PATTERN + r"\\n" + SPACE_PATTERN,                                     # 换行符 \\n
-        SPACE_PATTERN + r"\r\n" + SPACE_PATTERN,                                      # 换行符 \r\n
-        SPACE_PATTERN + r"\n" + SPACE_PATTERN,                                        # 换行符 \n
-        SPACE_PATTERN + r"\\\\<br>" + SPACE_PATTERN,                                  # 换行符 \\<br>
-        SPACE_PATTERN + r"<br>" + SPACE_PATTERN,                                      # 换行符 <br>
+        r"\\fr",                                            # 重置文本的改变
+        r"\\fb",                                            # 加粗
+        r"\\fi",                                            # 倾斜
+        r"\\\{",                                            # 放大字体 \{
+        r"\\\}",                                            # 缩小字体 \}
+        r"\\g",                                             # 显示货币 \G
+        r"\\\$",                                            # 打开金币框 \$
+        r"\\\.",                                            # 等待0.25秒 \.
+        r"\\\|",                                            # 等待1秒 \|
+        r"\\!",                                             # 等待按钮按下 \!
+        r"\\>",                                             # 在同一行显示文字 \>
+        r"\\<",                                             # 取消显示所有文字 \<
+        r"\\\^",                                            # 显示文本后不需要等待 \^
+        r"\\n",                                             # 换行符 \\n
+        r"\\\\<br>",                                        # 换行符 \\<br>
+        r"<br>",                                            # 换行符 <br>
+    )
+
+    # 空白符
+    CODE_PATTERN_SPACE = (
+        r"\u3000",                                          # 全角空格
+        r"\u0020",                                          # 半角空格
+        r"\r",                                              # 换行符
+        r"\n",                                              # 换行符
+        r"\t",                                              # 制表符
     )
 
     def __init__(self) -> None:
@@ -343,9 +347,19 @@ class FileManager():
         line = re.sub(r"\\p\[(\d+)\]", r"teammate_\1", line, flags = re.IGNORECASE)
 
         if language == NER.Language.EN:
-            line = re.sub(rf"(?:{"|".join(FileManager.CODE_PATTERN_EN + FileManager.CODE_PATTERN_COMMON)})+", "", line, flags = re.IGNORECASE)
+            line = re.sub(
+                rf"(?:{"|".join(FileManager.CODE_PATTERN_EN + FileManager.CODE_PATTERN_COMMON + FileManager.CODE_PATTERN_SPACE)})+",
+                "",
+                line,
+                flags = re.IGNORECASE,
+            )
         else:
-            line = re.sub(rf"(?:{"|".join(FileManager.CODE_PATTERN_NON_EN + FileManager.CODE_PATTERN_COMMON)})+", "", line, flags = re.IGNORECASE)
+            line = re.sub(
+                rf"(?:{"|".join(FileManager.CODE_PATTERN_NON_EN + FileManager.CODE_PATTERN_COMMON + FileManager.CODE_PATTERN_SPACE)})+",
+                "",
+                line,
+                flags = re.IGNORECASE,
+            )
 
         # 由于上面的代码移除，可能会产生空人名框的情况，干掉
         line = line.replace("【】", "")
@@ -574,7 +588,7 @@ class FileManager():
             LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
     # 将 AiNiee 词典写入文件
-    def write_ainiee_dict_to_file(self, words: list[Word], path: str, language: int) -> None:
+    def write_glossary_dict_to_file(self, words: list[Word], path: str, language: int) -> None:
         with open(path, "w", encoding = "utf-8") as file:
             datas = []
             for word in words:
@@ -641,6 +655,6 @@ class FileManager():
 
             # 写入文件
             self.write_words_log_to_file(words_by_type, f"output/{file_name}_{group}_日志.txt", language)
-            self.write_words_list_to_file(words_by_type, f"output/{file_name}_{group}_列表.json", language)
-            self.write_ainiee_dict_to_file(words_by_type, f"output/{file_name}_{group}_ainiee.json", language)
+            self.write_words_list_to_file(words_by_type, f"output/{file_name}_{group}_词典.json", language)
+            self.write_glossary_dict_to_file(words_by_type, f"output/{file_name}_{group}_术语表.json", language)
             self.write_galtransl_dict_to_file(words_by_type, f"output/{file_name}_{group}_galtransl.txt", language)

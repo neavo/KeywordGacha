@@ -180,7 +180,7 @@ def print_app_info(config: SimpleNamespace, version: str) -> None:
     LogHelper.print()
     LogHelper.rule(f"KeywordGacha {version}", style = "light_goldenrod2")
     LogHelper.rule("[blue]https://github.com/neavo/KeywordGacha", style = "light_goldenrod2")
-    LogHelper.rule("使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等内容文本中实体词语表的翻译辅助工具", style = "light_goldenrod2")
+    LogHelper.rule("使用 AI 能力分析 小说、游戏、字幕 等文本内容并生成术语表的次世代翻译辅助工具", style = "light_goldenrod2")
     LogHelper.print()
 
     table = Table(

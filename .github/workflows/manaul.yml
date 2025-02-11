@@ -1,12 +1,22 @@
 name: Manual Build
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
-    environment: KeywordGacha
+    permissions:
+      actions: write
+      checks: write
+      contents: write
+      deployments: write
+      issues: write
+      packages: write
+      pages: write
+      pull-requests: write
+      repository-projects: write
+      security-events: write
+      statuses: write
 
     steps:
       - name: Checkout Repository
@@ -22,7 +32,7 @@ jobs:
       - name: Create Env
         shell: cmd
         run: |
-          .\resource\aria2c.exe https://www.python.org/ftp/python/3.12.8/python-3.12.8-embed-amd64.zip -o python.zip
+          .\resource\aria2c.exe https://www.python.org/ftp/python/3.12.9/python-3.12.9-embed-amd64.zip -o python.zip
           powershell -Command "Expand-Archive -Path 'python.zip' -DestinationPath 'env'"
           powershell -Command "Remove-Item -Path 'python.zip' -Recurse -Force -ErrorAction SilentlyContinue"
 
@@ -70,7 +80,7 @@ jobs:
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: MANAUL_BUILD_${{ steps.check_version.outputs.version }}
           release_name: KeywordGacha_${{ steps.check_version.outputs.version }}
@@ -80,7 +90,7 @@ jobs:
       - name: Upload Release NV 001
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./KeywordGacha_${{ steps.check_version.outputs.version }}.7z.001
@@ -90,7 +100,7 @@ jobs:
       - name: Upload Release NV 002
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.KEYWORDGACHA_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./KeywordGacha_${{ steps.check_version.outputs.version }}.7z.002
