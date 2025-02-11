@@ -1,6 +1,6 @@
 <h1><p align='center' >KeywordGacha</p></h1>
 <div align=center><img src="https://img.shields.io/github/v/release/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/license/neavo/KeywordGacha"/>   <img src="https://img.shields.io/github/stars/neavo/KeywordGacha"/></div>
-<p align='center'>使用 OpenAI 兼容接口自动生成小说、漫画、字幕、游戏脚本等内容文本中实体词语表的翻译辅助工具</p>
+<p align='center'>使用 AI 能力分析 小说、游戏、字幕 等文本内容并生成术语表的次世代翻译辅助工具</p>
 
 
 &ensp;
@@ -12,7 +12,7 @@
 - `实体词语表` 可以在一定程度上解决在长篇文本翻译过程中 `人名` 等实体词语翻译版本不统一的问题
 - 根据 `中、英、日、韩` 文本内容自动生成 `实体词语表`，并且 `自动翻译`、`自动总结`、`自动分析`
 - 相较传统工具，具有高命中、语义化、智能总结角色信息等特色，对文本的兼容性更好
-- 极大的提升 `小说`、`漫画`、`字幕`、`游戏脚本` 等内容译前准备时制作词语表的工作效率
+- 极大的提升 `小说`、`漫画`、`字幕`、`游戏文本` 等内容译前准备时制作词语表的工作效率
 - 随机选取 [绿站榜单作品](https://books.fishhawk.top) 作为测试样本，与人工校对制作的词表对比，命中率约为 `80%-90%`
 
 > <img src="image/01.jpg" style="width: 80%;" alt="image/01.jpg">
@@ -24,7 +24,8 @@
 - 如您的项目涉及任何商业行为或者商业收益，在使用 [KeywordGacha](https://github.com/neavo/KeywordGacha) 前，请先与作者联系以获得授权！
 
 ## 配置要求 🖥️
-- 兼容 OpenAI 标准的 AI 大模型接口
+- 兼容 `OpenAI` 标准的 AI 大模型接口
+- 兼容 [LinguaGacha](https://github.com/neavo/LinguaGacha) `使用 AI 能力一键翻译小说、游戏、字幕的次世代文本翻译器` 👈👈
 - 注意，`SakuraLLM` 系列模型只具有翻译功能，无法进行文本分析，不能与 `KG` 配合使用
 
 ## 使用流程 🛸
@@ -35,9 +36,9 @@
 - 双击 `01_启动.bat` 启动应用，处理流程结束后，结果会保存在 `output` 文件夹内
 - 其中：
   - `*_日志.txt` - 抓取到的词语的原文、参考文本、翻译建议、角色信息总结等详细信息，用于人工确认
-  - `*_列表.json` - 通用词表，可以导入 [AiNiee - 替换词典](https://github.com/NEKOparapa/AiNiee)、[绿站 - 术语表](https://books.fishhawk.top/workspace/katakana) 等处使用
-  - `*_ainiee.json` - [AiNiee - 提示字典](https://github.com/NEKOparapa/AiNiee) 功能专用词语表
-  - `*_galtransl.json` - [GalTransl - GPT 字典](https://github.com/xd2333/GalTransl) 功能专用词语表
+  - `*_列表.json` - 通用词表，可以导入 [LinguaGacha 译前替换](https://github.com/neavo/LinguaGacha) 等处使用
+  - `*_术语表.json` - [LinguaGacha 术语表](https://github.com/neavo/LinguaGacha) 功能专用词语表
+  - `*_galtransl.json` - [GalTransl GPT 字典](https://github.com/xd2333/GalTransl) 功能专用词语表
 - 遵循 [常见问题](https://github.com/neavo/KeywordGacha#%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98-) 里的建议以获得最佳的使用效果
 
 ## 文本格式 🏷️
@@ -48,6 +49,9 @@
 - 具体可见 [支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
 
 ## 近期更新 📅
+- 20250211 v0.11.3
+  - 细节优化与修正 
+
 - 20250201 v0.11.2
   - 优化 韩文 分析能力
   - 优化 CPU 模式的兼容性
