@@ -9,8 +9,10 @@ pecab
 loguru
 openai
 openpyxl
+ebooklib
 tiktoken
 pykakasi
 sudachipy
 sudachidict-core
 aiolimiter
+beautifulsoup4
