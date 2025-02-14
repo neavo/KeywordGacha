@@ -1,8 +1,8 @@
-import logging
 import os
 import re
 import gc
 import json
+import logging
 import warnings
 from typing import Generator
 
@@ -39,6 +39,54 @@ class NER:
 
     # 模型路径
     MODEL_PATH = "resource/kg_ner_bf16"
+
+    # 伪名列表
+    FAKE_NAME = [
+        "蓝霁云",               # 雨后初晴的意象
+        "檀秋萦",               # 檀香与秋思萦绕
+        "墨临川",               # 文墨与临水意境
+        "泠鸢晚",               # 清越之声与黄昏纸鸢
+        "云螭遥",               # 云雾中的龙形
+        "邝溟幽",               # 深邃幽暗的海域
+        "颛鹤唳",               # 鹤鸣九皋的悠远
+        "玄璆夜",               # 黑玉般的夜色
+        "砚秋辞",               # 文房与秋意的结合
+        "聆音澈",               # 聆听清澈之音
+        "雪渟寒",               # 积雪静潭的寒意
+        "萤照晚",               # 萤火照亮黄昏
+        "青霭浮",               # 青色云雾漂浮
+        "绛霄临",               # 红色天空降临
+        "墨漪澜",               # 墨色水波荡漾
+        "霜序遥",               # 霜降时节的遥远
+        "霁川流",               # 雨后天晴的河流
+        "檀烟渺",               # 檀香烟雾渺茫
+        "玄螭隐",               # 黑龙隐匿
+        "青冥远",               # 青色天空的遥远
+        "墨笙寒",               # 墨色笙箫的寒意
+        "霜序晚",               # 霜降时节的黄昏
+        "霁云舒",               # 雨后天晴的云舒展
+        "檀香凝",               # 檀香凝结
+        "玄夜阑",               # 深夜将尽
+        "九十九朔夜",           # 古老姓氏"九十九"配破晓之夜
+        "十六夜隼人",           # 月相姓氏搭配武士称谓
+        "不知火琥珀",           # 神秘海市蜃楼与宝石名结合
+        "鸦羽透",               # 乌鸦羽毛意象的透明感
+        "百目鬼伶",             # 妖怪姓氏"百目鬼"配艺能称谓
+        "星屑海",               # 天文与海洋的浪漫结合
+        "蛇喰梦子",             # 神话生物与梦境意象
+        "铁仙斎",               # 金属质感的三字姓氏
+        "雨月莲矢",             # 雨季月色与莲花箭矢的意境
+        "龙胆朔",               # 植物名与朔日的组合
+        "冬月葵",               # 冬季月色与葵花的结合
+        "麒麟冢雪",             # 神话动物与雪景的结合
+        "胧月夜",               # 朦胧月色的夜晚
+        "霞草雫",               # 霞光与草间露珠的意象
+        "薄墨葵",               # 淡墨色与葵花的结合
+        "绯桜咲",               # 绯色樱花盛开的意象
+        "苍海凪",               # 苍茫大海与风平浪静的组合
+        "翠岚悠",               # 翠绿山岚与悠远意境的结合
+        "琥珀川",               # 宝石与河流的意象组合
+    ]
 
     def __init__(self) -> None:
         super().__init__()
@@ -317,8 +365,47 @@ class NER:
 
         return result
 
+   # 代码转换为姓名
+    def code_to_name(self, line: str, names: dict[int, str], nicknames: dict[int, str], fake_name_mapping: dict[str, str]) -> tuple[str, set]:
+        surfaces = set()
+
+        def repl(match: re.Match, names: dict[int, str]) -> str:
+            i = int(match.group(1))
+
+            # 索引在范围内则替换，不在范围内则原文返回
+            if i in names and names.get(i) != "":
+                surfaces.add(names.get(i))
+                return names.get(i)
+            elif match.group(0).lower() in fake_name_mapping:
+                surfaces.add(fake_name_mapping[match.group(0).lower()])
+                return fake_name_mapping[match.group(0).lower()]
+            elif len(NER.FAKE_NAME) > 0:
+                fake_name_mapping[match.group(0).lower()] = NER.FAKE_NAME.pop(0)
+                surfaces.add(fake_name_mapping[match.group(0).lower()])
+                return fake_name_mapping[match.group(0).lower()]
+            else:
+                return match.group(0)
+
+        # 根据 actors 中的数据还原 角色代码 \N[123] 实际指向的名字
+        line = re.sub(
+            r"\\n\[(\d+)\]",
+            lambda match: repl(match, names),
+            line,
+            flags = re.IGNORECASE
+        )
+
+        # 根据 actors 中的数据还原 角色代码 \NN[123] 实际指向的名字
+        line = re.sub(
+            r"\\nn\[(\d+)\]",
+            lambda match: repl(match, nicknames),
+            line,
+            flags = re.IGNORECASE
+        )
+
+        return line, surfaces
+
     # 查找实体词语
-    def search_for_entity(self, input_lines: list[str], language: int) -> list[Word]:
+    def search_for_entity(self, input_lines: list[str], names: dict, nicknames: dict, language: int) -> tuple[list, dict]:
         words = []
 
         if language == NER.Language.JA:
@@ -334,6 +421,25 @@ class NER:
 
         LogHelper.print("")
         with LogHelper.status("正在对文本进行预处理 ..."):
+            seen = set()
+            fake_name_mapping = {}
+            for i, line in enumerate(input_lines):
+                # 代码转换为姓名
+                line, surfaces = self.code_to_name(line, names, nicknames, fake_name_mapping)
+                input_lines[i] = line
+
+                # 匹配姓名框
+                for surface in re.findall(r"【(.*?)】", line):
+                    if TextHelper.get_display_lenght(surface) <= 16:
+                        surfaces.add(surface)
+
+                # 筛选并添加
+                for surface in surfaces:
+                    for word in self.generate_words(surface, line, 65535, "角色", language, input_lines):
+                        seen.add(word.surface) if word.surface not in seen else None
+                        words.append(word)
+
+            # 切割文本
             chunks = self.generate_chunks(input_lines, NER.MAX_LENGTH)
 
         with ProgressHelper.get_progress() as progress:
@@ -366,21 +472,15 @@ class NER:
                 i = i + 1
                 progress.update(pid, advance = 1, total = len(chunks))
 
-        # 匹配【】中的字符串
-        seen = set()
-        for line in input_lines:
-            for name in re.findall(r"【(.*?)】", line):
-                if TextHelper.get_display_lenght(name) <= 16:
-                    for word in self.generate_words(name, line, 65535, "PER", language, input_lines):
-                        seen.add(word.surface) if word.surface not in seen else None
-                        words.append(word)
-
         # 打印通过模式匹配抓取的角色实体
         LogHelper.print("")
-        LogHelper.info("[查找实体词语] 已完成 ...")
-        LogHelper.info(f"[查找实体词语] 通过模式 [green]【(.*?)】[/] 抓取到角色实体 - {", ".join(seen)}") if len(seen) > 0 else None
+        LogHelper.info(f"[查找实体词语] 已完成 ...")
+        if len(seen) > 0:
+            fake_name_mapping_ex = {v: k for k, v in fake_name_mapping.items()}
+            surfaces = [fake_name_mapping_ex.get(surface, surface) for surface in seen]
+            LogHelper.info(f"[查找实体词语] 通过 [green]模式匹配[/] 抓取到角色实体 - {", ".join(surfaces)}")
 
         # 释放显存
         self.release() if self.gpu_boost else None
 
-        return words
+        return words, fake_name_mapping

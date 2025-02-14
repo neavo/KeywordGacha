@@ -91,11 +91,11 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     words = []
 
     # 读取输入文件
-    input_lines = file_manager.load_lines_from_input_file(language)
+    input_lines, names, nicknames = file_manager.load_lines_from_input_file(language)
 
     # 查找实体词语
     LogHelper.info("即将开始执行 [查找实体词语] ...")
-    words = ner.search_for_entity(input_lines, language)
+    words, fake_name_mapping = ner.search_for_entity(input_lines, names, nicknames, language)
 
     # 合并相同词条
     words = merge_words(words)
@@ -123,7 +123,7 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
 
     # 等待 词义分析 任务结果
     LogHelper.info("即将开始执行 [词义分析] ...")
-    words = await llm.surface_analysis_batch(words)
+    words = await llm.surface_analysis_batch(words, fake_name_mapping)
     words = remove_words_by_type(words, "")
 
     # 调试功能
@@ -141,7 +141,7 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
         for group in groups:
             LogHelper.info(f"即将开始执行 [参考文本翻译 - {group}] ...")
             word_by_group = get_words_by_type(words, group)
-            word_by_group = await llm.context_translate_batch(word_by_group)
+            word_by_group = await llm.context_translate_batch(word_by_group, fake_name_mapping)
 
     # 调试功能
     TestHelper.save_context_translate_log(words, "log_context_translate.log")
