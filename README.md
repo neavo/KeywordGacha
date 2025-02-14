@@ -42,13 +42,29 @@
 - 遵循 [常见问题](https://github.com/neavo/KeywordGacha#%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98-) 里的建议以获得最佳的使用效果
 
 ## 文本格式 🏷️
-- 支持从 `.txt`、`.csv`、`.json`、`.xlsx` 文件中读取文本
-- 大部分主流的 `小说` 和 `游戏脚本` 数据格式都可以直接或者通过转换被 `KG` 识别
-- 输入路径是文件夹时，会读取文件夹内所有的 `.txt`、`.csv` 、`.json` 和 `.xlsx` 文件
-- 当应用目录下有 `input` 文件夹时，会自动读取 `input` 内所有的 `.txt`、`.csv` 、`.json` 和 `.xlsx` 文件
-- 具体可见 [支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)
+- 在任务开始时，`KG` 将读取指定的文件或文件夹（及其子目录）内所有支持的文件，包括但是不限于：
+  - 字幕（.srt .ass）
+  - 电子书（.txt .epub）
+  - [RenPy](https://www.renpy.org) 导出游戏文本（.rpy）
+  - [MTool](https://afdian.com/a/AdventCirno) 导出游戏文本（.json）
+  - [SExtractor](https://github.com/satan53x/SExtractor) 导出游戏文本（.txt .json .xlsx）
+  - [Translator++](https://dreamsavior.net/translator-plusplus) 导出游戏文本（.csv .xlsx）
+- 当应用目录下有 `input` 文件夹时，将自动识别 `input` 文件夹内的文件
+- 更多格式将持续添加，你也可以在 [ISSUES](https://github.com/neavo/KeywordGacha/issues) 中提出你的需求
 
 ## 近期更新 📅
+- 20250214 v0.12.0
+  - 调整 增强对姓名代码的识别能力
+  - 调整 重新设计了文件读取流程，现在：
+    - 在任务开始时，`KG` 将读取指定的文件或文件夹（及其子目录）内所有支持的文件，包括但是不限于：
+      - 字幕（.srt .ass）
+      - 电子书（.txt .epub）
+      - [RenPy](https://www.renpy.org) 导出游戏文本（.rpy）
+      - [MTool](https://afdian.com/a/AdventCirno) 导出游戏文本（.json）
+      - [SExtractor](https://github.com/satan53x/SExtractor) 导出游戏文本（.txt .json .xlsx）
+      - [Translator++](https://dreamsavior.net/translator-plusplus) 导出游戏文本（.csv .xlsx）
+    - 当应用目录下有 `input` 文件夹时，将自动识别 `input` 文件夹内的文件
+
 - 20250211 v0.11.3
   - 细节优化与修正 
 
@@ -111,7 +127,7 @@
   - 目前模型能处理的单行最大长度约为 `500` 字，过长的句子会被截断，超长单行文本请提前手动分行
 
 - 处理 `游戏文本` 的最佳实践
-  - 使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出游戏文本为 `csv` 或 `xlsx` 格式
+  - 使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出游戏文本为 `xlsx` 格式
   - 对于 `RPGMaker MV/MZ` 游戏
     - 复制 `Actors.json` 到指定位置以启用 [角色代码还原](https://github.com/neavo/KeywordGacha/wiki/%E8%A7%92%E8%89%B2%E4%BB%A3%E7%A0%81%E8%BF%98%E5%8E%9F) 功能
   - 如果抓取效果不好，可以多试几种导出工具和导出格式，有时候会有奇效
