@@ -71,6 +71,9 @@ jobs:
           copy "version.txt" ".\dist\KeywordGacha\"
           copy "libomp140.x86_64.dll" ".\dist\KeywordGacha\"
 
+          mkdir .\dist\KeywordGacha\input
+          mkdir .\dist\KeywordGacha\output
+
       - name: Compress Archive NV
         shell: cmd
         run: |

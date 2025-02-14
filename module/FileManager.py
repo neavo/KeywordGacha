@@ -71,6 +71,8 @@ class FileManager():
                 paths = [input_path]
             elif os.path.isdir(input_path):
                 paths = [os.path.join(root, file).replace("\\", "/").lower() for root, _, files in os.walk(input_path) for file in files]
+            else:
+                paths = []
 
             items.extend(self.read_from_path_txt(input_path, [path for path in paths if path.endswith(".txt")]))
             items.extend(self.read_from_path_ass(input_path, [path for path in paths if path.endswith(".ass")]))
@@ -361,11 +363,10 @@ class FileManager():
         return items
 
     # 从输入文件中加载数据
-    def load_lines_from_input_file(self, language: int) -> tuple[list, dict[int, str], dict[int, str]]:
+    def read_lines_from_input_file(self, language: int) -> tuple[list, dict[int, str], dict[int, str]]:
         # 依次读取每个数据文件
         with LogHelper.status("正在读取输入文件 ..."):
-            if os.path.isdir("input"):
-                lines = self.read_from_path("input")
+            lines = self.read_from_path("input")
 
         # 分别处理找到和没找到的情况
         if len(lines) == 0:

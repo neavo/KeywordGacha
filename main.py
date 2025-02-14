@@ -91,7 +91,7 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
     words = []
 
     # 读取输入文件
-    input_lines, names, nicknames = file_manager.load_lines_from_input_file(language)
+    input_lines, names, nicknames = file_manager.read_lines_from_input_file(language)
 
     # 查找实体词语
     LogHelper.info("即将开始执行 [查找实体词语] ...")
