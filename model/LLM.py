@@ -32,6 +32,10 @@ class LLM:
         MAX_TOKENS = 1024
         FREQUENCY_PENALTY = 0
 
+    # 前缀和后缀
+    RE_STRIP_DICT = re.compile(r"^[^\{]*|[^\}]*$", flags = re.DOTALL)
+    RE_STRIP_LIST = re.compile(r"^[^\[]*|[^\]]*$", flags = re.DOTALL)
+
     # 最大重试次数
     MAX_RETRY = 3
 
@@ -200,13 +204,13 @@ class LLM:
                     raise error
 
                 # 检查是否超过最大 token 限制
-                if usage.completion_tokens >= LLM.API_TEST_CONFIG.MAX_TOKENS:
-                    raise Exception("模型发生退化 ...")
+                if usage.completion_tokens >= LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS:
+                    raise Exception("返回结果错误（模型退化） ...")
 
                 # 反序列化 JSON
-                result = TextHelper.safe_load_json_dict(message.content.strip())
-                if len(result) == 0:
-                    raise Exception("未解析到有效数据 ...")
+                result = json.loads(LLM.RE_STRIP_DICT.sub("", message.content))
+                if not isinstance(result, dict) or result == {}:
+                    raise Exception("返回结果错误（数据结构） ...")
 
                 # 输出结果
                 success = True
@@ -253,12 +257,12 @@ class LLM:
 
                 # 检查是否超过最大 token 限制
                 if usage.completion_tokens >= LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS:
-                    raise Exception("模型发生退化 ...")
+                    raise Exception("返回结果错误（模型退化） ...")
 
                 # 反序列化 JSON
-                result = TextHelper.safe_load_json_dict(message.content.strip())
-                if len(result) == 0:
-                    raise Exception("未解析到有效数据 ...")
+                result = json.loads(LLM.RE_STRIP_DICT.sub("", message.content))
+                if not isinstance(result, dict) or result == {}:
+                    raise Exception("返回结果错误（数据结构） ...")
 
                 # 清理一下格式
                 for k, v in result.items():
@@ -280,6 +284,7 @@ class LLM:
                 fake_name_mapping_ex = {v: k for k, v in fake_name_mapping.items()}
                 if word.surface in fake_name_mapping_ex:
                     word.surface = fake_name_mapping_ex.get(word.surface)
+                    word.surface_romaji = ""
                     word.surface_translation = ""
 
                 # 如果性别有效，则直接判断为角色类型
@@ -364,8 +369,9 @@ class LLM:
                 if error != None:
                     raise error
 
-                if usage.completion_tokens >= LLM.TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS:
-                    raise Exception("模型发生退化 ...")
+                # 检查是否超过最大 token 限制
+                if usage.completion_tokens >= LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS:
+                    raise Exception("返回结果错误（模型退化） ...")
 
                 context_translation = [line.strip() for line in message.content.splitlines() if line.strip() != ""]
 

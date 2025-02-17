@@ -70,19 +70,19 @@ class FileManager():
             if os.path.isfile(input_path):
                 paths = [input_path]
             elif os.path.isdir(input_path):
-                paths = [os.path.join(root, file).replace("\\", "/").lower() for root, _, files in os.walk(input_path) for file in files]
+                paths = [os.path.join(root, file).replace("\\", "/") for root, _, files in os.walk(input_path) for file in files]
             else:
-                paths = []
+                paths: list[str] = []
 
-            items.extend(self.read_from_path_txt(input_path, [path for path in paths if path.endswith(".txt")]))
-            items.extend(self.read_from_path_ass(input_path, [path for path in paths if path.endswith(".ass")]))
-            items.extend(self.read_from_path_srt(input_path, [path for path in paths if path.endswith(".srt")]))
-            items.extend(self.read_from_path_csv(input_path, [path for path in paths if path.endswith(".csv")]))
-            items.extend(self.read_from_path_xlsx(input_path, [path for path in paths if path.endswith(".xlsx")]))
-            items.extend(self.read_from_path_epub(input_path, [path for path in paths if path.endswith(".epub")]))
-            items.extend(self.read_from_path_renpy(input_path, [path for path in paths if path.endswith(".renpy")]))
-            items.extend(self.read_from_path_kvjson(input_path, [path for path in paths if path.endswith(".json")]))
-            items.extend(self.read_from_path_messagejson(input_path, [path for path in paths if path.endswith(".json")]))
+            items.extend(self.read_from_path_txt(input_path, [path for path in paths if path.lower().endswith(".txt")]))
+            items.extend(self.read_from_path_ass(input_path, [path for path in paths if path.lower().endswith(".ass")]))
+            items.extend(self.read_from_path_srt(input_path, [path for path in paths if path.lower().endswith(".srt")]))
+            items.extend(self.read_from_path_csv(input_path, [path for path in paths if path.lower().endswith(".csv")]))
+            items.extend(self.read_from_path_xlsx(input_path, [path for path in paths if path.lower().endswith(".xlsx")]))
+            items.extend(self.read_from_path_epub(input_path, [path for path in paths if path.lower().endswith(".epub")]))
+            items.extend(self.read_from_path_renpy(input_path, [path for path in paths if path.lower().endswith(".rpy")]))
+            items.extend(self.read_from_path_kvjson(input_path, [path for path in paths if path.lower().endswith(".json")]))
+            items.extend(self.read_from_path_messagejson(input_path, [path for path in paths if path.lower().endswith(".json")]))
         except Exception as e:
             LogHelper.error(f"文件读取失败 ... {e}")
 
@@ -309,21 +309,16 @@ class FileManager():
 
         items = []
         for abs_path in set(abs_paths):
-            # 数据处理
-            with open(abs_path, "r", encoding = "utf-8") as reader:
-                json_data: dict[str, str] = TextHelper.safe_load_json_dict(reader.read().strip())
+            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
+                json_data: dict[str, str] = json.load(reader)
 
                 # 格式校验
-                if json_data == {}:
+                if not isinstance(json_data, dict):
                     continue
 
                 # 读取数据
                 for k, v in json_data.items():
-                    # 格式校验
-                    if not isinstance(k, str) or not isinstance(v, str):
-                        continue
-
-                    if k != "":
+                    if isinstance(k, str) and isinstance(v, str):
                         items.append(k)
 
         return items
@@ -344,20 +339,15 @@ class FileManager():
 
         items = []
         for abs_path in set(abs_paths):
-            # 数据处理
-            with open(abs_path, "r", encoding = "utf-8") as reader:
-                json_data: list[dict] = TextHelper.safe_load_json_list(reader.read().strip())
+            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
+                json_data: list[dict] = json.load(reader)
 
                 # 格式校验
-                if json_data == [] or not isinstance(json_data[0], dict):
+                if not isinstance(json_data, list):
                     continue
 
                 for v in json_data:
-                    # 格式校验
-                    if "message" not in v:
-                        continue
-
-                    if v.get("message") != "":
+                    if isinstance(v, dict) and "message" in v:
                         items.append(f"【{v.get("name", "")}】{v.get("message")}")
 
         return items
