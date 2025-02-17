@@ -1,8 +1,14 @@
 import threading
 
 import tiktoken
+import tiktoken_ext
+from tiktoken_ext import openai_public
 
 class Word:
+
+    # 必须显式的引用这两个库，否则打包后会报错
+    tiktoken_ext
+    openai_public
 
     TYPE_FILTER = (int, str, bool, float, list, dict, tuple)
 
@@ -53,7 +59,7 @@ class Word:
             if line in Word.cache:
                 count = Word.cache[line]
             else:
-                count = len(tiktoken.get_encoding("cl100k_base").encode(line))
+                count = len(tiktoken.get_encoding("o200k_base").encode(line))
                 Word.cache[line] = count
 
         return count
