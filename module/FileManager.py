@@ -9,6 +9,7 @@ import openpyxl
 from bs4 import BeautifulSoup
 from ebooklib import epub
 
+from model.LLM import LLM
 from model.NER import NER
 from model.Word import Word
 from module.LogHelper import LogHelper
@@ -511,7 +512,12 @@ class FileManager():
                 continue
 
             # 写入文件
-            self.write_words_log_to_file(words_by_type, f"output/{file_name}_{group}_日志.txt", language)
-            self.write_words_list_to_file(words_by_type, f"output/{file_name}_{group}_词典.json", language)
-            self.write_glossary_dict_to_file(words_by_type, f"output/{file_name}_{group}_术语表.json", language)
-            self.write_galtransl_dict_to_file(words_by_type, f"output/{file_name}_{group}_galtransl.txt", language)
+            if group in LLM.GROUP_MAPPING:
+                prefix = f"output/{file_name}_{group}"
+            else:
+                prefix = f"output/{file_name}_分类失败_{group}"
+
+            self.write_words_log_to_file(words_by_type, f"{prefix}_日志.txt", language)
+            self.write_words_list_to_file(words_by_type, f"{prefix}_词典.json", language)
+            self.write_glossary_dict_to_file(words_by_type, f"{prefix}_术语表.json", language)
+            self.write_galtransl_dict_to_file(words_by_type, f"{prefix}_galtransl.txt", language)
