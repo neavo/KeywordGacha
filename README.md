@@ -33,7 +33,7 @@
 - 打开配置文件 `config.json`，填入 API 信息，推荐在以下两种方式中选择其一：
   - [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)，需付费但便宜，速度快，质量高，无显卡要求 `👈👈 推荐`
   - [本地接口 - 点击查看教程](https://github.com/neavo/OneClickLLAMA)，免费，速度较慢，质量稍差，理论上支持所有 8G 以上显存的显卡
-- 双击 `01_启动.bat` 启动应用，处理流程结束后，结果会保存在 `output` 文件夹内
+- 双击 `app.exe` 启动应用，处理流程结束后，结果会保存在 `output` 文件夹内
 - 其中：
   - `*_日志.txt` - 抓取到的词语的原文、参考文本、翻译建议、角色信息总结等详细信息，用于人工确认
   - `*_列表.json` - 通用词表，可以导入 [LinguaGacha 译前替换](https://github.com/neavo/LinguaGacha) 等处使用
@@ -53,17 +53,12 @@
 - 更多格式将持续添加，你也可以在 [ISSUES](https://github.com/neavo/KeywordGacha/issues) 中提出你的需求
 
 ## 近期更新 📅
+- 20250218 v0.12.1
+  - 细节优化与修正 
+
 - 20250214 v0.12.0
   - 调整 增强对姓名代码的识别能力
   - 调整 重新设计了文件读取流程，现在：
-    - 在任务开始时，`KG` 将读取指定的文件或文件夹（及其子目录）内所有支持的文件，包括但是不限于：
-      - 字幕（.srt .ass）
-      - 电子书（.txt .epub）
-      - [RenPy](https://www.renpy.org) 导出游戏文本（.rpy）
-      - [MTool](https://afdian.com/a/AdventCirno) 导出游戏文本（.json）
-      - [SExtractor](https://github.com/satan53x/SExtractor) 导出游戏文本（.txt .json .xlsx）
-      - [Translator++](https://dreamsavior.net/translator-plusplus) 导出游戏文本（.csv .xlsx）
-    - 当应用目录下有 `input` 文件夹时，将自动识别 `input` 文件夹内的文件
 
 - 20250211 v0.11.3
   - 细节优化与修正 
@@ -74,16 +69,6 @@
   - 优化 支持 DeepSeek-R1 等思考模型
   - 修正 一些兼容性问题
   - 感谢不愿透露姓名的 @PiDanShouRouZhouXD 同学提供本次模型更新的训练算力支持
-
-- 20250122 v0.10.0
-  - 新增生物分类
-  - 词义分析任务速度优化
-  - 继续优化识别能力与词语边界的准确性
-
-- 20250101 v0.9.0
-  - 词义分析任务优化
-  - 重复词判断方式优化
-  - 使用了 DeepSeek v3 生成的合成数据，显著提升了词语边界的准确性
 
 ## 设置说明 🎚️
 
