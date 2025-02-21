@@ -37,7 +37,7 @@ class FileManager():
         nicknames = {}
 
         if os.path.exists(path):
-            with open(path, "r", encoding = "utf-8") as reader:
+            with open(path, "r", encoding = "utf-8-sig") as reader:
                 for item in json.load(reader):
                     if isinstance(item, dict):
                         id = item.get("id", -1)
@@ -94,7 +94,7 @@ class FileManager():
         items = []
         for abs_path in set(abs_paths):
             # 数据处理
-            with open(abs_path, "r", encoding = "utf-8") as reader:
+            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
                 for line in [line.removesuffix("\n") for line in reader.readlines()]:
                     items.append(line)
 
@@ -122,7 +122,7 @@ class FileManager():
         items = []
         for abs_path in set(abs_paths):
             # 数据处理
-            with open(abs_path, "r", encoding = "utf-8") as reader:
+            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
                 lines = [line.strip() for line in reader.readlines()]
 
                 # 格式字段的数量
@@ -162,7 +162,7 @@ class FileManager():
         items = []
         for abs_path in set(abs_paths):
             # 数据处理
-            with open(abs_path, "r", encoding = "utf-8") as reader:
+            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
                 chunks = re.split(r"\n{2,}", reader.read().strip())
                 for chunk in chunks:
                     lines = chunk.splitlines()
@@ -279,7 +279,7 @@ class FileManager():
         items = []
         for abs_path in set(abs_paths):
             # 数据处理
-            with open(abs_path, "r", encoding = "utf-8") as reader:
+            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
                 lines = [line.removesuffix("\n") for line in reader.readlines()]
 
             skip_next = False
