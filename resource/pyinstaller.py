@@ -18,10 +18,13 @@ cmd = [
 
 if os.path.exists("./requirements.txt"):
     # 生成配置
-    with open("./requirements.txt", "r", encoding = "utf-8") as reader:
+    with open("./requirements.txt", "r", encoding = "utf-8-sig") as reader:
         for line in reader:
             if not line.strip().startswith(("#", "--")):
                 cmd.append("--hidden-import=" + line.strip())
+
+            if line.strip() == "pecab":
+                cmd.append(f"--add-data={get_pip_root()}/pecab:pecab")
 
             if line.strip() == "pykakasi":
                 cmd.append(f"--add-data={get_pip_root()}/pykakasi:pykakasi")

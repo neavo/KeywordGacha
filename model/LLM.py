@@ -7,6 +7,7 @@ import urllib.request
 from types import SimpleNamespace
 
 import pykakasi
+import json_repair as repair
 from openai import AsyncOpenAI
 from aiolimiter import AsyncLimiter
 
@@ -31,10 +32,6 @@ class LLM:
         TOP_P = 0.95
         MAX_TOKENS = 1024
         FREQUENCY_PENALTY = 0
-
-    # 前缀和后缀
-    RE_STRIP_DICT = re.compile(r"^[^\{]*|[^\}]*$", flags = re.DOTALL)
-    RE_STRIP_LIST = re.compile(r"^[^\[]*|[^\]]*$", flags = re.DOTALL)
 
     # 最大重试次数
     MAX_RETRY = 3
@@ -111,7 +108,7 @@ class LLM:
         try:
             for entry in os.scandir("prompt"):
                 if entry.is_file() and "prompt" in entry.name and entry.name.endswith(".txt"):
-                    with open(entry.path, "r", encoding = "utf-8") as reader:
+                    with open(entry.path, "r", encoding = "utf-8-sig") as reader:
                         setattr(self, entry.name.replace(".txt", ""), reader.read().strip())
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
@@ -121,8 +118,8 @@ class LLM:
             # 获取 llama.cpp 响应数据
             try:
                 response_json = None
-                with urllib.request.urlopen(f"{re.sub(r"/v1$", "", self.base_url)}/slots") as response:
-                    response_json = json.loads(response.read().decode("utf-8"))
+                with urllib.request.urlopen(f"{re.sub(r"/v1$", "", self.base_url)}/slots") as reader:
+                    response_json = repair.load(reader)
             except Exception:
                 LogHelper.debug("无法获取 [green]llama.cpp[/] 响应数据 ...")
 
@@ -208,7 +205,7 @@ class LLM:
                     raise Exception("返回结果错误（模型退化） ...")
 
                 # 反序列化 JSON
-                result = json.loads(LLM.RE_STRIP_DICT.sub("", message.content))
+                result = repair.loads(message.content)
                 if not isinstance(result, dict) or result == {}:
                     raise Exception("返回结果错误（数据结构） ...")
 
@@ -260,7 +257,7 @@ class LLM:
                     raise Exception("返回结果错误（模型退化） ...")
 
                 # 反序列化 JSON
-                result = json.loads(LLM.RE_STRIP_DICT.sub("", message.content))
+                result = repair.loads(message.content)
                 if not isinstance(result, dict) or result == {}:
                     raise Exception("返回结果错误（数据结构） ...")
 

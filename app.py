@@ -268,12 +268,12 @@ def load_config() -> tuple[LLM, NER, FileManager, SimpleNamespace, str]:
                 path = "config_dev.json"
 
             # 读取配置文件
-            with open(path, "r", encoding = "utf-8") as reader:
+            with open(path, "r", encoding = "utf-8-sig") as reader:
                 for k, v in json.load(reader).items():
                     setattr(config, k, v[0])
 
             # 读取版本号文件
-            with open("version.txt", "r", encoding = "utf-8") as reader:
+            with open("version.txt", "r", encoding = "utf-8-sig") as reader:
                 version = reader.read().strip()
         except Exception:
             LogHelper.error("配置文件读取失败 ...")

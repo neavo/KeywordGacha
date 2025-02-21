@@ -185,7 +185,7 @@ class NER:
         try:
             for entry in os.scandir("blacklist"):
                 if entry.is_file() and entry.name.endswith(".json"):
-                    with open(entry.path, "r", encoding = "utf-8") as reader:
+                    with open(entry.path, "r", encoding = "utf-8-sig") as reader:
                         for v in json.load(reader):
                             if v.get("srt") != None:
                                 self.blacklist.add(v.get("srt"))

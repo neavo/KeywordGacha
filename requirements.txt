@@ -15,4 +15,5 @@ pykakasi
 sudachipy
 sudachidict-core
 aiolimiter
+json-repair
 beautifulsoup4
