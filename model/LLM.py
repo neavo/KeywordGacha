@@ -13,8 +13,8 @@ from aiolimiter import AsyncLimiter
 
 from model.NER import NER
 from model.Word import Word
+from module.Text.TextHelper import TextHelper
 from module.LogHelper import LogHelper
-from module.TextHelper import TextHelper
 
 class LLM:
 
@@ -147,9 +147,9 @@ class LLM:
                 self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
 
     # 异步发送请求到 OpenAI 获取模型回复
-    async def do_request(self, messages: list, llm_config: LLMConfig, retry: bool) -> tuple[dict, dict, dict, dict, Exception]:
+    async def do_request(self, messages: list, llm_config: LLMConfig, retry: bool) -> tuple[Exception, dict, str, str, dict, dict]:
         try:
-            usage, message, llm_request, llm_response, error = None, None, None, None, None
+            error, usage, response_think, response_result, llm_request, llm_response = None, None, None, None, None, None
 
             llm_request = {
                 "model" : self.model_name,
@@ -163,17 +163,29 @@ class LLM:
                 "messages" : messages,
             }
 
-            completion = await self.client.chat.completions.create(**llm_request)
+            response = await self.client.chat.completions.create(**llm_request)
 
             # OpenAI 的 API 返回的对象通常是 OpenAIObject 类型
             # 该类有一个内置方法可以将其转换为字典
-            llm_response = completion.to_dict()
-            usage = completion.usage
-            message = completion.choices[0].message
+            llm_response = response.to_dict()
+
+            # 提取回复内容
+            usage = response.usage
+            message = response.choices[0].message
+            if hasattr(message, "reasoning_content") and isinstance(message.reasoning_content, str):
+                response_think = message.reasoning_content.replace("\n\n", "\n").strip()
+                response_result = message.content.strip()
+            elif "</think>" in message.content:
+                splited = message.content.split("</think>")
+                response_think = splited[0].removeprefix("<think>").replace("\n\n", "\n").strip()
+                response_result = splited[-1].strip()
+            else:
+                response_think = ""
+                response_result = message.content.strip()
         except Exception as e:
             error = e
         finally:
-            return usage, message, llm_request, llm_response, error
+            return error, usage, response_think, response_result, llm_request, llm_response
 
     # 接口测试任务
     async def api_test(self) -> bool:
@@ -181,7 +193,7 @@ class LLM:
             try:
                 success = False
 
-                usage, message, llm_request, llm_response, error = await self.do_request(
+                error, usage, _, response_result, llm_request, llm_response = await self.do_request(
                     [
                         {
                             "role": "user",
@@ -205,7 +217,7 @@ class LLM:
                     raise Exception("返回结果错误（模型退化） ...")
 
                 # 反序列化 JSON
-                result = repair.loads(message.content)
+                result = repair.loads(response_result)
                 if not isinstance(result, dict) or result == {}:
                     raise Exception("返回结果错误（数据结构） ...")
 
@@ -233,7 +245,7 @@ class LLM:
                 else:
                     prompt = self.prompt_surface_analysis_without_translation
 
-                usage, message, llm_request, llm_response, error = await self.do_request(
+                error, usage, _, response_result, llm_request, llm_response = await self.do_request(
                     [
                         {
                             "role": "user",
@@ -257,7 +269,7 @@ class LLM:
                     raise Exception("返回结果错误（模型退化） ...")
 
                 # 反序列化 JSON
-                result = repair.loads(message.content)
+                result = repair.loads(response_result)
                 if not isinstance(result, dict) or result == {}:
                     raise Exception("返回结果错误（数据结构） ...")
 
@@ -349,7 +361,7 @@ class LLM:
     async def context_translate(self, word: Word, words: list[Word], fake_name_mapping: dict[str, str], success: list[Word], retry: bool) -> None:
         async with self.semaphore, self.async_limiter:
             try:
-                usage, message, llm_request, llm_response, error = await self.do_request(
+                error, usage, _, response_result, llm_request, llm_response = await self.do_request(
                     [
                         {
                             "role": "user",
@@ -370,7 +382,7 @@ class LLM:
                 if usage.completion_tokens >= LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS:
                     raise Exception("返回结果错误（模型退化） ...")
 
-                context_translation = [line.strip() for line in message.content.splitlines() if line.strip() != ""]
+                context_translation = [line.strip() for line in response_result.splitlines() if line.strip() != ""]
 
                 word.context_translation = context_translation
                 word.llmrequest_context_translate = llm_request
