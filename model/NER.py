@@ -20,8 +20,8 @@ from transformers.pipelines.base import Pipeline
 from transformers.tokenization_utils_fast import PreTrainedTokenizerFast
 
 from model.Word import Word
+from module.Text.TextHelper import TextHelper
 from module.LogHelper import LogHelper
-from module.TextHelper import TextHelper
 from module.ProgressHelper import ProgressHelper
 
 class NER:
@@ -327,7 +327,7 @@ class NER:
                 surface = token.surface()
 
                 # 跳过包含至少一个标点符号的条目
-                if TextHelper.has_any_punctuation(surface):
+                if TextHelper.any_punctuation(surface):
                     continue
 
                 # 跳过目标类型以外的条目
@@ -367,16 +367,16 @@ class NER:
     # 按语言移除首尾无效字符
     def strip_by_language(self, text: str, language: int) -> str:
         if language == NER.Language.ZH:
-            return TextHelper.strip_not_cjk(text).strip("的")
+            return TextHelper.CJK.strip_non_target(text).strip("的")
 
         if language == NER.Language.EN:
-            return TextHelper.strip_not_latin(text).removeprefix("a ").removeprefix("an ").removeprefix("the ").strip()
+            return TextHelper.Latin.strip_non_target(text).removeprefix("a ").removeprefix("an ").removeprefix("the ").strip()
 
         if language == NER.Language.JA:
-            return TextHelper.strip_not_japanese(text).strip("の")
+            return TextHelper.JA.strip_non_target(text).strip("の")
 
         if language == NER.Language.KO:
-            return TextHelper.strip_not_korean(text)
+            return TextHelper.KO.strip_non_target(text)
 
     # 按语言进行验证
     def verify_by_language(self, text: str, language: int) -> bool:
@@ -386,22 +386,22 @@ class NER:
             result = False
 
         if language == NER.Language.ZH:
-            if not TextHelper.has_any_cjk(text):
+            if not TextHelper.CJK.any(text):
                 result = False
 
         if language == NER.Language.EN:
             if not text[0].isupper():
                 result = False
 
-            if not TextHelper.has_any_latin(text):
+            if not TextHelper.Latin.any(text):
                 result = False
 
         if language == NER.Language.JA:
-            if not TextHelper.has_any_japanese(text):
+            if not TextHelper.JA.any(text):
                 result = False
 
         if language == NER.Language.KO:
-            if not TextHelper.has_any_korean(text):
+            if not TextHelper.KO.any(text):
                 result = False
 
         return result

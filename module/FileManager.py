@@ -12,9 +12,9 @@ from ebooklib import epub
 from model.LLM import LLM
 from model.NER import NER
 from model.Word import Word
+from module.Text.TextHelper import TextHelper
 from module.LogHelper import LogHelper
 from module.Normalizer import Normalizer
-from module.TextHelper import TextHelper
 
 class FileManager():
 
@@ -387,13 +387,13 @@ class FileManager():
                 if len(line) == 0:
                     continue
 
-                if language == NER.Language.ZH and not TextHelper.has_any_cjk(line):
+                if language == NER.Language.ZH and not TextHelper.CJK.any(line):
                     continue
-                elif language == NER.Language.EN and not TextHelper.has_any_latin(line):
+                elif language == NER.Language.EN and not TextHelper.Latin.any(line):
                     continue
-                elif language == NER.Language.JA and not TextHelper.has_any_japanese(line):
+                elif language == NER.Language.JA and not TextHelper.JA.any(line):
                     continue
-                elif language == NER.Language.KO and not TextHelper.has_any_korean(line):
+                elif language == NER.Language.KO and not TextHelper.KO.any(line):
                     continue
 
                 # 添加结果
