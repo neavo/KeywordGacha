@@ -53,6 +53,9 @@
 - 更多格式将持续添加，你也可以在 [ISSUES](https://github.com/neavo/KeywordGacha/issues) 中提出你的需求
 
 ## 近期更新 📅
+- 20250222 v0.12.3
+  - 细节调整
+
 - 20250221 v0.12.2
   - 细节调整
 
