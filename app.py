@@ -18,7 +18,7 @@ from module.TestHelper import TestHelper
 from module.FileManager import FileManager
 
 # 定义常量
-SCORE_THRESHOLD = 0.65
+SCORE_THRESHOLD = 0.60
 
 # 合并词语
 def merge_words(words: list[Word]) -> list[Word]:
@@ -55,6 +55,7 @@ def search_for_context(words: list[Word], input_lines: list[str]) -> list[Word]:
             word.context = {line for i, line in enumerate(input_lines) if i in index}
             word.context = sorted(list(word.context), key = lambda v: len(v), reverse = True)
             word.count = len(word.context)
+            word.group = "未知类型"
 
             # 掩盖已命中的实体词语文本，避免其子串错误的与父串匹配
             input_lines_ex = [
