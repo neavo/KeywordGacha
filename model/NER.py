@@ -491,7 +491,7 @@ class NER:
 
                 # 筛选并添加
                 for surface in surfaces:
-                    for word in self.generate_words(surface, line, 65535, "角色", language, input_lines):
+                    for word in self.generate_words(surface, line, 65535, "PER", language, input_lines):
                         seen.add(word.surface) if word.surface not in seen else None
                         words.append(word)
 

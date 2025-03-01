@@ -232,7 +232,7 @@ class LLM:
                 LogHelper.warning(f"llm_response - {llm_response}")
 
     # 词义分析任务
-    async def surface_analysis(self, word: Word, words: list[Word], fake_name_mapping: dict[str, str], success: list[Word], retry: bool) -> None:
+    async def surface_analysis(self, word: Word, words: list[Word], fake_name_mapping: dict[str, str], success: list[Word], retry: bool, last_round: bool) -> None:
         async with self.semaphore, self.async_limiter:
             try:
                 if not hasattr(self, "prompt_groups"):
@@ -296,27 +296,28 @@ class LLM:
                     word.surface_romaji = ""
                     word.surface_translation = ""
 
-                # 如果性别有效，则直接判断为角色类型
-                if word.gender in ("男", "女"):
-                    word.group = "角色"
-                    LogHelper.debug(f"[词义分析] 性别有效 - {word.surface} [green]->[/] {word.group} ...")
-                else:
-                    # 匹配实体类型
-                    matched = False
-                    for k, v in LLM.GROUP_MAPPING.items():
-                        if word.group in set(v):
-                            word.group = k
-                            matched = True
-                            break
-                    for k, v in LLM.GROUP_MAPPING_ADDITIONAL.items():
-                        if word.group in set(v):
-                            LogHelper.debug(f"[词义分析] 命中额外类型 - {word.surface} [green]->[/] {word.group} ...")
-                            word.group = k
-                            matched = True
-                            break
-                    if matched == False:
+                # 匹配实体类型
+                matched = False
+                for k, v in LLM.GROUP_MAPPING.items():
+                    if word.group in set(v):
+                        word.group = k
+                        matched = True
+                        break
+                for k, v in LLM.GROUP_MAPPING_ADDITIONAL.items():
+                    if word.group in set(v):
+                        LogHelper.debug(f"[词义分析] 命中额外类型 - {word.surface} [green]->[/] {word.group} ...")
+                        word.group = k
+                        matched = True
+                        break
+
+                # 处理未命中目标类型的情况
+                if matched == False:
+                    if last_round == True:
                         LogHelper.warning(f"[词义分析] 无法匹配的实体类型 - {word.surface} [green]->[/] {word.group} ...")
                         word.group = ""
+                    else:
+                        LogHelper.warning(f"[词义分析] 无法匹配的实体类型 - {word.surface} [green]->[/] {word.group} ...")
+                        error = Exception("无法匹配的实体类型 ...")
             except Exception as e:
                 LogHelper.warning(f"[词义分析] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
                 LogHelper.debug(f"llm_request - {llm_request}")
@@ -346,7 +347,7 @@ class LLM:
 
             # 执行异步任务
             tasks = [
-                asyncio.create_task(self.surface_analysis(word, words, fake_name_mapping, success, retry))
+                asyncio.create_task(self.surface_analysis(word, words, fake_name_mapping, success, retry, i == LLM.MAX_RETRY))
                 for word in words_this_round
             ]
             await asyncio.gather(*tasks, return_exceptions = True)
