@@ -1,16 +1,24 @@
+import re
 import threading
 
 import tiktoken
 import tiktoken_ext
 from tiktoken_ext import openai_public
 
-class Word:
+from base.BaseData import BaseData
+
+class Word(BaseData):
 
     # 必须显式的引用这两个库，否则打包后会报错
     tiktoken_ext
     openai_public
 
-    TYPE_FILTER = (int, str, bool, float, list, dict, tuple)
+    # 去重
+    RE_DUPLICATE = re.compile(r"[\r\n]+", flags = re.IGNORECASE)
+
+    # 缓存
+    CACHE = {}
+    CACHE_LOCK = threading.Lock()
 
     def __init__(self) -> None:
         super().__init__()
@@ -34,33 +42,17 @@ class Word:
         self.llmresponse_surface_analysis: dict = {}
         self.llmresponse_context_translate: dict = {}
 
-        # 类变量
-        Word.cache = {} if not hasattr(Word, "cache") else Word.cache
-
-        # 类线程锁
-        Word.lock = threading.Lock() if not hasattr(Word, "lock") else Word.lock
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.get_vars()})"
-
-    def get_vars(self) -> dict:
-        return {
-            k:v
-            for k, v in vars(self).items()
-            if isinstance(v, __class__.TYPE_FILTER)
-        }
-
     # 获取token数量，优先从缓存中获取
     def get_token_count(self, line: str) -> int:
         count = 0
 
         # 优先从缓存中取数据
-        with Word.lock:
-            if line in Word.cache:
-                count = Word.cache[line]
+        with Word.CACHE_LOCK:
+            if line in Word.CACHE:
+                count = Word.CACHE[line]
             else:
                 count = len(tiktoken.get_encoding("o200k_base").encode(line))
-                Word.cache[line] = count
+                Word.CACHE[line] = count
 
         return count
 
@@ -124,19 +116,25 @@ class Word:
     # 获取用于参考文本翻译任务的参考文本文本
     def get_context_str_for_translate(self, language: int) -> str:
         from model.NER import NER
-        return "\n".join(
-            self.clip_context(
-                line_threshold = 20,
-                token_threshold = 512 if language == NER.Language.EN else 768,
+        return Word.RE_DUPLICATE.sub(
+            "\n",
+            "\n".join(
+                self.clip_context(
+                    line_threshold = 0,
+                    token_threshold = 192 if language == NER.Language.EN else 256,
+                )
             )
-        ).replace("\n\n", "\n").strip()
+        )
 
     # 获取用于词义分析任务的参考文本文本
     def get_context_str_for_surface_analysis(self, language: int) -> str:
         from model.NER import NER
-        return "\n".join(
-            self.clip_context(
-                line_threshold = 0,
-                token_threshold = 512 if language == NER.Language.EN else 768,
+        return Word.RE_DUPLICATE.sub(
+            "\n",
+            "\n".join(
+                self.clip_context(
+                    line_threshold = 0,
+                    token_threshold = 256 if language == NER.Language.EN else 256,
+                )
             )
-        ).replace("\n\n", "\n").strip()
+        )

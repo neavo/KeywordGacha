@@ -28,6 +28,9 @@ class FileManager():
         message = "This search incorrectly ignores the root element, and will be fixed in a future version"
     )
 
+    # 去重
+    RE_DUPLICATE = re.compile(r"[\r\n]+", flags = re.IGNORECASE)
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -403,7 +406,7 @@ class FileManager():
         return lines_filtered, names, nicknames
 
     # 将 词语日志 写入文件
-    def write_words_log_to_file(self, words: list[Word], path: str, language: int) -> None:
+    def write_log_to_file(self, words: list[Word], path: str, language: int) -> None:
         with open(path, "w", encoding = "utf-8") as writer:
             for k, word in enumerate(words):
                 if getattr(word, "surface", "") != "":
@@ -433,15 +436,15 @@ class FileManager():
 
                 if len(getattr(word, "context_translation", [])) > 0:
                     writer.write("参考文本翻译 : ※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※※" + "\n")
-                    writer.write(f"{"\n".join(word.context_translation)}" + "\n")
+                    writer.write(f"{FileManager.RE_DUPLICATE.sub("\n", "\n".join(word.context_translation))}" + "\n")
 
                 # 多写入一个换行符，确保每段信息之间有间隔
                 writer.write("\n")
 
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
-    # 将 词语列表 写入文件
-    def write_words_list_to_file(self, words: list[Word], path: str, language: int) -> None:
+    # 写入文件
+    def write_dict_to_file(self, words: list[Word], path: str, language: int) -> None:
         with open(path, "w", encoding = "utf-8") as file:
             data = {}
             for k, word in enumerate(words):
@@ -450,8 +453,8 @@ class FileManager():
             file.write(json.dumps(data, indent = 4, ensure_ascii = False))
             LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
-    # 将 AiNiee 词典写入文件
-    def write_glossary_dict_to_file(self, words: list[Word], path: str, language: int) -> None:
+    # 写入文件
+    def write_glossary_to_file(self, words: list[Word], path: str, language: int) -> None:
         with open(path, "w", encoding = "utf-8") as file:
             datas = []
             for word in words:
@@ -473,8 +476,8 @@ class FileManager():
             file.write(json.dumps(datas, indent = 4, ensure_ascii = False))
             LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
-    # 将 GalTransl 词典写入文件
-    def write_galtransl_dict_to_file(self, words: list[Word], path: str, language: int) -> None:
+    # 写入文件
+    def write_galtransl_to_file(self, words: list[Word], path: str, language: int) -> None:
         with open(path, "w", encoding = "utf-8") as file:
             for word in words:
                 line = f"{word.surface}\t{word.surface_translation}"
@@ -512,12 +515,8 @@ class FileManager():
                 continue
 
             # 写入文件
-            if group in LLM.GROUP_MAPPING:
-                prefix = f"output/{file_name}_{group}"
-            else:
-                prefix = f"output/{file_name}_分类失败_{group}"
-
-            self.write_words_log_to_file(words_by_type, f"{prefix}_日志.txt", language)
-            self.write_words_list_to_file(words_by_type, f"{prefix}_词典.json", language)
-            self.write_glossary_dict_to_file(words_by_type, f"{prefix}_术语表.json", language)
-            self.write_galtransl_dict_to_file(words_by_type, f"{prefix}_galtransl.txt", language)
+            prefix = f"output/{file_name}_{group}"
+            self.write_log_to_file(words_by_type, f"{prefix}_日志.txt", language)
+            self.write_dict_to_file(words_by_type, f"{prefix}_词典.json", language)
+            self.write_glossary_to_file(words_by_type, f"{prefix}_术语表.json", language)
+            self.write_galtransl_to_file(words_by_type, f"{prefix}_galtransl.txt", language)
