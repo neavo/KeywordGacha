@@ -42,7 +42,7 @@ def search_for_context(words: list[Word], input_lines: list[str]) -> list[Word]:
     # 按实体词语的长度降序排序
     words = sorted(words, key = lambda v: len(v.surface), reverse = True)
 
-    LogHelper.print(f"")
+    LogHelper.print("")
     with ProgressHelper.get_progress() as progress:
         pid = progress.add_task("搜索参考文本", total = len(words))
 
@@ -65,7 +65,7 @@ def search_for_context(words: list[Word], input_lines: list[str]) -> list[Word]:
 
             # 更新进度条
             progress.update(pid, advance = 1)
-    LogHelper.print(f"")
+    LogHelper.print("")
 
     # 按出现次数降序排序
     return sorted(words, key = lambda x: x.count, reverse = True)
@@ -142,7 +142,14 @@ async def process_text(llm: LLM, ner: NER, file_manager: FileManager, config: Si
         for group in groups:
             LogHelper.info(f"即将开始执行 [参考文本翻译 - {group}] ...")
             word_by_group = get_words_by_type(words, group)
-            word_by_group = await llm.context_translate_batch(word_by_group, fake_name_mapping)
+            word_by_group = await llm.context_translate_batch(word_by_group)
+
+    # 还原伪名
+    for word in words:
+        for k, v in fake_name_mapping.items():
+            word.context_summary = word.context_summary.replace(v, k)
+            word.context = [line.replace(v, k) for line in word.context]
+            word.context_translation = [line.replace(v, k) for line in word.context_translation]
 
     # 调试功能
     TestHelper.save_context_translate_log(words, "log_context_translate.log")
