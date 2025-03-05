@@ -1,6 +1,5 @@
 import os
 import re
-import json
 import asyncio
 import threading
 import urllib.request
@@ -359,7 +358,7 @@ class LLM:
         return words
 
     # 参考文本翻译任务
-    async def context_translate(self, word: Word, words: list[Word], fake_name_mapping: dict[str, str], success: list[Word], retry: bool) -> None:
+    async def context_translate(self, word: Word, words: list[Word], success: list[Word], retry: bool) -> None:
         async with self.semaphore, self.async_limiter:
             try:
                 error, usage, _, response_result, llm_request, llm_response = await self.do_request(
@@ -388,12 +387,6 @@ class LLM:
                 word.context_translation = context_translation
                 word.llmrequest_context_translate = llm_request
                 word.llmresponse_context_translate = llm_response
-
-                # 还原伪名
-                for k, v in fake_name_mapping.items():
-                    word.context_summary = word.context_summary.replace(v, k)
-                    word.context = [line.replace(v, k) for line in word.context]
-                    word.context_translation = [line.replace(v, k) for line in word.context_translation]
             except Exception as e:
                 LogHelper.warning(f"[参考文本翻译] 子任务执行失败，稍后将重试 ... {LogHelper.get_trackback(e)}")
                 LogHelper.debug(f"llm_request - {llm_request}")
@@ -406,7 +399,7 @@ class LLM:
                     LogHelper.info(f"[参考文本翻译] 已完成 {len(success)} / {len(words)} ...")
 
     # 批量执行参考文本翻译任务
-    async def context_translate_batch(self, words: list[Word], fake_name_mapping: dict[str, str]) -> list[Word]:
+    async def context_translate_batch(self, words: list[Word]) -> list[Word]:
         failure: list[Word] = []
         success: list[Word] = []
 
@@ -423,7 +416,7 @@ class LLM:
 
             # 执行异步任务
             tasks = [
-                asyncio.create_task(self.context_translate(word, words, fake_name_mapping, success, retry))
+                asyncio.create_task(self.context_translate(word, words, success, retry))
                 for word in words_this_round
             ]
             await asyncio.gather(*tasks, return_exceptions = True)
