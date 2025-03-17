@@ -1,17 +1,20 @@
 import os
 import re
-import csv
 import json
 import warnings
 
-import ebooklib
-import openpyxl
-from bs4 import BeautifulSoup
-from ebooklib import epub
-
-from model.LLM import LLM
 from model.NER import NER
 from model.Word import Word
+from module.File.MD import MD
+from module.File.ASS import ASS
+from module.File.SRT import SRT
+from module.File.TXT import TXT
+from module.File.EPUB import EPUB
+from module.File.XLSX import XLSX
+from module.File.TRANS import TRANS
+from module.File.RENPY import RENPY
+from module.File.KVJSON import KVJSON
+from module.File.MESSAGEJSON import MESSAGEJSON
 from module.Text.TextHelper import TextHelper
 from module.LogHelper import LogHelper
 from module.Normalizer import Normalizer
@@ -69,290 +72,27 @@ class FileManager():
 
     # 读
     def read_from_path(self, input_path: str) -> list[str]:
-        items = []
+        items: list[str] = []
         try:
+            paths: list[str] = []
             if os.path.isfile(input_path):
                 paths = [input_path]
             elif os.path.isdir(input_path):
-                paths = [os.path.join(root, file).replace("\\", "/") for root, _, files in os.walk(input_path) for file in files]
-            else:
-                paths: list[str] = []
+                for root, _, files in os.walk(input_path):
+                    paths.extend([f"{root}/{file}".replace("\\", "/") for file in files])
 
-            items.extend(self.read_from_path_txt(input_path, [path for path in paths if path.lower().endswith(".txt")]))
-            items.extend(self.read_from_path_ass(input_path, [path for path in paths if path.lower().endswith(".ass")]))
-            items.extend(self.read_from_path_srt(input_path, [path for path in paths if path.lower().endswith(".srt")]))
-            items.extend(self.read_from_path_csv(input_path, [path for path in paths if path.lower().endswith(".csv")]))
-            items.extend(self.read_from_path_xlsx(input_path, [path for path in paths if path.lower().endswith(".xlsx")]))
-            items.extend(self.read_from_path_epub(input_path, [path for path in paths if path.lower().endswith(".epub")]))
-            items.extend(self.read_from_path_renpy(input_path, [path for path in paths if path.lower().endswith(".rpy")]))
-            items.extend(self.read_from_path_kvjson(input_path, [path for path in paths if path.lower().endswith(".json")]))
-            items.extend(self.read_from_path_messagejson(input_path, [path for path in paths if path.lower().endswith(".json")]))
+            items.extend(MD().read_from_path([path for path in paths if path.lower().endswith(".md")]))
+            items.extend(TXT().read_from_path([path for path in paths if path.lower().endswith(".txt")]))
+            items.extend(ASS().read_from_path([path for path in paths if path.lower().endswith(".ass")]))
+            items.extend(SRT().read_from_path([path for path in paths if path.lower().endswith(".srt")]))
+            items.extend(EPUB().read_from_path([path for path in paths if path.lower().endswith(".epub")]))
+            items.extend(XLSX().read_from_path([path for path in paths if path.lower().endswith(".xlsx")]))
+            items.extend(RENPY().read_from_path([path for path in paths if path.lower().endswith(".rpy")]))
+            items.extend(TRANS().read_from_path([path for path in paths if path.lower().endswith(".trans")]))
+            items.extend(KVJSON().read_from_path([path for path in paths if path.lower().endswith(".json")]))
+            items.extend(MESSAGEJSON().read_from_path([path for path in paths if path.lower().endswith(".json")]))
         except Exception as e:
             LogHelper.error(f"文件读取失败 ... {e}")
-
-        return items
-
-    # TXT
-    def read_from_path_txt(self, input_path: str, abs_paths: list[str]) -> list[str]:
-        items = []
-        for abs_path in set(abs_paths):
-            # 数据处理
-            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
-                for line in [line.removesuffix("\n") for line in reader.readlines()]:
-                    items.append(line)
-
-        return items
-
-    # ASS
-    def read_from_path_ass(self, input_path: str, abs_paths: list[str]) -> list[str]:
-        # [Script Info]
-        # ; This is an Advanced Sub Station Alpha v4+ script.
-        # Title:
-        # ScriptType: v4.00+
-        # PlayDepth: 0
-        # ScaledBorderAndShadow: Yes
-
-        # [V4+ Styles]
-        # Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-        # Style: Default,Arial,20,&H00FFFFFF,&H0000FFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,1,1,2,10,10,10,1
-
-        # [Events]
-        # Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-        # Dialogue: 0,0:00:08.12,0:00:10.46,Default,,0,0,0,,にゃにゃにゃ
-        # Dialogue: 0,0:00:14.00,0:00:15.88,Default,,0,0,0,,えーこの部屋一人で使\Nえるとか最高じゃん
-        # Dialogue: 0,0:00:15.88,0:00:17.30,Default,,0,0,0,,えるとか最高じゃん
-
-        items = []
-        for abs_path in set(abs_paths):
-            # 数据处理
-            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
-                lines = [line.strip() for line in reader.readlines()]
-
-                # 格式字段的数量
-                in_event = False
-                format_field_num = -1
-                for line in lines:
-                    # 判断是否进入事件块
-                    if line == "[Events]":
-                        in_event = True
-                    # 在事件块中寻找格式字段
-                    if in_event == True and line.startswith("Format:"):
-                        format_field_num = len(line.split(",")) - 1
-                        break
-
-                for line in lines:
-                    content = ",".join(line.split(",")[format_field_num:]) if line.startswith("Dialogue:") else ""
-
-                    # 添加数据
-                    items.append(content.replace("\\N", "\n"))
-
-        return items
-
-    # SRT
-    def read_from_path_srt(self, input_path: str, abs_paths: list[str]) -> list[str]:
-        # 1
-        # 00:00:08,120 --> 00:00:10,460
-        # にゃにゃにゃ
-
-        # 2
-        # 00:00:14,000 --> 00:00:15,880
-        # えーこの部屋一人で使
-
-        # 3
-        # 00:00:15,880 --> 00:00:17,300
-        # えるとか最高じゃん
-
-        items = []
-        for abs_path in set(abs_paths):
-            # 数据处理
-            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
-                chunks = re.split(r"\n{2,}", reader.read().strip())
-                for chunk in chunks:
-                    lines = chunk.splitlines()
-
-                    # 格式校验
-                    # isdigit
-                    # 仅返回 True 如果字符串中的所有字符都是 Unicode 数字字符（例如：0-9），不包括带有上标的数字（如 ²）或带分隔符的数字（如罗马数字）。
-                    # isnumeric
-                    # 返回 True 如果字符串中的所有字符都是 Unicode 数值字符，包括 Unicode 数字、带有上标的数字和其他形式的数值字符（如罗马数字）。
-                    if len(lines) < 3 or not lines[0].isdigit():
-                        continue
-
-                    # 添加数据
-                    if lines[-1] != "":
-                        items.append("\n".join(lines[2:]))
-
-        return items
-
-    # CSV
-    def read_from_path_csv(self, input_path: str, abs_paths: list[str]) -> list[str]:
-        items = []
-        for abs_path in set(abs_paths):
-            with open(abs_path, "r", newline = "", encoding = "utf-8") as file:
-                for row in csv.reader(file):
-                    items.append(row[0])
-
-        return items
-
-    # XLSX
-    def read_from_path_xlsx(self, input_path: str, abs_paths: list[str]) -> list[str]:
-        items = []
-        for abs_path in set(abs_paths):
-            # 数据处理
-            wb = openpyxl.load_workbook(abs_path)
-            sheet = wb.active
-
-            # 跳过空表格
-            if sheet.max_column == 0:
-                continue
-
-            for row in range(1, sheet.max_row + 1):
-                src = sheet.cell(row = row, column = 1).value
-
-                # 跳过读取失败的行
-                if src is None:
-                    continue
-
-                items.append(str(src))
-
-        return items
-
-    # EPUB
-    def read_from_path_epub(self, input_path: str, abs_paths: list[str]) -> list[str]:
-        items = []
-        for abs_path in set(abs_paths):
-            # 数据处理
-            book = epub.read_epub(abs_path)
-            for doc in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
-                bs = BeautifulSoup(doc.get_content(), "html.parser")
-                for line in bs.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6"]):
-                    items.append(line.get_text())
-
-        return items
-
-    # RENPY
-    def read_from_path_renpy(self, input_path: str, abs_paths: list[str]) -> list[str]:
-        # # game/script8.rpy:16878
-        # translate chinese arabialogoff_e5798d9a:
-        #
-        #     # lo "And you...?{w=2.3}{nw}" with dissolve
-        #     lo "And you...?{w=2.3}{nw}" with dissolve
-        #
-        # # game/script/1-home/1-Perso_Home/elice.rpy:281
-        # translate schinese elice_ask_home_f01e3240_5:
-        #
-        #     # e ".{w=0.5}.{w=0.5}.{w=0.5}{nw}"
-        #     e ".{w=0.5}.{w=0.5}.{w=0.5}{nw}"
-        #
-        # # game/script8.rpy:33
-        # translate chinese update08_a626b58f:
-        #
-        #     # "*Snorts* Fucking hell, I hate this dumpster of a place." with dis06
-        #     "*Snorts* Fucking hell, I hate this dumpster of a place." with dis06
-        #
-        # translate chinese strings:
-        #
-        #     # game/script8.rpy:307
-        #     old "Accompany her to the inn"
-        #     new "Accompany her to the inn"
-        #
-        #     # game/script8.rpy:2173
-        #     old "{sc=3}{size=44}Jump off the ship.{/sc}"
-        #     new "{sc=3}{size=44}Jump off the ship.{/sc}"
-
-        # 查找文本中最后一对双引号包裹的文本
-        def find_content(text: str) -> str:
-            matches = re.findall(r"\"(.*?)(?<!\\)\"(?!\")", text)
-
-            if matches:
-                # 获取最后一对引号中的子串
-                last_match = matches[-1]
-
-                # 找到最后一个目标子串的位置，包括引号
-                start_index = text.rfind('"' + last_match + '"')
-                end_index = start_index + len('"' + last_match + '"')
-
-                # 将剩余的字符串中目标子串的内容（不包括引号）替换为 {{CONTENT}}
-                modified_str = text[: start_index + 1] + "{{CONTENT}}" + text[end_index - 1 :]
-
-                return last_match, modified_str
-            else:
-                return "", text
-
-        items = []
-        for abs_path in set(abs_paths):
-            # 数据处理
-            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
-                lines = [line.removesuffix("\n") for line in reader.readlines()]
-
-            skip_next = False
-            for line in lines:
-                if skip_next == True:
-                    skip_next = False
-                    continue
-                elif line.count("\"") >= 2 and (line.startswith("    # ") or line.startswith("    old ")):
-                    skip_next = True
-                    content, extra_field = find_content(line)
-                    content = content.replace("\\n", "\n")
-                else:
-                    content = ""
-                    extra_field = line
-
-                # 添加数据
-                items.append(content)
-
-        return items
-
-    # KV JSON
-    def read_from_path_kvjson(self, input_path: str, abs_paths: list[str]) -> list[str]:
-        # {
-        #     "「あ・・」": "「あ・・」",
-        #     "「ごめん、ここ使う？」": "「ごめん、ここ使う？」",
-        #     "「じゃあ・・私は帰るね」": "「じゃあ・・私は帰るね」",
-        # }
-
-        items = []
-        for abs_path in set(abs_paths):
-            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
-                json_data: dict[str, str] = json.load(reader)
-
-                # 格式校验
-                if not isinstance(json_data, dict):
-                    continue
-
-                # 读取数据
-                for k, v in json_data.items():
-                    if isinstance(k, str) and isinstance(v, str):
-                        items.append(k)
-
-        return items
-
-    # Message JSON
-    def read_from_path_messagejson(self, input_path: str, abs_paths: list[str]) -> list[str]:
-        # [
-        #     {
-        #         "message": "<fgName:pipo-fog004><fgLoopX:1><fgLoopY:1><fgSx:-2><fgSy:0.5>"
-        #     },
-        #     {
-        #         "message": "エンディングを変更しますか？"
-        #     },
-        #     {
-        #         "message": "はい"
-        #     },
-        # ]
-
-        items = []
-        for abs_path in set(abs_paths):
-            with open(abs_path, "r", encoding = "utf-8-sig") as reader:
-                json_data: list[dict] = json.load(reader)
-
-                # 格式校验
-                if not isinstance(json_data, list):
-                    continue
-
-                for v in json_data:
-                    if isinstance(v, dict) and "message" in v:
-                        items.append(f"【{v.get("name", "")}】{v.get("message")}")
 
         return items
 
