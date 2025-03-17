@@ -16,4 +16,5 @@ sudachipy
 sudachidict-core
 aiolimiter
 json-repair
+lxml
 beautifulsoup4
