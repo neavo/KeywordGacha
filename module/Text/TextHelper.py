@@ -1,18 +1,20 @@
 import re
 import unicodedata
 
-from module.LogHelper import LogHelper
 from module.Text import TextBase
 
 class TextHelper:
 
-    # 汉字标点符号
+    # 汉字标点符号（CJK）
     CJK_PUNCTUATION_SET = {
         chr(char)
         for start, end in (
-            (0x2000, 0x206F),
-            (0x3001, 0x303F),                           # 0x3000 是半角空格
-            (0xFF00, 0xFFEF),
+            (0x3001, 0x303F),                           # CJK标点（排除全角空格0x3000）
+            (0xFF01, 0xFF0F),                           # 全角标点（！＂＃＄％＆＇（）＊＋，－．／）
+            (0xFF1A, 0xFF1F),                           # 全角标点（：；＜＝＞？）
+            (0xFF3B, 0xFF40),                           # 全角标点（［＼］＾＿｀）
+            (0xFF5B, 0xFF65),                           # 全角标点（｛｜｝～｟｠）
+            (0xFFE0, 0xFFEE),                           # 补充全角符号（￠￡￢￣￤￨等）
         )
         for char in range(start, end + 1)
     }
@@ -21,17 +23,19 @@ class TextHelper:
     LATIN_PUNCTUATION_SET = {
         chr(char)
         for start, end in (
-            (0x0021, 0x002F),                           # 0x0020 是半角空格
-            (0x003A, 0x0040),
-            (0x005B, 0x0060),
-            (0x007B, 0x007E),
-            (0x2000, 0x206F),
-            (0x2E00, 0x2E7F),
+            (0x0021, 0x002F),                           # 基本拉丁标点（!"#$%&'()*+,-./）
+            (0x003A, 0x0040),                           # 基本拉丁标点（:;<=>?@）
+            (0x005B, 0x0060),                           # 基本拉丁标点（[\]^_`）
+            (0x007B, 0x007E),                           # 基本拉丁标点（{|}~）
+            (0x2000, 0x206F),                           # 通用标点符号（含引号、破折号等）
+            (0x2E00, 0x2E7F),                           # 补充标点符号（双引号、括号等）
+            (0x2010, 0x2027),                           # 连字符、破折号、引号等
+            (0x2030, 0x205E),                           # 千分比符号、引号等
         )
         for char in range(start, end + 1)
     }
 
-    # 不属于标点符号范围但是一般也认为是标点符号
+    # 特殊符号(不属于标点符号范围但是当作标点符号处理)
     SPECIAL_PUNCTUATION_SET = {
         chr(0x00b7),                                    # ·
         chr(0x30FB),                                    # ・
@@ -55,6 +59,21 @@ class TextHelper:
 
     # 德文
     DE = TextBase.DE()
+
+    # 法文
+    FR = TextBase.FR()
+
+    # 西班牙文
+    ES = TextBase.ES()
+
+    # 意大利文
+    IT = TextBase.IT()
+
+    # 葡萄牙文
+    PT = TextBase.PT()
+
+    # 泰文
+    TH = TextBase.TH()
 
     # 印尼文
     ID = TextBase.ID()
@@ -104,7 +123,7 @@ class TextHelper:
         while end >= start and TextHelper.is_punctuation(text_list[end]):
             end -= 1
 
-        # 如果整个字符串都是标点符号，返回空字符串
+        # 越界检测
         if start > end:
             return ""
 
@@ -141,7 +160,7 @@ class TextHelper:
         return sum(1 if unicodedata.east_asian_width(c) in "NaH" else 2 for c in text)
 
     # 计算 Jaccard 相似度
-    def check_similarity_by_Jaccard(x: str, y: str) -> float:
+    def check_similarity_by_jaccard(x: str, y: str) -> float:
         set_x = set(x)
         set_y = set(y)
 
