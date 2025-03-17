@@ -15,9 +15,9 @@
 - 极大的提升 `小说`、`漫画`、`字幕`、`游戏文本` 等内容译前准备时制作词语表的工作效率
 - 随机选取 [绿站榜单作品](https://books.fishhawk.top) 作为测试样本，与人工校对制作的词表对比，命中率约为 `80%-90%`
 
-> <img src="image/01.jpg" style="width: 80%;" alt="image/01.jpg">
+> ![01](https://github.com/user-attachments/assets/09af4f77-20fe-4a06-be2f-e6eb1f6dc3dd)
 
-> <img src="image/02.jpg" style="width: 80%;" alt="image/02.jpg">
+> ![02](https://github.com/user-attachments/assets/e035ab46-88e4-4b2e-9efb-2064e3b649fd)
 
 ## 特别说明 ⚠️
 - 如您在翻译过程中使用了 [KeywordGacha](https://github.com/neavo/KeywordGacha)，请在作品信息或发布页面的显要位置进行说明！
@@ -30,9 +30,10 @@
 
 ## 使用流程 🛸
 - 从 [发布页](https://github.com/neavo/KeywordGacha/releases) 或 [百度网盘](https://pan.baidu.com/s/1_JXmKvnar6PGHlIbl0Mi2Q?pwd=9e54) 下载应用
-- 打开配置文件 `config.json`，填入 API 信息，推荐在以下两种方式中选择其一：
-  - [DeepSeek - 点击查看教程](https://github.com/neavo/KeywordGacha/wiki/DeepSeek)，需付费但便宜，速度快，质量高，无显卡要求 `👈👈 推荐`
-  - [本地接口 - 点击查看教程](https://github.com/neavo/OneClickLLAMA)，免费，速度较慢，质量稍差，理论上支持所有 8G 以上显存的显卡
+- 打开配置文件 `config.json`，填入 API 信息，建议选择其一：
+  - [ [本地接口](https://github.com/neavo/OneClickLLAMA) ]，免费，需至少 8G 显存的独立显卡，Nvidia 显卡为佳
+  - [ [火山引擎](https://github.com/neavo/KeywordGacha/wiki/VolcEngine) ]，需付费但便宜，速度快，质量高，无显卡要求 `👈👈 推荐`
+  - [ [DeepSeek](https://github.com/neavo/KeywordGacha/wiki/DeepSeek) ]，需付费但便宜，速度快，质量高，无显卡要求 `👈👈 推荐`
 - 双击 `app.exe` 启动应用，处理流程结束后，结果会保存在 `output` 文件夹内
 - 其中：
   - `*_日志.txt` - 抓取到的词语的原文、参考文本、翻译建议、角色信息总结等详细信息，用于人工确认
@@ -45,40 +46,25 @@
 - 在任务开始时，`KG` 将读取指定的文件或文件夹（及其子目录）内所有支持的文件，包括但是不限于：
   - 字幕（.srt .ass）
   - 电子书（.txt .epub）
+  - Markdown（.md）
   - [RenPy](https://www.renpy.org) 导出游戏文本（.rpy）
-  - [MTool](https://afdian.com/a/AdventCirno) 导出游戏文本（.json）
+  - [MTool](https://mtool.app) 导出游戏文本（.json）
   - [SExtractor](https://github.com/satan53x/SExtractor) 导出游戏文本（.txt .json .xlsx）
-  - [Translator++](https://dreamsavior.net/translator-plusplus) 导出游戏文本（.csv .xlsx）
+  - [VNTextPatch](https://github.com/arcusmaximus/VNTranslationTools) 导出游戏文本（.json）
+  - [Translator++](https://dreamsavior.net/translator-plusplus) 项目文件（.trans）
+  - [Translator++](https://dreamsavior.net/translator-plusplus) 导出游戏文本（.xlsx）
 - 当应用目录下有 `input` 文件夹时，将自动识别 `input` 文件夹内的文件
 - 更多格式将持续添加，你也可以在 [ISSUES](https://github.com/neavo/KeywordGacha/issues) 中提出你的需求
 
 ## 近期更新 📅
+- 20250318 v0.13.1
+  - 新增 - [Translator++](https://dreamsavior.net/translator-plusplus) 项目文件（.trans）
+  - 调整 - 伪名还原执行的时机
+  - 调整 - 迁移 LLM 设置到独立文件
+
 - 20250301 v0.13.0
   - 调整 - 词义分析流程
     - 尝试修复非人实体被误判为角色的问题
-
-- 20250222 v0.12.3
-  - 细节调整
-
-- 20250221 v0.12.2
-  - 细节调整
-
-- 20250218 v0.12.1
-  - 细节调整
-
-- 20250214 v0.12.0
-  - 调整 增强对姓名代码的识别能力
-  - 调整 重新设计了文件读取流程，现在：
-
-- 20250211 v0.11.3
-  - 细节优化与修正 
-
-- 20250201 v0.11.2
-  - 优化 韩文 分析能力
-  - 优化 CPU 模式的兼容性
-  - 优化 支持 DeepSeek-R1 等思考模型
-  - 修正 一些兼容性问题
-  - 感谢不愿透露姓名的 @PiDanShouRouZhouXD 同学提供本次模型更新的训练算力支持
 
 ## 设置说明 🎚️
 
@@ -108,7 +94,7 @@
         3,
         "网络请求频率阈值，单位为 次/秒，值可以小于 1，如果频繁出现 429 代码的网络错误，可以调小这个值。",
         "使用 llama.cpp 运行的本地模型时，将根据 llama.cpp 的配置调整自动设置，无需手动调整这个值。",
-        "使用 DeepSeek 等不限制并发数的在线接口时可以调大这个值。"
+        "使用 火山引擎 等不限制并发数的在线接口时可以调大这个值。"
     ],
     "context_translate_mode": [
         2,
@@ -122,7 +108,7 @@
   - 目前模型能处理的单行最大长度约为 `500` 字，过长的句子会被截断，超长单行文本请提前手动分行
 
 - 处理 `游戏文本` 的最佳实践
-  - 使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 导出游戏文本为 `xlsx` 格式
+  - 使用 [Translator++](https://dreamsavior.net/translator-plusplus/) 保存项目为 `.trans` 格式
   - 对于 `RPGMaker MV/MZ` 游戏
     - 复制 `Actors.json` 到指定位置以启用 [角色代码还原](https://github.com/neavo/KeywordGacha/wiki/%E8%A7%92%E8%89%B2%E4%BB%A3%E7%A0%81%E8%BF%98%E5%8E%9F) 功能
   - 如果抓取效果不好，可以多试几种导出工具和导出格式，有时候会有奇效
