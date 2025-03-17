@@ -60,6 +60,7 @@ jobs:
         run: |
           xcopy "prompt" ".\dist\KeywordGacha\prompt" /E /I /Q /H /Y
           xcopy "blacklist" ".\dist\KeywordGacha\blacklist" /E /I /Q /H /Y
+          xcopy ".\resource\llm_config" ".\dist\KeywordGacha\resource\llm_config" /E /I /Q /H /Y
 
           copy "config.json" ".\dist\KeywordGacha\"
           copy "version.txt" ".\dist\KeywordGacha\"
