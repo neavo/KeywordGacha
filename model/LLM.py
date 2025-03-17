@@ -1,4 +1,3 @@
-import os
 import re
 import asyncio
 import threading
@@ -10,6 +9,7 @@ import json_repair as repair
 from openai import AsyncOpenAI
 from aiolimiter import AsyncLimiter
 
+from base.BaseData import BaseData
 from model.NER import NER
 from model.Word import Word
 from module.Text.TextHelper import TextHelper
@@ -18,43 +18,22 @@ from module.LogHelper import LogHelper
 class LLM:
 
     # 任务类型
-    class Type():
+    class Type(BaseData):
 
-        API_TEST = 100                  # 语义分析
-        SURFACE_ANALYSIS = 200          # 语义分析
-        TRANSLATE_CONTEXT = 300         # 翻译参考文本
+        API_TEST: int = 100                  # 语义分析
+        SURFACE_ANALYSIS: int = 200          # 语义分析
+        TRANSLATE_CONTEXT: int = 300         # 翻译参考文本
 
     # LLM 配置参数
-    class LLMConfig():
+    class LLMConfig(BaseData):
 
-        TEMPERATURE = 0.05
-        TOP_P = 0.95
-        MAX_TOKENS = 1024
-        FREQUENCY_PENALTY = 0
+        TEMPERATURE: float = 0.05
+        TOP_P: float = 0.95
+        MAX_TOKENS: float = 1024
+        FREQUENCY_PENALTY: float = 0.0
 
     # 最大重试次数
-    MAX_RETRY = 3
-
-    # 请求参数配置 - 接口测试
-    API_TEST_CONFIG = LLMConfig()
-    API_TEST_CONFIG.TEMPERATURE = 0.05
-    API_TEST_CONFIG.TOP_P = 0.95
-    API_TEST_CONFIG.MAX_TOKENS = 1024
-    API_TEST_CONFIG.FREQUENCY_PENALTY = 0
-
-    # 请求参数配置 - 词义分析
-    SURFACE_ANALYSIS_CONFIG = LLMConfig()
-    SURFACE_ANALYSIS_CONFIG.TEMPERATURE = 0.05
-    SURFACE_ANALYSIS_CONFIG.TOP_P = 0.95
-    SURFACE_ANALYSIS_CONFIG.MAX_TOKENS = 1024
-    SURFACE_ANALYSIS_CONFIG.FREQUENCY_PENALTY = 0
-
-    # 请求参数配置 - 翻译参考文本
-    TRANSLATE_CONTEXT_CONFIG = LLMConfig()
-    TRANSLATE_CONTEXT_CONFIG.TEMPERATURE = 0.95
-    TRANSLATE_CONTEXT_CONFIG.TOP_P = 0.95
-    TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS = 1024
-    TRANSLATE_CONTEXT_CONFIG.FREQUENCY_PENALTY = 0
+    MAX_RETRY: int = 3
 
     # 类型映射表
     GROUP_MAPPING = {
@@ -102,48 +81,84 @@ class LLM:
     def set_language(self, language: int) -> None:
         self.language = language
 
-    # 加载 Prompt 文件内容
+    # 加载指令
     def load_prompt(self) -> None:
         try:
-            for entry in os.scandir("prompt"):
-                if entry.is_file() and "prompt" in entry.name and entry.name.endswith(".txt"):
-                    with open(entry.path, "r", encoding = "utf-8-sig") as reader:
-                        setattr(self, entry.name.replace(".txt", ""), reader.read().strip())
+            with open("prompt/prompt_context_translate.txt", "r", encoding = "utf-8-sig") as reader:
+                self.prompt_context_translate = reader.read().strip()
+        except Exception as e:
+            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
+
+        try:
+            with open("prompt/prompt_surface_analysis_with_translation.txt", "r", encoding = "utf-8-sig") as reader:
+                self.prompt_surface_analysis_with_translation = reader.read().strip()
+        except Exception as e:
+            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
+
+        try:
+            with open("prompt/prompt_surface_analysis_without_translation.txt", "r", encoding = "utf-8-sig") as reader:
+                self.prompt_surface_analysis_without_translation = reader.read().strip()
+        except Exception as e:
+            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
+
+    # 加载配置文件
+    def load_llm_config(self) -> None:
+        try:
+            with open("resource/llm_config/api_test_config.json", "r", encoding = "utf-8-sig") as reader:
+                LLM.API_TEST_CONFIG = LLM.LLMConfig()
+                for key, value in repair.load(reader).items():
+                    setattr(LLM.API_TEST_CONFIG, key.upper(), value)
+        except Exception as e:
+            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
+
+        try:
+            with open("resource/llm_config/surface_analysis_config.json", "r", encoding = "utf-8-sig") as reader:
+                LLM.SURFACE_ANALYSIS_CONFIG = LLM.LLMConfig()
+                for key, value in repair.load(reader).items():
+                    setattr(LLM.SURFACE_ANALYSIS_CONFIG, key.upper(), value)
+        except Exception as e:
+            LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
+
+        try:
+            with open("resource/llm_config/context_translate_config.json", "r", encoding = "utf-8-sig") as reader:
+                LLM.CONTEXT_TRANSLATE_CONFIG = LLM.LLMConfig()
+                for key, value in repair.load(reader).items():
+                    setattr(LLM.CONTEXT_TRANSLATE_CONFIG, key.upper(), value)
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
     # 设置请求限制器
     def set_request_limiter(self) -> None:
-            # 获取 llama.cpp 响应数据
-            try:
-                response_json = None
-                with urllib.request.urlopen(f"{re.sub(r"/v1$", "", self.base_url)}/slots") as reader:
-                    response_json = repair.load(reader)
-            except Exception:
-                LogHelper.debug("无法获取 [green]llama.cpp[/] 响应数据 ...")
+        # 获取 llama.cpp 响应数据
+        try:
+            response_json = None
+            with urllib.request.urlopen(f"{re.sub(r"/v1$", "", self.base_url)}/slots") as reader:
+                response_json = repair.load(reader)
+        except Exception:
+            LogHelper.debug("无法获取 [green]llama.cpp[/] 响应数据 ...")
 
-            # 如果响应数据有效，则是 llama.cpp 接口
-            if isinstance(response_json, list) and len(response_json) > 0:
-                self.request_frequency_threshold = len(response_json)
-                LogHelper.info("")
-                LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(response_json)}[/] 次/秒 ...")
-                LogHelper.info("")
-            # 否则，按在线接口设置
-            else:
-                LLM.API_TEST_CONFIG.MAX_TOKENS = 4 * 1024
-                LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS = 4 * 1024
-                LLM.TRANSLATE_CONTEXT_CONFIG.MAX_TOKENS = 4 * 1024
+        # 如果响应数据有效，则是 llama.cpp 接口
+        if isinstance(response_json, list) and len(response_json) > 0:
+            self.request_frequency_threshold = len(response_json)
+            LogHelper.info("")
+            LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(response_json)}[/] 次/秒 ...")
+            LogHelper.info("")
+        # 否则，按在线接口设置
+        else:
+            LLM.API_TEST_CONFIG.MAX_TOKENS = 4 * 1024
+            LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS = 4 * 1024
+            LLM.CONTEXT_TRANSLATE_CONFIG.MAX_TOKENS = 4 * 1024
 
-            # 设置请求限制器
-            if self.request_frequency_threshold > 1:
-                self.semaphore = asyncio.Semaphore(self.request_frequency_threshold)
-                self.async_limiter = AsyncLimiter(max_rate = self.request_frequency_threshold, time_period = 1)
-            elif self.request_frequency_threshold > 0:
-                self.semaphore = asyncio.Semaphore(1)
-                self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1 / self.request_frequency_threshold)
-            else:
-                self.semaphore = asyncio.Semaphore(1)
-                self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
+        # 设置请求限制器
+        if self.request_frequency_threshold > 1:
+            self.semaphore = asyncio.Semaphore(self.request_frequency_threshold)
+            self.async_limiter = AsyncLimiter(max_rate = self.request_frequency_threshold, time_period = 1)
+        elif self.request_frequency_threshold > 0:
+            self.semaphore = asyncio.Semaphore(1)
+            self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1 / self.request_frequency_threshold)
+        else:
+            self.semaphore = asyncio.Semaphore(1)
+            self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
 
     # 异步发送请求到 OpenAI 获取模型回复
     async def do_request(self, messages: list, llm_config: LLMConfig, retry: bool) -> tuple[Exception, dict, str, str, dict, dict]:
@@ -371,7 +386,7 @@ class LLM:
                             ),
                         },
                     ],
-                    LLM.TRANSLATE_CONTEXT_CONFIG,
+                    LLM.CONTEXT_TRANSLATE_CONFIG,
                     retry
                 )
 

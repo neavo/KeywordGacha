@@ -289,6 +289,7 @@ def load_config() -> tuple[LLM, NER, FileManager, SimpleNamespace, str]:
         # 初始化 LLM 对象
         llm = LLM(config)
         llm.load_prompt()
+        llm.load_llm_config()
 
         # 初始化 NER 对象
         ner = NER()
