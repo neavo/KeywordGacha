@@ -1,8 +1,10 @@
 import os
 import re
 import json
-import warnings
+import openpyxl
+import openpyxl.worksheet.worksheet
 
+from base.Base import Base
 from model.NER import NER
 from model.Word import Word
 from module.File.MD import MD
@@ -11,25 +13,18 @@ from module.File.SRT import SRT
 from module.File.TXT import TXT
 from module.File.EPUB import EPUB
 from module.File.XLSX import XLSX
-from module.File.TRANS import TRANS
+from module.File.WOLFXLSX import WOLFXLSX
 from module.File.RENPY import RENPY
+from module.File.TRANS.TRANS import TRANS
 from module.File.KVJSON import KVJSON
 from module.File.MESSAGEJSON import MESSAGEJSON
 from module.Text.TextHelper import TextHelper
+from module.Cache.CacheItem import CacheItem
 from module.LogHelper import LogHelper
 from module.Normalizer import Normalizer
+from module.XLSXHelper import XLSXHelper
 
 class FileManager():
-
-    # https://github.com/aerkalov/ebooklib/issues/296
-    warnings.filterwarnings(
-        "ignore",
-        message = "In the future version we will turn default option ignore_ncx to True."
-    )
-    warnings.filterwarnings(
-        "ignore",
-        message = "This search incorrectly ignores the root element, and will be fixed in a future version"
-    )
 
     # 去重
     RE_DUPLICATE = re.compile(r"[\r\n]+", flags = re.IGNORECASE)
@@ -72,7 +67,7 @@ class FileManager():
 
     # 读
     def read_from_path(self, input_path: str) -> list[str]:
-        items: list[str] = []
+        items: list[CacheItem] = []
         try:
             paths: list[str] = []
             if os.path.isfile(input_path):
@@ -81,20 +76,32 @@ class FileManager():
                 for root, _, files in os.walk(input_path):
                     paths.extend([f"{root}/{file}".replace("\\", "/") for file in files])
 
-            items.extend(MD().read_from_path([path for path in paths if path.lower().endswith(".md")]))
-            items.extend(TXT().read_from_path([path for path in paths if path.lower().endswith(".txt")]))
-            items.extend(ASS().read_from_path([path for path in paths if path.lower().endswith(".ass")]))
-            items.extend(SRT().read_from_path([path for path in paths if path.lower().endswith(".srt")]))
-            items.extend(EPUB().read_from_path([path for path in paths if path.lower().endswith(".epub")]))
-            items.extend(XLSX().read_from_path([path for path in paths if path.lower().endswith(".xlsx")]))
-            items.extend(RENPY().read_from_path([path for path in paths if path.lower().endswith(".rpy")]))
-            items.extend(TRANS().read_from_path([path for path in paths if path.lower().endswith(".trans")]))
-            items.extend(KVJSON().read_from_path([path for path in paths if path.lower().endswith(".json")]))
-            items.extend(MESSAGEJSON().read_from_path([path for path in paths if path.lower().endswith(".json")]))
+            # 伪数据
+            config: dict[str, str] = {
+                "input_folder": "",
+                "output_folder": "",
+                "source_language": "",
+                "target_language": ""
+            }
+
+            items.extend(MD(config).read_from_path([path for path in paths if path.lower().endswith(".md")]))
+            items.extend(TXT(config).read_from_path([path for path in paths if path.lower().endswith(".txt")]))
+            items.extend(ASS(config).read_from_path([path for path in paths if path.lower().endswith(".ass")]))
+            items.extend(SRT(config).read_from_path([path for path in paths if path.lower().endswith(".srt")]))
+            items.extend(EPUB(config).read_from_path([path for path in paths if path.lower().endswith(".epub")]))
+            items.extend(XLSX(config).read_from_path([path for path in paths if path.lower().endswith(".xlsx")]))
+            items.extend(WOLFXLSX(config).read_from_path([path for path in paths if path.lower().endswith(".xlsx")]))
+            items.extend(RENPY(config).read_from_path([path for path in paths if path.lower().endswith(".rpy")]))
+            items.extend(TRANS(config).read_from_path([path for path in paths if path.lower().endswith(".trans")]))
+            items.extend(KVJSON(config).read_from_path([path for path in paths if path.lower().endswith(".json")]))
+            items.extend(MESSAGEJSON(config).read_from_path([path for path in paths if path.lower().endswith(".json")]))
         except Exception as e:
             LogHelper.error(f"文件读取失败 ... {e}")
 
-        return items
+        return [
+            v.get_src().strip()
+            for v in items if v.get_status() != Base.TranslationStatus.EXCLUDED and v.get_src().strip() != ""
+        ]
 
     # 从输入文件中加载数据
     def read_lines_from_input_file(self, language: int) -> tuple[list, dict[int, str], dict[int, str]]:
@@ -184,17 +191,7 @@ class FileManager():
         LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
     # 写入文件
-    def write_dict_to_file(self, words: list[Word], path: str, language: int) -> None:
-        with open(path, "w", encoding = "utf-8") as file:
-            data = {}
-            for k, word in enumerate(words):
-                data[word.surface] = word.surface_translation
-
-            file.write(json.dumps(data, indent = 4, ensure_ascii = False))
-            LogHelper.info(f"结果已写入 - [green]{path}[/]")
-
-    # 写入文件
-    def write_glossary_to_file(self, words: list[Word], path: str, language: int) -> None:
+    def write_glossary_to_json_file(self, words: list[Word], path: str, language: int) -> None:
         with open(path, "w", encoding = "utf-8") as file:
             datas = []
             for word in words:
@@ -203,9 +200,9 @@ class FileManager():
                 data["dst"] = word.surface_translation
 
                 if word.group == "角色" and "男" in word.gender:
-                    data["info"] = "男性名字"
+                    data["info"] = "男性"
                 elif word.group == "角色" and "女" in word.gender:
-                    data["info"] = "女性名字"
+                    data["info"] = "女性"
                 elif word.group == "角色":
                     data["info"] = "名字"
                 else:
@@ -217,22 +214,40 @@ class FileManager():
             LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
     # 写入文件
-    def write_galtransl_to_file(self, words: list[Word], path: str, language: int) -> None:
-        with open(path, "w", encoding = "utf-8") as file:
-            for word in words:
-                line = f"{word.surface}\t{word.surface_translation}"
+    def write_glossary_to_xlsx_file(self, words: list[Word], path: str, language: int) -> None:
+        # 新建工作表
+        book: openpyxl.Workbook = openpyxl.Workbook()
+        sheet: openpyxl.worksheet.worksheet.Worksheet = book.active
 
-                if word.group == "角色" and "男" in word.gender:
-                    line = line + "\t男性名字"
-                elif word.group == "角色" and "女" in word.gender:
-                    line = line + "\t女性名字"
-                elif word.group == "角色":
-                    line = line + "\t名字"
-                else:
-                    line = line + f"\t{word.group}"
+        # 设置表头
+        sheet.column_dimensions["A"].width = 32
+        sheet.column_dimensions["B"].width = 32
+        sheet.column_dimensions["C"].width = 32
+        sheet.column_dimensions["D"].width = 32
+        XLSXHelper.set_cell_value(sheet, 1, 1, "src", 10)
+        XLSXHelper.set_cell_value(sheet, 1, 2, "dst", 10)
+        XLSXHelper.set_cell_value(sheet, 1, 3, "info", 10)
+        XLSXHelper.set_cell_value(sheet, 1, 4, "regex", 10)
 
-                file.write(f"{line}" + "\n")
-            LogHelper.info(f"结果已写入 - [green]{path}[/]")
+        # 将数据写入工作表
+        for row, word in enumerate(words):
+            if word.group == "角色" and "男" in word.gender:
+                info = "男性"
+            elif word.group == "角色" and "女" in word.gender:
+                info = "女性"
+            elif word.group == "角色":
+                info = "名字"
+            else:
+                info = word.group
+
+            XLSXHelper.set_cell_value(sheet, row + 2, 1, word.surface, 10)
+            XLSXHelper.set_cell_value(sheet, row + 2, 2, word.surface_translation, 10)
+            XLSXHelper.set_cell_value(sheet, row + 2, 3, info, 10)
+            XLSXHelper.set_cell_value(sheet, row + 2, 4, "False", 10)
+
+        # 保存工作簿
+        book.save(path)
+        LogHelper.info(f"结果已写入 - [green]{path}[/]")
 
     # 将结果写入文件
     def write_result_to_file(self, words: list[Word], language: int) -> None:
@@ -257,6 +272,5 @@ class FileManager():
             # 写入文件
             prefix = f"output/{file_name}_{group}"
             self.write_log_to_file(words_by_type, f"{prefix}_日志.txt", language)
-            self.write_dict_to_file(words_by_type, f"{prefix}_词典.json", language)
-            self.write_glossary_to_file(words_by_type, f"{prefix}_术语表.json", language)
-            self.write_galtransl_to_file(words_by_type, f"{prefix}_galtransl.txt", language)
+            self.write_glossary_to_json_file(words_by_type, f"{prefix}_术语表.json", language)
+            self.write_glossary_to_xlsx_file(words_by_type, f"{prefix}_术语表.xlsx", language)
