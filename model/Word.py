@@ -121,7 +121,7 @@ class Word(BaseData):
             "\n".join(
                 self.clip_context(
                     line_threshold = 0,
-                    token_threshold = 192 if language == NER.Language.EN else 256,
+                    token_threshold = 256 if language == NER.Language.EN else 384,
                 )
             )
         )
@@ -134,7 +134,7 @@ class Word(BaseData):
             "\n".join(
                 self.clip_context(
                     line_threshold = 0,
-                    token_threshold = 256 if language == NER.Language.EN else 256,
+                    token_threshold = 256 if language == NER.Language.EN else 384,
                 )
             )
         )
