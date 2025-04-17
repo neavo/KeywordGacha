@@ -1,12 +1,32 @@
 import os
+import shutil
 
 import openpyxl
+import openpyxl.styles
 import openpyxl.worksheet.worksheet
 
 from base.Base import Base
 from module.Cache.CacheItem import CacheItem
 
-class XLSX(Base):
+class WOLFXLSX(Base):
+
+    BLACKLIST_EXT: tuple[str] = (
+        ".mp3", ".wav", ".ogg", "mid",
+        ".png", ".jpg", ".jpeg", ".gif", ".psd", ".webp", ".heif", ".heic",
+        ".avi", ".mp4", ".webm",
+        ".txt", ".7z", ".gz", ".rar", ".zip", ".json",
+        ".sav", ".mps", ".ttf", ".otf", ".woff",
+    )
+
+    FILL_COLOR_WHITELIST: tuple = (
+        9,                                                              # 白色
+    )
+
+    FILL_COLOR_BLACKLIST: tuple = (
+        44,                                                             # 蓝色
+        47,                                                             # 土黄
+        55,                                                             # 灰色
+    )
 
     def __init__(self, config: dict) -> None:
         super().__init__()
@@ -34,29 +54,33 @@ class XLSX(Base):
                 continue
 
             # 判断是否为 WOLF 翻译表格文件
-            if self.is_wold_xlsx(sheet):
+            if not self.is_wold_xlsx(sheet):
                 continue
 
-            for row in range(1, sheet.max_row + 1):
-                src = sheet.cell(row = row, column = 1).value
-                dst = sheet.cell(row = row, column = 2).value
+            for row in range(2, sheet.max_row + 1):
+                src: str = sheet.cell(row = row, column = 6).value
+                dst: str = sheet.cell(row = row, column = 7).value
 
                 # 跳过读取失败的行
                 # 数据不存在时为 None，存在时可能是 str int float 等多种类型
                 if src is None:
                     continue
 
-                src = str(src)
-                dst = str(dst) if dst is not None else ""
+                src: str = str(src)
+                dst: str = str(dst) if dst is not None else ""
 
-                if src == "":
+                if (
+                    src == ""
+                    or self.get_fg_color_index(sheet, row, 6) not in WOLFXLSX.FILL_COLOR_WHITELIST
+                ):
                     items.append(
                         CacheItem({
                             "src": src,
                             "dst": dst,
                             "row": row,
-                            "file_type": CacheItem.FileType.XLSX,
+                            "file_type": CacheItem.FileType.WOLFXLSX,
                             "file_path": rel_path,
+                            "text_type": CacheItem.TextType.WOLF,
                             "status": Base.TranslationStatus.EXCLUDED,
                         })
                     )
@@ -66,8 +90,9 @@ class XLSX(Base):
                             "src": src,
                             "dst": dst,
                             "row": row,
-                            "file_type": CacheItem.FileType.XLSX,
+                            "file_type": CacheItem.FileType.WOLFXLSX,
                             "file_path": rel_path,
+                            "text_type": CacheItem.TextType.WOLF,
                             "status": Base.TranslationStatus.TRANSLATED_IN_PAST,
                         })
                     )
@@ -77,8 +102,9 @@ class XLSX(Base):
                             "src": src,
                             "dst": dst,
                             "row": row,
-                            "file_type": CacheItem.FileType.XLSX,
+                            "file_type": CacheItem.FileType.WOLFXLSX,
                             "file_path": rel_path,
+                            "text_type": CacheItem.TextType.WOLF,
                             "status": Base.TranslationStatus.UNTRANSLATED,
                         })
                     )
@@ -104,3 +130,15 @@ class XLSX(Base):
             return False
 
         return True
+
+    # 获取单元格填充颜色索引
+    def get_fg_color_index(self, sheet: openpyxl.worksheet.worksheet.Worksheet, row: int, column: int) -> int:
+        fill = sheet.cell(row = row, column = column).fill
+        if fill.fill_type is not None:
+            fg_color = fill.fgColor
+            if fg_color:
+                if isinstance(fg_color, openpyxl.styles.Color):
+                    if fg_color.type == "indexed":
+                        return fg_color.indexed
+
+        return -1

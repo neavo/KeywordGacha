@@ -9,7 +9,6 @@ pecab
 loguru
 openai
 openpyxl
-ebooklib
 tiktoken
 pykakasi
 sudachipy
