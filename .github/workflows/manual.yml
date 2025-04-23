@@ -72,7 +72,7 @@ jobs:
       - name: Compress Archive
         shell: cmd
         run: |
-          .\resource\7za.exe a -y -bt -mx5 -v2000M KeywordGacha_${{ steps.check_version.outputs.version }}.zip .\dist\*
+          .\resource\7za.exe a -y -bt -mx4 -v2000M KeywordGacha_${{ steps.check_version.outputs.version }}.zip .\dist\*
 
       - name: Create Release
         id: create_release
