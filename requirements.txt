@@ -5,6 +5,7 @@ torchaudio
 torchvision
 
 rich
+httpx
 pecab
 loguru
 openai

@@ -2,6 +2,7 @@ import re
 import asyncio
 import threading
 import urllib.request
+from typing import Any
 from types import SimpleNamespace
 
 import pykakasi
@@ -24,16 +25,11 @@ class LLM:
         SURFACE_ANALYSIS: int = 200          # 语义分析
         TRANSLATE_CONTEXT: int = 300         # 翻译参考文本
 
-    # LLM 配置参数
-    class LLMConfig(BaseData):
-
-        TEMPERATURE: float = 0.05
-        TOP_P: float = 0.95
-        MAX_TOKENS: float = 1024
-        FREQUENCY_PENALTY: float = 0.0
-
     # 最大重试次数
     MAX_RETRY: int = 3
+
+    # OPENAI 思考模型 o1 o3-mini o4-mini-20240406
+    REGEX_O_Series: re.Pattern = re.compile(r"o\d$|o\d\-", flags = re.IGNORECASE)
 
     # 类型映射表
     GROUP_MAPPING = {
@@ -55,11 +51,11 @@ class LLM:
     }
 
     def __init__(self, config: SimpleNamespace) -> None:
-        self.api_key = config.api_key
-        self.base_url = config.base_url
-        self.model_name = config.model_name
-        self.request_timeout = config.request_timeout
-        self.request_frequency_threshold = config.request_frequency_threshold
+        self.api_key: str = config.api_key
+        self.base_url: str = config.base_url
+        self.model_name: str = config.model_name
+        self.request_timeout: int = config.request_timeout
+        self.request_frequency_threshold: int = config.request_frequency_threshold
 
         # 初始化
         self.kakasi = pykakasi.kakasi()
@@ -105,25 +101,19 @@ class LLM:
     def load_llm_config(self) -> None:
         try:
             with open("resource/llm_config/api_test_config.json", "r", encoding = "utf-8-sig") as reader:
-                LLM.API_TEST_CONFIG = LLM.LLMConfig()
-                for key, value in repair.load(reader).items():
-                    setattr(LLM.API_TEST_CONFIG, key.upper(), value)
+                self.api_test_config = repair.load(reader)
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
         try:
             with open("resource/llm_config/surface_analysis_config.json", "r", encoding = "utf-8-sig") as reader:
-                LLM.SURFACE_ANALYSIS_CONFIG = LLM.LLMConfig()
-                for key, value in repair.load(reader).items():
-                    setattr(LLM.SURFACE_ANALYSIS_CONFIG, key.upper(), value)
+                self.surface_analysis_config = repair.load(reader)
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
         try:
             with open("resource/llm_config/context_translate_config.json", "r", encoding = "utf-8-sig") as reader:
-                LLM.CONTEXT_TRANSLATE_CONFIG = LLM.LLMConfig()
-                for key, value in repair.load(reader).items():
-                    setattr(LLM.CONTEXT_TRANSLATE_CONFIG, key.upper(), value)
+                self.context_translate_config = repair.load(reader)
         except Exception as e:
             LogHelper.error(f"加载配置文件时发生错误 - {LogHelper.get_trackback(e)}")
 
@@ -143,11 +133,6 @@ class LLM:
             LogHelper.info("")
             LogHelper.info(f"检查到 [green]llama.cpp[/]，根据其配置，请求频率阈值自动设置为 [green]{len(response_json)}[/] 次/秒 ...")
             LogHelper.info("")
-        # 否则，按在线接口设置
-        else:
-            LLM.API_TEST_CONFIG.MAX_TOKENS = 4 * 1024
-            LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS = 4 * 1024
-            LLM.CONTEXT_TRANSLATE_CONFIG.MAX_TOKENS = 4 * 1024
 
         # 设置请求限制器
         if self.request_frequency_threshold > 1:
@@ -161,21 +146,33 @@ class LLM:
             self.async_limiter = AsyncLimiter(max_rate = 1, time_period = 1)
 
     # 异步发送请求到 OpenAI 获取模型回复
-    async def do_request(self, messages: list, llm_config: LLMConfig, retry: bool) -> tuple[Exception, dict, str, str, dict, dict]:
+    async def do_request(self, messages: list, llm_config: dict[str, Any], retry: bool) -> tuple[Exception, dict, str, str, dict, dict]:
         try:
             error, usage, response_think, response_result, llm_request, llm_response = None, None, None, None, None, None
 
             llm_request = {
                 "model" : self.model_name,
-                "stream" : False,
-                "temperature" : max(llm_config.TEMPERATURE, 0.50) if retry == True else llm_config.TEMPERATURE,
-                "top_p" : llm_config.TOP_P,
-                "max_tokens" : llm_config.MAX_TOKENS,
-                # 同时设置 max_tokens 和 max_completion_tokens 时 OpenAI 接口会报错
-                # "max_completion_tokens" : llm_config.MAX_TOKENS,
-                "frequency_penalty" : max(llm_config.FREQUENCY_PENALTY, 0.2) if retry == True else llm_config.FREQUENCY_PENALTY,
                 "messages" : messages,
+                "max_tokens" : llm_config.get("max_tokens"),
             }
+
+            # 设置请求参数
+            if isinstance(llm_config.get("top_p"), (int, float)):
+                llm_request["top_p"] = llm_config.get("top_p")
+            if isinstance(llm_config.get("temperature"), (int, float)):
+                llm_request["temperature"] = llm_config.get("temperature")
+            if isinstance(llm_config.get("presence_penalty"), (int, float)):
+                llm_request["presence_penalty"] = llm_config.get("presence_penalty")
+            if isinstance(llm_config.get("frequency_penalty"), (int, float)):
+                llm_request["frequency_penalty"] = llm_config.get("frequency_penalty")
+
+            # 根据是否为 OpenAI O-Series 模型对请求参数进行处理
+            if (
+                self.base_url.startswith("https://api.openai.com") or
+                __class__.REGEX_O_Series.search(self.model_name) is not None
+            ):
+                llm_request.pop("max_tokens", None)
+                llm_request["max_completion_tokens"] = llm_config.get("max_tokens")
 
             response = await self.client.chat.completions.create(**llm_request)
 
@@ -218,17 +215,13 @@ class LLM:
                             ),
                         },
                     ],
-                    LLM.API_TEST_CONFIG,
+                    self.api_test_config,
                     True
                 )
 
                 # 检查错误
                 if error != None:
                     raise error
-
-                # 检查是否超过最大 token 限制
-                if usage.completion_tokens >= LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS:
-                    raise Exception("返回结果错误（模型退化） ...")
 
                 # 反序列化 JSON
                 result = repair.loads(response_result)
@@ -270,17 +263,13 @@ class LLM:
                             ),
                         },
                     ],
-                    LLM.SURFACE_ANALYSIS_CONFIG,
+                    self.surface_analysis_config,
                     retry
                 )
 
                 # 检查错误
                 if error != None:
                     raise error
-
-                # 检查是否超过最大 token 限制
-                if usage.completion_tokens >= LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS:
-                    raise Exception("返回结果错误（模型退化） ...")
 
                 # 反序列化 JSON
                 result = repair.loads(response_result)
@@ -386,16 +375,12 @@ class LLM:
                             ),
                         },
                     ],
-                    LLM.CONTEXT_TRANSLATE_CONFIG,
+                    self.context_translate_config,
                     retry
                 )
 
                 if error != None:
                     raise error
-
-                # 检查是否超过最大 token 限制
-                if usage.completion_tokens >= LLM.SURFACE_ANALYSIS_CONFIG.MAX_TOKENS:
-                    raise Exception("返回结果错误（模型退化） ...")
 
                 context_translation = [line.strip() for line in response_result.splitlines() if line.strip() != ""]
 
