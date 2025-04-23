@@ -3,5 +3,8 @@
     "temperature": null,
     "top_p": null,
     "presence_penalty": null,
-    "frequency_penalty": null
+    "frequency_penalty": null,
+    "extra_headers": null,
+    "extra_query": null,
+    "extra_body": null
 }

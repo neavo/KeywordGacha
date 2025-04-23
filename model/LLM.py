@@ -165,6 +165,12 @@ class LLM:
                 llm_request["presence_penalty"] = llm_config.get("presence_penalty")
             if isinstance(llm_config.get("frequency_penalty"), (int, float)):
                 llm_request["frequency_penalty"] = llm_config.get("frequency_penalty")
+            if isinstance(llm_config.get("extra_headers"), dict):
+                llm_request["extra_headers"] = llm_config.get("extra_headers")
+            if isinstance(llm_config.get("extra_query"), dict):
+                llm_request["extra_query"] = llm_config.get("extra_query")
+            if isinstance(llm_config.get("extra_body"), dict):
+                llm_request["extra_body"] = llm_config.get("extra_body")
 
             # 根据是否为 OpenAI O-Series 模型对请求参数进行处理
             if (
