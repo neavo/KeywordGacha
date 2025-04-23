@@ -196,13 +196,16 @@ class TestHelper:
         with open(path, "w", encoding = "utf-8") as writer:
             x = {k for k in TestHelper.DATA.keys()}
             y = {word.surface for word in words if word.group == "角色"}
+            z = {word.surface for word in words if word.group != "角色"}
 
-            writer.write(f"第一个词典独有的键 - {len(x - y)}\n")
-            writer.write(f"{x - y}\n")
-            writer.write(f"第二个词典独有的键 - {len(y - x)}\n")
-            writer.write(f"{y - x}\n")
-            writer.write(f"两个字典共有的键 - {len(x & y)}\n")
+            writer.write(f"x 独有的键 - {len(x - y - z)}\n")
+            writer.write(f"{x - y - z}\n")
+            writer.write(f"y 独有的键 - {len(y - x - z)}\n")
+            writer.write(f"{y - x - z}\n")
+            writer.write(f"xy 共有的键 - {len(x & y)}\n")
             writer.write(f"{x & y}\n")
+            writer.write(f"xz 共有的键 - {len(x & z)}\n")
+            writer.write(f"{x & z}\n")
             writer.write("\n")
             writer.write("\n")
 

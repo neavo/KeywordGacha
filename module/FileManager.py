@@ -100,7 +100,11 @@ class FileManager():
 
         return [
             v.get_src().strip()
-            for v in items if v.get_status() != Base.TranslationStatus.EXCLUDED and v.get_src().strip() != ""
+            for v in items
+            if (
+                v.get_src().strip() != ""
+                and (v.get_file_type() == CacheItem.FileType.TRANS or v.get_status() != Base.TranslationStatus.EXCLUDED)
+            )
         ]
 
     # 从输入文件中加载数据
