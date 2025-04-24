@@ -43,7 +43,10 @@ class WOLFXLSX(Base):
         items:list[CacheItem] = []
         for abs_path in abs_paths:
             # 获取相对路径
-            rel_path = os.path.relpath(abs_path, self.input_path)
+            try:
+                rel_path = os.path.relpath(abs_path, self.input_path)
+            except Exception:
+                rel_path = abs_path
 
             # 数据处理
             book: openpyxl.Workbook = openpyxl.load_workbook(abs_path)

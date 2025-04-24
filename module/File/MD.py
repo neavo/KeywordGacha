@@ -25,7 +25,10 @@ class MD(Base):
 
         for abs_path in abs_paths:
             # 获取相对路径
-            rel_path = os.path.relpath(abs_path, self.input_path)
+            try:
+                rel_path = os.path.relpath(abs_path, self.input_path)
+            except Exception:
+                rel_path = abs_path
 
             # 数据处理
             with open(abs_path, "r", encoding = "utf-8-sig") as reader:
