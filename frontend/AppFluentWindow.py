@@ -29,6 +29,7 @@ from frontend.EmptyPage import EmptyPage
 from frontend.Project.PlatformPage import PlatformPage
 from frontend.Project.ProjectPage import ProjectPage
 from frontend.Quality.CustomPromptPage import CustomPromptPage
+from frontend.Quality.ReplacementPage import ReplacementPage
 from frontend.Setting.BasicSettingsPage import BasicSettingsPage
 from frontend.Setting.ExpertSettingsPage import ExpertSettingsPage
 from frontend.TaskPage import TaskPage
@@ -296,6 +297,13 @@ class AppFluentWindow(FluentWindow, Base):
 
     # 添加质量类页面
     def add_quality_pages(self) -> None:
+        self.addSubInterface(
+            interface = ReplacementPage("pre_replacement_page", self, "pre_replacement"),
+            icon = FluentIcon.SEARCH,
+            text = Localizer.get().app_pre_replacement_page,
+            position = NavigationItemPosition.SCROLL,
+        )
+
         self.custom_prompt_page = EmptyPage("custom_prompt_page", self)
         self.addSubInterface(
             self.custom_prompt_page,

@@ -129,8 +129,7 @@ class FakeNameHelper():
                 return code
 
         # 将代码转换为伪名
-        src = re.sub(r"\\n\[\d+\]", lambda match: repl(match), src,flags = re.IGNORECASE)
-        src = re.sub(r"\\nn\[\d+\]", lambda match: repl(match), src,flags = re.IGNORECASE)
+        src = re.sub(r"\\n{1,2}\[\d+\]", lambda match: repl(match), src, flags = re.IGNORECASE)
 
         return src
 

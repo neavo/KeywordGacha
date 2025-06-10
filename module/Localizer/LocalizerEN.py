@@ -59,6 +59,7 @@ class LocalizerEN(LocalizerZH):
     app_task_page: str = "Start Task"
     app_basic_settings_page: str = "Basic Settings"
     app_expert_settings_page: str = "Expert Settings"
+    app_pre_replacement_page: str = "Pre-Replacement"
     app_custom_prompt_navigation_item: str = "Custom Prompts"
     app_custom_prompt_zh_page: str = "Chinese Prompts"
     app_custom_prompt_en_page: str = "English Prompts"
@@ -236,6 +237,19 @@ class LocalizerEN(LocalizerZH):
     quality_select_file_type: str = "Support Format (*.json *.xlsx)"
     quality_delete_row: str = "Delete Row"
     quality_switch_regex: str = "Regex Switch"
+
+    # 前置替换
+    pre_replacement_page_head_title: str = "Pre-Replacement"
+    pre_replacement_page_head_content: str = (
+        "Before the task begins, matched parts of the original text will be replaced by specified text, processed in top-down order"
+        "<br>"
+        "For games using the <font color='darkgoldenrod'><b>RPGMaker MV/MZ</b></font> engine:"
+        "<br>"
+        "• Importing the <font color='darkgoldenrod'><b>actors.json</b></font> file from the <font color='darkgoldenrod'><b>data</b></font> or <font color='darkgoldenrod'><b>www\\data</b></font> folder in the game directory can restore actor codes to plain text"
+    )
+    pre_replacement_page_table_row_01: str = "Original"
+    pre_replacement_page_table_row_02: str = "Replacement"
+    pre_replacement_page_table_row_03: str = "Regex"
 
     # 自定义提示词 - 中文
     custom_prompt_zh_page_head: str = "Custom Chinese Prompts (SakuraLLM model not supported)"
