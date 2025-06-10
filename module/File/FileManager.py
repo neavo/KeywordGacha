@@ -4,7 +4,6 @@ import random
 from datetime import datetime
 
 import openpyxl
-import openpyxl.styles
 import openpyxl.worksheet.worksheet
 
 from base.Base import Base
@@ -80,6 +79,9 @@ class FileManager(Base):
         TableManager.set_cell_value(sheet, 1, 2, "dst", 10)
         TableManager.set_cell_value(sheet, 1, 3, "info", 10)
         TableManager.set_cell_value(sheet, 1, 4, "regex", 10)
+
+        # 启用表头筛选
+        sheet.auto_filter.ref = "A1:D1"
 
         # 将数据写入工作表
         for row, item in enumerate(glossary):
