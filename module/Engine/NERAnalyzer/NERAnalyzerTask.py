@@ -1,3 +1,4 @@
+import re
 import time
 
 import rich
@@ -44,13 +45,19 @@ class NERAnalyzerTask(Base):
             if item.get_first_name_src() is not None:
                 item.set_src(f"【{item.get_first_name_src()}】{item.get_src()}")
 
-            # 注入伪名
-            item.set_src(FakeNameHelper.inject(item.get_src()))
-
             # 拆分文本
             for src in item.get_src().split("\n"):
+                # 正规化
                 src = Normalizer.normalize(src)
+
+                # 清理注音
                 src = RubyCleaner.clean(src)
+
+                # 前置替换
+                src = self.pre_replacement(src)
+
+                # 注入伪名
+                src = FakeNameHelper.inject(src)
 
                 if src == "":
                     pass
@@ -121,6 +128,19 @@ class NERAnalyzerTask(Base):
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
         }
+
+    # 前置替换
+    def pre_replacement(self, src: str) -> str:
+        if self.config.pre_replacement_enable == False:
+            return src
+
+        for v in self.config.pre_replacement_data:
+            if v.get("regex", False) != True:
+                src = src.replace(v.get("src"), v.get("dst"))
+            else:
+                src = re.sub(rf"{v.get("src")}", rf"{v.get("dst")}", src)
+
+        return src
 
     # 打印日志表格
     def print_log_table(self, start: int, input: int, output: int, srcs: list[str], file_log: list[str], console_log: list[str]) -> None:

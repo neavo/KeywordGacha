@@ -59,6 +59,7 @@ class LocalizerZH():
     app_task_page: str = "开始任务"
     app_basic_settings_page: str = "基础设置"
     app_expert_settings_page: str = "专家设置"
+    app_pre_replacement_page: str = "前置替换"
     app_custom_prompt_navigation_item: str = "自定义提示词"
     app_custom_prompt_zh_page: str = "中文提示词"
     app_custom_prompt_en_page: str = "英文提示词"
@@ -236,6 +237,19 @@ class LocalizerZH():
     quality_select_file_type: str = "支持的数据格式 (*.json *.xlsx)"
     quality_delete_row: str = "删除行"
     quality_switch_regex: str = "切换正则模式"
+
+    # 前置替换
+    pre_replacement_page_head_title: str = "前置替换"
+    pre_replacement_page_head_content: str = (
+        "在任务开始前，将原文中匹配的部分替换为指定的文本，执行的顺序为从上到下依次替换"
+        "<br>"
+        "对于 <font color='darkgoldenrod'><b>RPGMaker MV/MZ</b></font> 引擎的游戏："
+        "<br>"
+        "• 导入游戏目录的 <font color='darkgoldenrod'><b>data</b></font> 或者 <font color='darkgoldenrod'><b>www\\data</b></font> 文件夹内的 <font color='darkgoldenrod'><b>actors.json</b></font> 文件可以将角色代码还原为明文"
+    )
+    pre_replacement_page_table_row_01: str = "原文"
+    pre_replacement_page_table_row_02: str = "替换"
+    pre_replacement_page_table_row_03: str = "正则"
 
     # 自定义提示词 - 中文
     custom_prompt_zh_page_head: str = "自定义中文提示词"

@@ -49,6 +49,10 @@ class Config():
     output_folder_open_on_finish: bool = False
     traditional_chinese_enable: bool = False
 
+    # pre_replacement_page
+    pre_replacement_enable: bool = True
+    pre_replacement_data: list[dict[str, str]] = dataclasses.field(default_factory = list)
+
     # CustomPromptZHPage
     custom_prompt_zh_enable: bool = False
     custom_prompt_zh_data: str = None
