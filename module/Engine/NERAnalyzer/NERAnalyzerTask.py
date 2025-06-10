@@ -10,6 +10,7 @@ from base.LogManager import LogManager
 from model.Item import Item
 from module.Config import Config
 from module.Engine.TaskRequester import TaskRequester
+from module.FakeNameHelper import FakeNameHelper
 from module.Localizer.Localizer import Localizer
 from module.Normalizer import Normalizer
 from module.PromptBuilder import PromptBuilder
@@ -39,6 +40,14 @@ class NERAnalyzerTask(Base):
         # 文本预处理
         srcs: list[str] = []
         for item in items:
+            # 注入姓名
+            if item.get_first_name_src() is not None:
+                item.set_src(f"【{item.get_first_name_src()}】{item.get_src()}")
+
+            # 注入伪名
+            item.set_src(FakeNameHelper.inject(item.get_src()))
+
+            # 拆分文本
             for src in item.get_src().split("\n"):
                 src = Normalizer.normalize(src)
                 src = RubyCleaner.clean(src)
@@ -47,8 +56,6 @@ class NERAnalyzerTask(Base):
                     pass
                 elif src.strip() == "":
                     pass
-                elif item.get_first_name_src() is not None:
-                    srcs.append(f"【{item.get_first_name_src()}】{src}")
                 else:
                     srcs.append(src)
 

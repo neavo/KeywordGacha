@@ -65,7 +65,6 @@ class LocalizerEN(LocalizerZH):
 
     # 路径
     path_bilingual: str = "bilingual"
-    path_glossary: str = "glossary"
 
     # 日志
     log_crash: str = "A critical error has occurred, app will now exit, error detail has been saved to the log file …"
