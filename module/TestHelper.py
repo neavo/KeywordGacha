@@ -1,10 +1,8 @@
-import json
-
-from model.Word import Word
+from rich import print
 
 class TestHelper:
 
-    DATA = {
+    SAMPLE = {
         # "ブルースライム": "蓝史莱姆",
         # "ワイバーン": "双足飞龙",
         # "ミスリル": "秘银",
@@ -155,88 +153,23 @@ class TestHelper:
         "ヴェントルジェント": "文特尔金特",
     }
 
-    THRESHOLDS = (
-        0.25,
-        0.30,
-        0.35,
-        0.40,
-        0.45,
-        0.50,
-        0.55,
-        0.60,
-        0.65,
-        0.70,
-        0.75,
-        0.80,
-        0.85,
-        0.90,
-        0.95,
-    )
+    def __init__(self) -> None:
+        super().__init__()
 
-    def check_score_threshold(words: list[Word], path: str) -> None:
-        with open(path, "w", encoding = "utf-8") as writer:
-            for threshold in TestHelper.THRESHOLDS:
-                x = {k for k in TestHelper.DATA.keys()}
-                y = {
-                    word.surface
-                    for word in words if word.score > threshold
-                }
+    def check_result_duplication(self, glossary: list[dict[str, str]]) -> None:
+        x = {k for k in __class__.SAMPLE.keys()}
+        y = {v.get("src", "") for v in glossary}
 
-                writer.write(f"当置信度阈值设置为 {threshold:.4f} 时：\n")
-                writer.write(f"第一个词典独有的键 - {len(x - y)}\n")
-                writer.write(f"{x - y}\n")
-                writer.write(f"第二个词典独有的键 - {len(y - x)}\n")
-                writer.write(f"{y - x}\n")
-                writer.write(f"两个字典共有的键 - {len(x & y)}\n")
-                writer.write(f"{x & y}\n")
-                writer.write("\n")
-                writer.write("\n")
+        print("")
+        print("")
+        print(f"第一个词典独有的键 - {len(x - y)}")
+        print(f"{x - y}")
+        print(f"第二个词典独有的键 - {len(y - x)}")
+        print(f"{y - x}")
+        print(f"两个字典共有的键 - {len(x & y)}")
+        print(f"{x & y}")
+        print("")
+        print("")
 
-    def check_result_duplication(words: list[Word], path: str) -> None:
-        with open(path, "w", encoding = "utf-8") as writer:
-            x = {k for k in TestHelper.DATA.keys()}
-            y = {word.surface for word in words if word.group == "角色"}
-            z = {word.surface for word in words if word.group != "角色"}
-
-            writer.write(f"x 独有的键 - {len(x - y - z)}\n")
-            writer.write(f"{x - y - z}\n")
-            writer.write(f"y 独有的键 - {len(y - x - z)}\n")
-            writer.write(f"{y - x - z}\n")
-            writer.write(f"xy 共有的键 - {len(x & y)}\n")
-            writer.write(f"{x & y}\n")
-            writer.write(f"xz 共有的键 - {len(x & z)}\n")
-            writer.write(f"{x & z}\n")
-            writer.write("\n")
-            writer.write("\n")
-
-    def save_surface_analysis_log(words: list[Word], path: str) -> None:
-        with open(path, "w", encoding = "utf-8") as writer:
-            writer.write(
-                json.dumps(
-                    [
-                        {
-                            "request": word.llmrequest_surface_analysis,
-                            "response": word.llmresponse_surface_analysis,
-                        }
-                        for word in words
-                    ],
-                    indent = 4,
-                    ensure_ascii = False,
-                )
-            )
-
-    def save_context_translate_log(words: list[Word], path: str) -> None:
-        with open(path, "w", encoding = "utf-8") as writer:
-            writer.write(
-                json.dumps(
-                    [
-                        {
-                            "request": word.llmrequest_context_translate,
-                            "response": word.llmresponse_context_translate,
-                        }
-                        for word in words
-                    ],
-                    indent = 4,
-                    ensure_ascii = False,
-                )
-            )
+if __name__ == "__main__":
+    TestHelper().check_result_duplication()

@@ -1,12 +1,10 @@
-__pycache__
-
-/env*
-/dist*
-/build*
-/input*
-/output*
+*__pycache__
 
 /*log*
-/*dev*
 /*debug*
-/resource/*ner*
+/*input*
+/*output*
+/*.json
+/*.xlsx
+/resource/config.json
+/resource/expert_config.json

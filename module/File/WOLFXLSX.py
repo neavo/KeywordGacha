@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 
 import openpyxl
@@ -6,7 +7,10 @@ import openpyxl.styles
 import openpyxl.worksheet.worksheet
 
 from base.Base import Base
-from module.Cache.CacheItem import CacheItem
+from base.BaseLanguage import BaseLanguage
+from model.Item import Item
+from module.Config import Config
+from module.TableManager import TableManager
 
 class WOLFXLSX(Base):
 
@@ -28,25 +32,26 @@ class WOLFXLSX(Base):
         55,                                                             # 灰色
     )
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: Config) -> None:
         super().__init__()
 
         # 初始化
-        self.config: dict = config
-        self.input_path: str = config.get("input_folder")
-        self.output_path: str = config.get("output_folder")
-        self.source_language: str = config.get("source_language")
-        self.target_language: str = config.get("target_language")
+        self.config = config
+        self.input_path: str = config.input_folder
+        self.output_path: str = config.output_folder
+        self.source_language: BaseLanguage.Enum = config.source_language
+        self.target_language: BaseLanguage.Enum = config.target_language
 
     # 读取
-    def read_from_path(self, abs_paths: list[str]) -> list[CacheItem]:
-        items:list[CacheItem] = []
+    def read_from_path(self, abs_paths: list[str]) -> list[Item]:
+        items:list[Item] = []
         for abs_path in abs_paths:
             # 获取相对路径
-            try:
-                rel_path = os.path.relpath(abs_path, self.input_path)
-            except Exception:
-                rel_path = abs_path
+            rel_path = os.path.relpath(abs_path, self.input_path)
+
+            # 将原始文件复制一份
+            os.makedirs(os.path.dirname(f"{self.output_path}/cache/temp/{rel_path}"), exist_ok = True)
+            shutil.copy(abs_path, f"{self.output_path}/cache/temp/{rel_path}")
 
             # 数据处理
             book: openpyxl.Workbook = openpyxl.load_workbook(abs_path)
@@ -77,42 +82,78 @@ class WOLFXLSX(Base):
                     or self.get_fg_color_index(sheet, row, 6) not in WOLFXLSX.FILL_COLOR_WHITELIST
                 ):
                     items.append(
-                        CacheItem({
+                        Item.from_dict({
                             "src": src,
                             "dst": dst,
                             "row": row,
-                            "file_type": CacheItem.FileType.WOLFXLSX,
+                            "file_type": Item.FileType.WOLFXLSX,
                             "file_path": rel_path,
-                            "text_type": CacheItem.TextType.WOLF,
-                            "status": Base.TranslationStatus.EXCLUDED,
+                            "text_type": Item.TextType.WOLF,
+                            "status": Base.ProjectStatus.EXCLUDED,
                         })
                     )
                 elif dst != "" and src != dst:
                     items.append(
-                        CacheItem({
+                        Item.from_dict({
                             "src": src,
                             "dst": dst,
                             "row": row,
-                            "file_type": CacheItem.FileType.WOLFXLSX,
+                            "file_type": Item.FileType.WOLFXLSX,
                             "file_path": rel_path,
-                            "text_type": CacheItem.TextType.WOLF,
-                            "status": Base.TranslationStatus.TRANSLATED_IN_PAST,
+                            "text_type": Item.TextType.WOLF,
+                            "status": Base.ProjectStatus.PROCESSED_IN_PAST,
                         })
                     )
                 else:
                     items.append(
-                        CacheItem({
+                        Item.from_dict({
                             "src": src,
                             "dst": dst,
                             "row": row,
-                            "file_type": CacheItem.FileType.WOLFXLSX,
+                            "file_type": Item.FileType.WOLFXLSX,
                             "file_path": rel_path,
-                            "text_type": CacheItem.TextType.WOLF,
-                            "status": Base.TranslationStatus.UNTRANSLATED,
+                            "text_type": Item.TextType.WOLF,
+                            "status": Base.ProjectStatus.NONE,
                         })
                     )
 
         return items
+
+    # 写入
+    def write_to_path(self, items: list[Item]) -> None:
+        target = [
+            item for item in items
+            if item.get_file_type() == Item.FileType.WOLFXLSX
+        ]
+
+        # 按文件路径分组
+        group: dict[str, list[str]] = {}
+        for item in target:
+            group.setdefault(item.get_file_path(), []).append(item)
+
+        # 分别处理每个文件
+        for rel_path, items in group.items():
+            # 按行号排序
+            items = sorted(items, key = lambda x: x.get_row())
+
+            # 新建工作表
+            book: openpyxl.Workbook = openpyxl.Workbook()
+            sheet: openpyxl.worksheet.worksheet.Worksheet = book.active
+
+            # 设置表头
+            sheet.column_dimensions["A"].width = 64
+            sheet.column_dimensions["B"].width = 64
+
+            # 将数据写入工作表
+            for item in items:
+                row: int = item.get_row()
+                TableManager.set_cell_value(sheet, row, column = 6, value = item.get_src())
+                TableManager.set_cell_value(sheet, row, column = 7, value = item.get_dst())
+
+            # 保存工作簿
+            abs_path = f"{self.output_path}/{rel_path}"
+            os.makedirs(os.path.dirname(abs_path), exist_ok = True)
+            book.save(abs_path)
 
     # 是否为 WOLF 翻译表格文件
     def is_wold_xlsx(self, sheet: openpyxl.worksheet.worksheet.Worksheet) -> bool:
