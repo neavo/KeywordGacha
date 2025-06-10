@@ -57,6 +57,11 @@ class Config():
     custom_prompt_en_enable: bool = False
     custom_prompt_en_data: str = None
 
+    # 兼容性字段
+    deduplication_in_trans: bool = True
+    deduplication_in_bilingual: bool = True
+    write_translated_name_fields_to_file: bool = True
+
     # 类属性
     CONFIG_PATH: ClassVar[str] = "./resource/config.json"
     CONFIG_LOCK: ClassVar[threading.Lock] = threading.Lock()

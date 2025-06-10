@@ -89,8 +89,8 @@ class FileManager(Base):
             TableManager.set_cell_value(sheet, row + 2, 4, item.get("regex", ""), 10)
 
         # 保存工作簿
-        book.save(f"{self.config.output_folder}/{Localizer.get().path_glossary}.xlsx")
+        book.save(f"{self.config.output_folder}/output.xlsx")
 
         # 保存为 JSON
-        with open(f"{self.config.output_folder}/{Localizer.get().path_glossary}.json", "w", encoding = "utf-8") as writer:
+        with open(f"{self.config.output_folder}/output.json", "w", encoding = "utf-8") as writer:
             writer.write(json.dumps(glossary, indent = 4, ensure_ascii = False))

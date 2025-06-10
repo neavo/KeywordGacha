@@ -65,7 +65,6 @@ class LocalizerZH():
 
     # 路径
     path_bilingual: str = "双语对照"
-    path_glossary: str = "术语表"
 
     # 日志
     log_crash: str = "出现严重错误，应用即将退出，错误信息已保存至日志文件 …"

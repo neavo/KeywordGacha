@@ -20,6 +20,7 @@ from module.Engine.Engine import Engine
 from module.Engine.NERAnalyzer.NERAnalyzerTask import NERAnalyzerTask
 from module.Engine.TaskLimiter import TaskLimiter
 from module.Engine.TaskRequester import TaskRequester
+from module.FakeNameHelper import FakeNameHelper
 from module.File.FileManager import FileManager
 from module.Filter.LanguageFilter import LanguageFilter
 from module.Filter.RuleFilter import RuleFilter
@@ -149,6 +150,7 @@ class NERAnalyzer(Base):
         # 重置
         TaskRequester.reset()
         PromptBuilder.reset()
+        FakeNameHelper.reset()
 
         # 生成缓存列表
         if status == Base.ProjectStatus.PROCESSING:
@@ -207,7 +209,7 @@ class NERAnalyzer(Base):
 
             # 第二轮开始切分
             if current_round > 0:
-                self.config.token_threshold = max(1, int(self.config.token_threshold / 3))
+                self.config.token_threshold = max(1, int(self.config.token_threshold / 2))
 
             # 生成缓存数据条目片段
             chunks = self.cache_manager.generate_item_chunks(self.config.token_threshold)
@@ -379,6 +381,9 @@ class NERAnalyzer(Base):
                 dst: str = self.convert_chinese_character_form(v.get("dst", ""))
                 info: str = self.convert_chinese_character_form(v.get("info", ""))
 
+                # 伪名还原
+                src, fake_name_injected = FakeNameHelper.restore(src)
+
                 # 将原文和译文都按标点切分
                 srcs: list[str] = TextHelper.split_by_punctuation(src, split_by_space = True)
                 dsts: list[str] = TextHelper.split_by_punctuation(dst, split_by_space = True)
@@ -389,10 +394,11 @@ class NERAnalyzer(Base):
                     src = src.strip()
                     dst = dst.strip()
 
-                    if src == dst or src == "" or dst == "":
+                    if fake_name_injected == True:
+                        dst = ""
+                    elif src == dst or src == "" or dst == "":
                         continue
-
-                    if self.check(src, dst, info) == False:
+                    elif self.check(src, dst, info) == False:
                         continue
 
                     group.setdefault(src, []).append({
