@@ -184,7 +184,7 @@ class TaskPage(QWidget, Base):
             self.action_start.setEnabled(False)
             self.action_stop.setEnabled(False)
             self.action_export.setEnabled(False)
-        elif Engine.get().get_status() == Base.TaskStatus.TRANSLATING:
+        elif Engine.get().get_status() == Base.TaskStatus.NERING:
             self.action_start.setEnabled(False)
             self.action_stop.setEnabled(True)
             self.action_export.setEnabled(True)
@@ -212,7 +212,7 @@ class TaskPage(QWidget, Base):
 
     # 更新时间
     def update_time(self, data: dict) -> None:
-        if Engine.get().get_status() not in (Base.TaskStatus.STOPPING, Base.TaskStatus.TRANSLATING):
+        if Engine.get().get_status() not in (Base.TaskStatus.STOPPING, Base.TaskStatus.NERING):
             return None
 
         if self.data.get("start_time", 0) == 0:
@@ -243,7 +243,7 @@ class TaskPage(QWidget, Base):
 
     # 更新行数
     def update_line(self, data: dict) -> None:
-        if Engine.get().get_status() not in (Base.TaskStatus.STOPPING, Base.TaskStatus.TRANSLATING):
+        if Engine.get().get_status() not in (Base.TaskStatus.STOPPING, Base.TaskStatus.NERING):
             return None
 
         line = self.data.get("line", 0)
@@ -280,7 +280,7 @@ class TaskPage(QWidget, Base):
 
     # 更新 Token 数据
     def update_token(self, data: dict) -> None:
-        if Engine.get().get_status() not in (Base.TaskStatus.STOPPING, Base.TaskStatus.TRANSLATING):
+        if Engine.get().get_status() not in (Base.TaskStatus.STOPPING, Base.TaskStatus.NERING):
             return None
 
         token = self.data.get("total_tokens", 0)
@@ -309,15 +309,13 @@ class TaskPage(QWidget, Base):
             percent = self.data.get("line", 0) / max(1, self.data.get("total_line", 0))
             self.ring.setValue(int(percent * 10000))
             self.ring.setFormat(f"{Localizer.get().task_page_status_stopping}\n{percent * 100:.2f}%")
-        elif Engine.get().get_status() == Base.TaskStatus.TRANSLATING:
+        elif Engine.get().get_status() == Base.TaskStatus.NERING:
             percent = self.data.get("line", 0) / max(1, self.data.get("total_line", 0))
             self.ring.setValue(int(percent * 10000))
-            self.ring.setFormat(f"{Localizer.get().task_page_status_translating}\n{percent * 100:.2f}%")
+            self.ring.setFormat(f"{Localizer.get().task_page_status_nering}\n{percent * 100:.2f}%")
         else:
             self.ring.setValue(0)
             self.ring.setFormat(Localizer.get().task_page_status_idle)
-
-
 
     # 头部
     def add_widget_head(self, parent: QLayout, config: Config, window: FluentWindow) -> None:

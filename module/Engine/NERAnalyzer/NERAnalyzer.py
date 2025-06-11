@@ -88,7 +88,7 @@ class NERAnalyzer(Base):
 
     # 停止事件
     def ner_analyzer_export(self, event: Base.Event, data: dict) -> None:
-        if Engine.get().get_status() != Base.TaskStatus.TRANSLATING:
+        if Engine.get().get_status() != Base.TaskStatus.NERING:
             return None
 
         # 复制一份以避免影响原始数据
@@ -140,7 +140,7 @@ class NERAnalyzer(Base):
         status: Base.ProjectStatus = data.get("status")
 
         # 更新运行状态
-        Engine.get().set_status(Base.TaskStatus.TRANSLATING)
+        Engine.get().set_status(Base.TaskStatus.NERING)
 
         # 初始化
         self.config = config if isinstance(config, Config) else Config().load()
@@ -235,6 +235,8 @@ class NERAnalyzer(Base):
             self.info(f"{Localizer.get().engine_api_name} - {self.platform.get("name")}")
             self.info(f"{Localizer.get().engine_api_url} - {self.platform.get("api_url")}")
             self.info(f"{Localizer.get().engine_api_model} - {self.platform.get("model")}")
+            self.print("")
+            self.info(PromptBuilder(self.config).build_main())
             self.print("")
 
             # 开始执行翻译任务
@@ -412,7 +414,10 @@ class NERAnalyzer(Base):
             glossary.append(self.find_best(src, choices))
 
         # 去重
-        glossary = list({v["src"]: v for v in glossary}.values())
+        glossary = list({v.get("src"): v for v in glossary}.values())
+
+        # 计数
+        glossary = self.search_for_context(glossary, self.cache_manager.get_items())
 
         # 排序
         glossary = sorted(glossary, key = lambda x: x.get("src"))
@@ -457,6 +462,39 @@ class NERAnalyzer(Base):
             "dst": dst,
             "info": info,
         }
+
+    # 搜索参考文本，并按出现次数排序
+    def search_for_context(self, glossary: list[dict[str, str]], items: list[Item]) -> list[dict[str, str | int | list[str]]]:
+        # 已处理的文本
+        lines: list[str] = [item.get_src() for item in items if item.get_status() == Base.ProjectStatus.PROCESSED]
+        lines_cp: list[str] = lines.copy()
+
+        # 按实体词语的长度降序排序
+        glossary = sorted(glossary, key = lambda x: len(x.get("src")), reverse = True)
+
+        # 逐条处理
+        for entry in glossary:
+            src: str = entry.get("src")
+
+            # 找出匹配的行
+            index = {i for i, line in enumerate(lines) if src in line}
+
+            # 获取匹配的参考文本，去重，并按长度降序排序
+            entry["context"] = sorted(
+                list({line for i, line in enumerate(lines_cp) if i in index}),
+                key = lambda x: len(x),
+                reverse = True,
+            )
+            entry["count"] = len(entry.get("context"))
+
+            # 掩盖已命中的实体词语文本，避免其子串错误的与父串匹配
+            lines = [
+                line.replace(src, len(src) * "#") if i in index else line
+                for i, line in enumerate(lines)
+            ]
+
+        # 按出现次数降序排序
+        return sorted(glossary, key = lambda x: x.get("count"), reverse = True)
 
     # 中文字型转换
     def convert_chinese_character_form(self, src: str) -> str:

@@ -103,6 +103,10 @@ class LocalizerZH():
     api_tester_result: str = "共测试 {COUNT} 个接口，成功 {SUCCESS} 个，失败 {FAILURE} 个 …"
     api_tester_result_failure: str = "失败的密钥："
     api_tester_running: str = "任务正在执行中，请稍后再试 …"
+    ner_output_log_src: str = "原文："
+    ner_output_log_dst: str = "译文："
+    ner_output_log_count: str = "出现次数："
+    ner_output_log_context: str = "参考文本："
 
     # 应用设置
     app_settings_page_expert_title: str = "专家模式"
@@ -177,7 +181,7 @@ class LocalizerZH():
     # 开始任务
     task_page_status_idle: str = "无任务"
     task_page_status_testing: str = "测试中"
-    task_page_status_translating: str = "翻译中"
+    task_page_status_nering: str = "提取中"
     task_page_status_stopping: str = "停止中"
     task_page_indeterminate_saving: str = "缓存保存中 …"
     task_page_indeterminate_stoping: str = "正在停止任务 …"

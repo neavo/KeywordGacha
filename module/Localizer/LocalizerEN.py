@@ -99,10 +99,14 @@ class LocalizerEN(LocalizerZH):
     engine_task_success: str = "Task time {TIME} seconds, {LINES} lines of text, input tokens {PT}, output tokens {CT}"
     engine_task_too_many: str = "Too many real-time tasks, details hidden for performance …"
     api_tester_key: str = "Testing API Key"
-    api_tester_messages: str = "Task prompts:"
+    api_tester_messages: str = "Task Prompts:"
     api_tester_result: str = "Tested {COUNT} APIs in total, {SUCCESS} successful, {FAILURE} failed …"
     api_tester_result_failure: str = "Failed Keys:"
     api_tester_running: str = "Task is running, please try again later …"
+    ner_output_log_src: str = "Original: "
+    ner_output_log_dst: str = "Translation: "
+    ner_output_log_count: str = "Count: "
+    ner_output_log_context: str = "Context: "
 
     # 应用设置
     app_settings_page_expert_title: str = "Expert Mode"
@@ -177,7 +181,7 @@ class LocalizerEN(LocalizerZH):
     # 开始翻译
     task_page_status_idle: str = "Idle"
     task_page_status_testing: str = "Testing"
-    task_page_status_translating: str = "Translating"
+    task_page_status_nering: str = "Extracting"
     task_page_status_stopping: str = "Stopping"
     task_page_indeterminate_saving: str = "Saving cache …"
     task_page_indeterminate_stoping: str = "Stopping task …"
