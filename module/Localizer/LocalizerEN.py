@@ -99,7 +99,7 @@ class LocalizerEN(LocalizerZH):
     engine_response_result: str = "Model Response:"
     engine_task_success: str = "Task time {TIME} seconds, {LINES} lines of text, input tokens {PT}, output tokens {CT}"
     engine_task_too_many: str = "Too many real-time tasks, details hidden for performance …"
-    api_tester_key: str = "Testing API Key"
+    api_tester_key: str = "Testing Key:"
     api_tester_messages: str = "Task Prompts:"
     api_tester_result: str = "Tested {COUNT} APIs in total, {SUCCESS} successful, {FAILURE} failed …"
     api_tester_result_failure: str = "Failed Keys:"
@@ -226,11 +226,15 @@ class LocalizerEN(LocalizerZH):
     basic_settings_page_max_round_title: str = "Maximum Rounds"
     basic_settings_page_max_round_content: str = "After completing a round of tasks, failed tasks will be retried in a new round until all are completed or the round threshold is reached"
 
+    # 专家设置
+    expert_settings_page_output_kvjson_title: str = "Output KVJSON Result File"
+    expert_settings_page_output_kvjson_description: str = "Generate a KVJSON formatted data file when outputting results, disabled by default"
+
     # 质量类通用
     quality_import: str = "Import"
     quality_import_toast: str = "Data imported …"
     quality_export: str = "Export"
-    quality_export_toast: str = "Data exported to application root directory …"
+    quality_export_toast: str = "Data exported …"
     quality_save: str = "Save"
     quality_save_toast: str = "Data saved …"
     quality_merge_duplication: str = "Duplicate data merged …"

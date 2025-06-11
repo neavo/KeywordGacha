@@ -113,6 +113,11 @@ class FileManager(Base):
                     writer.write("\n".join(context) + "\n")
                     writer.write("\n")
 
+            # 保存 KVJSON
+            if self.config.output_kvjson == True:
+                with open(f"{self.config.output_folder}/output_kv.json", "w", encoding = "utf-8") as writer:
+                    writer.write(json.dumps({v.get("src"): v.get("dst") for v in glossary}, indent = 4, ensure_ascii = False))
+
             # 保存 JSON
             [v.pop("context", None) for v in glossary]
             with open(f"{self.config.output_folder}/output.json", "w", encoding = "utf-8") as writer:

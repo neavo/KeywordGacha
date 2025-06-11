@@ -67,8 +67,8 @@ class APITester(Base):
         requester = TaskRequester(config, platform)
         for key in platform.get("api_key"):
             self.print("")
-            self.info(f"{Localizer.get().api_tester_key} - {key}")
-            self.info(f"{Localizer.get().api_tester_messages}\n{messages}")
+            self.info(Localizer.get().api_tester_key + "\n" + f"[green]{key}[/]")
+            self.info(Localizer.get().api_tester_messages + "\n" + f"{messages}")
             skip, response_think, response_result, _, _ = requester.request(messages)
 
             # 提取回复内容
@@ -85,9 +85,9 @@ class APITester(Base):
 
         # 测试结果
         result_msg = (
-            Localizer.get().api_tester_result.replace("{COUNT}", f"{len(platform.get("api_key"))}")
-                                                  .replace("{SUCCESS}", f"{len(success)}")
-                                                  .replace("{FAILURE}", f"{len(failure)}")
+            Localizer.get().api_tester_result.replace("{COUNT}", str(len(platform.get("api_key"))))
+                                             .replace("{SUCCESS}", str(len(success)))
+                                             .replace("{FAILURE}", str(len(failure)))
         )
         self.print("")
         self.info(result_msg)

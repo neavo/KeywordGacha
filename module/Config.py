@@ -41,6 +41,9 @@ class Config():
     request_timeout: int = 120
     max_round: int = 16
 
+    # ExpertSettingsPage
+    output_kvjson: bool = False
+
     # ProjectPage
     source_language: BaseLanguage.Enum = BaseLanguage.Enum.JA
     target_language: BaseLanguage.Enum = BaseLanguage.Enum.ZH

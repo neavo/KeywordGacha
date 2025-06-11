@@ -287,13 +287,13 @@ class AppFluentWindow(FluentWindow, Base):
         )
 
         # 专家设置
-        # if LogManager.get().is_expert_mode():
-        #     self.addSubInterface(
-        #         ExpertSettingsPage("expert_settings_page", self),
-        #         FluentIcon.EDUCATION,
-        #         Localizer.get().app_expert_settings_page,
-        #         NavigationItemPosition.SCROLL
-        #     )
+        if LogManager.get().is_expert_mode():
+            self.addSubInterface(
+                ExpertSettingsPage("expert_settings_page", self),
+                FluentIcon.EDUCATION,
+                Localizer.get().app_expert_settings_page,
+                NavigationItemPosition.SCROLL
+            )
 
     # 添加质量类页面
     def add_quality_pages(self) -> None:

@@ -99,7 +99,7 @@ class LocalizerZH():
     engine_response_result: str = "模型回复内容："
     engine_task_success: str = "任务耗时 {TIME} 秒，文本行数 {LINES} 行，输入消耗 {PT} Tokens，输出消耗 {CT} Tokens"
     engine_task_too_many: str = "实时任务较多，暂时停止显示详细结果以提升性能 …"
-    api_tester_key: str = "正在测试密钥"
+    api_tester_key: str = "测试密钥："
     api_tester_messages: str = "任务提示词："
     api_tester_result: str = "共测试 {COUNT} 个接口，成功 {SUCCESS} 个，失败 {FAILURE} 个 …"
     api_tester_result_failure: str = "失败的密钥："
@@ -226,11 +226,15 @@ class LocalizerZH():
     basic_settings_page_max_round_title: str = "任务轮次阈值"
     basic_settings_page_max_round_content: str = "当完成一轮任务后，将在新的轮次中对失败的任务进行重试，直到全部完成或达到轮次阈值"
 
+    # 专家设置
+    expert_settings_page_output_kvjson_title: str = "输出 KVJSON 格式的结果文件"
+    expert_settings_page_output_kvjson_description: str = "在输出结果时生成 KVJSON 格式的数据文件，默认禁用"
+
     # 质量类通用
     quality_import: str = "导入"
     quality_import_toast: str = "数据已导入 …"
     quality_export: str = "导出"
-    quality_export_toast: str = "数据已导出到应用根目录 …"
+    quality_export_toast: str = "数据已导出 …"
     quality_save: str = "保存"
     quality_save_toast: str = "数据已保存 …"
     quality_merge_duplication: str = "已合并重复数据 …"

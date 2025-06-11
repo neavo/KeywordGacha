@@ -39,5 +39,30 @@ class ExpertSettingsPage(QWidget, Base):
         # 将滚动区域添加到父布局
         self.root.addWidget(scroll_area)
 
+        # 添加控件
+        self.add_widget_output_kv_json(scroll_area_vbox, config, window)
+
         # 填充
         scroll_area_vbox.addStretch(1)
+
+    # 输出 KVJSON 文件
+    def add_widget_output_kv_json(self, parent: QLayout, config: Config, windows: FluentWindow) -> None:
+
+        def init(widget: SwitchButtonCard) -> None:
+            widget.get_switch_button().setChecked(
+                config.output_kvjson
+            )
+
+        def checked_changed(widget: SwitchButtonCard) -> None:
+            config = Config().load()
+            config.output_kvjson = widget.get_switch_button().isChecked()
+            config.save()
+
+        parent.addWidget(
+            SwitchButtonCard(
+                title = Localizer.get().expert_settings_page_output_kvjson_title,
+                description = Localizer.get().expert_settings_page_output_kvjson_description,
+                init = init,
+                checked_changed = checked_changed,
+            )
+        )
