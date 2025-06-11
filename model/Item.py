@@ -55,7 +55,7 @@ class Item():
     file_type: FileType = FileType.NONE                                                         # 文件的类型
     file_path: str = ""                                                                         # 文件的相对路径
     text_type: TextType = TextType.NONE                                                         # 文本的实际类型
-    status: Base.ProjectStatus = Base.ProjectStatus.NONE                        # 翻译状态
+    status: Base.ProjectStatus = Base.ProjectStatus.NONE                                        # 翻译状态
     retry_count: int = 0                                                                        # 重试次数，当前只有单独重试的时候才增加此计数
 
     # 线程锁

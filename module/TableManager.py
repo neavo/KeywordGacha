@@ -1,5 +1,6 @@
 import json
 from enum import StrEnum
+from typing import Any
 
 import openpyxl
 import openpyxl.styles
@@ -393,13 +394,13 @@ class TableManager():
             ]
 
             # 格式校验
-            if not isinstance(data[0], str):
+            if len(data) == 0 or data[0] is None:
                 continue
 
-            src: str = data[0].strip()
-            dst: str = data[1].strip() if data[1] is not None else ""
-            info: str = data[2].strip() if data[2] is not None else ""
-            regex: str = data[3].strip().lower() == "true" if data[3] is not None else False
+            src: str = str(data[0]).strip()
+            dst: str = str(data[1]).strip() if data[1] is not None else ""
+            info: str = str(data[2]).strip() if data[2] is not None else ""
+            regex: str = str(data[3]).strip().lower() == "true" if data[3] is not None else False
 
             if src == "src" and dst == "dst":
                 continue
@@ -419,13 +420,11 @@ class TableManager():
 
     # 设置单元格值
     @classmethod
-    def set_cell_value(cls, sheet: openpyxl.worksheet.worksheet.Worksheet, row: int, column: int, value: str, font_size: int = 9) -> None:
+    def set_cell_value(cls, sheet: openpyxl.worksheet.worksheet.Worksheet, row: int, column: int, value: Any, font_size: int = 9) -> None:
         if value is None:
             value = ""
-        elif isinstance(value, str) == False:
-            value = str(value)
         # 如果单元格内容以单引号 ' 开头，Excel 会将其视为普通文本而不是公式
-        elif value.startswith("=") == True:
+        elif isinstance(value, str) and value.startswith("=") == True:
             value = "'" + value
 
         sheet.cell(row = row, column = column).value = value
