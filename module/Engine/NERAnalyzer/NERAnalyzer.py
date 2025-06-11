@@ -94,7 +94,8 @@ class NERAnalyzer(Base):
         # 复制一份以避免影响原始数据
         def task(event: str, data: dict) -> None:
             self.save_ouput(
-                copy.deepcopy(self.cache_manager.get_project().get_extras().get("glossary", []))
+                copy.deepcopy(self.cache_manager.get_project().get_extras().get("glossary", [])),
+                end = False,
             )
         threading.Thread(target = task, args = (event, data)).start()
 
@@ -262,7 +263,6 @@ class NERAnalyzer(Base):
                 self.print("")
                 self.info(Localizer.get().engine_task_done)
                 self.info(Localizer.get().engine_task_save)
-                self.print("")
 
                 # 通知
                 self.emit(Base.Event.TOAST, {
@@ -277,7 +277,6 @@ class NERAnalyzer(Base):
                 self.print("")
                 self.warning(Localizer.get().engine_task_fail)
                 self.warning(Localizer.get().engine_task_save)
-                self.print("")
 
                 # 通知
                 self.emit(Base.Event.TOAST, {
@@ -298,7 +297,8 @@ class NERAnalyzer(Base):
 
         # 检查结果并写入文件
         self.save_ouput(
-            self.cache_manager.get_project().get_extras().get("glossary", [])
+            self.cache_manager.get_project().get_extras().get("glossary", []),
+            end = True,
         )
 
         # 重置内部状态（正常完成翻译）
@@ -374,7 +374,7 @@ class NERAnalyzer(Base):
         self.info(Localizer.get().engine_task_language_filter.replace("{COUNT}", str(count)))
 
     # 输出结果
-    def save_ouput(self, glossary: list[dict[str, str]]) -> None:
+    def save_ouput(self, glossary: list[dict[str, str]], end: bool) -> None:
         group: dict[str, list[dict[str, str]]] = {}
         with self.lock:
             v: dict[str, str] = {}
@@ -417,7 +417,7 @@ class NERAnalyzer(Base):
         glossary = list({v.get("src"): v for v in glossary}.values())
 
         # 计数
-        glossary = self.search_for_context(glossary, self.cache_manager.get_items())
+        glossary = self.search_for_context(glossary, self.cache_manager.get_items(), end)
 
         # 排序
         glossary = sorted(glossary, key = lambda x: x.get("src"))
@@ -464,34 +464,39 @@ class NERAnalyzer(Base):
         }
 
     # 搜索参考文本，并按出现次数排序
-    def search_for_context(self, glossary: list[dict[str, str]], items: list[Item]) -> list[dict[str, str | int | list[str]]]:
-        # 已处理的文本
+    def search_for_context(self, glossary: list[dict[str, str]], items: list[Item], end: bool) -> list[dict[str, str | int | list[str]]]:
         lines: list[str] = [item.get_src() for item in items if item.get_status() == Base.ProjectStatus.PROCESSED]
         lines_cp: list[str] = lines.copy()
 
         # 按实体词语的长度降序排序
         glossary = sorted(glossary, key = lambda x: len(x.get("src")), reverse = True)
 
-        # 逐条处理
-        for entry in glossary:
-            src: str = entry.get("src")
+        self.print("")
+        with ProgressBar(transient = False) as progress:
+            pid = progress.new() if end == True else None
+            for entry in glossary:
+                progress.update(pid, advance = 1, total = len(glossary)) if end == True else None
+                src: str = entry.get("src")
 
-            # 找出匹配的行
-            index = {i for i, line in enumerate(lines) if src in line}
+                # 找出匹配的行
+                index = {i for i, line in enumerate(lines) if src in line}
 
-            # 获取匹配的参考文本，去重，并按长度降序排序
-            entry["context"] = sorted(
-                list({line for i, line in enumerate(lines_cp) if i in index}),
-                key = lambda x: len(x),
-                reverse = True,
-            )
-            entry["count"] = len(entry.get("context"))
+                # 获取匹配的参考文本，去重，并按长度降序排序
+                entry["context"] = sorted(
+                    list({line for i, line in enumerate(lines_cp) if i in index}),
+                    key = lambda x: len(x),
+                    reverse = True,
+                )
+                entry["count"] = len(entry.get("context"))
 
-            # 掩盖已命中的实体词语文本，避免其子串错误的与父串匹配
-            lines = [
-                line.replace(src, len(src) * "#") if i in index else line
-                for i, line in enumerate(lines)
-            ]
+                # 掩盖已命中的实体词语文本，避免其子串错误的与父串匹配
+                lines = [
+                    line.replace(src, len(src) * "#") if i in index else line
+                    for i, line in enumerate(lines)
+                ]
+
+        # 打印日志
+        self.info(Localizer.get().engine_task_context_search.replace("{COUNT}", str(len(glossary))))
 
         # 按出现次数降序排序
         return sorted(glossary, key = lambda x: x.get("count"), reverse = True)

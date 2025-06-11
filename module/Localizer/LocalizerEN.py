@@ -89,6 +89,7 @@ class LocalizerEN(LocalizerZH):
     engine_task_generation: str = "Task generation completed, {COUNT} tasks generated in total …"
     engine_task_rule_filter: str = "Rule filtering completed, {COUNT} entries that do not require translation were filtered in total …"
     engine_task_language_filter: str = "Language filtering completed, {COUNT} entries not containing the target language were filtered in total …"
+    engine_task_context_search: str = "Context searhing completed, {COUNT} entries were processed in total …"
     engine_max_round: str = "Max Rounds"
     engine_current_round: str = "Current Round"
     engine_api_url: str = "API URL"

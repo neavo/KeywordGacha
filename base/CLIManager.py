@@ -21,7 +21,7 @@ class CLIManager(Base):
 
         return cls.__instance__
 
-    def translation_done(self, event: Base.Event, data: dict) -> None:
+    def ner_analyzer_done(self, event: Base.Event, data: dict) -> None:
         self.exit()
 
     def exit(self) -> None:
@@ -96,6 +96,6 @@ class CLIManager(Base):
             "config": config,
             "status": Base.ProjectStatus.NONE,
         })
-        self.subscribe(Base.Event.NER_ANALYZER_DONE, self.translation_done)
+        self.subscribe(Base.Event.NER_ANALYZER_DONE, self.ner_analyzer_done)
 
         return True

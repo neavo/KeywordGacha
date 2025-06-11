@@ -89,6 +89,7 @@ class LocalizerZH():
     engine_task_generation: str = "任务生成已完成，共生成 {COUNT} 个任务 …"
     engine_task_rule_filter: str = "规则过滤已完成，共过滤 {COUNT} 个无需翻译的条目 …"
     engine_task_language_filter: str = "语言过滤已完成，共过滤 {COUNT} 个不包含目标语言的条目 …"
+    engine_task_context_search: str = "参考文本搜索已完成，共处理 {COUNT} 个条目 …"
     engine_max_round: str = "最大轮次"
     engine_current_round: str = "当前轮次"
     engine_api_url: str = "接口地址"
