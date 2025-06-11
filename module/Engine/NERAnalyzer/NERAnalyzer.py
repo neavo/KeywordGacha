@@ -162,6 +162,11 @@ class NERAnalyzer(Base):
             self.cache_manager.set_items(items)
             self.cache_manager.set_project(project)
 
+        # 兼容性处理
+        for item in items:
+            if item.get_status() == Base.ProjectStatus.PROCESSED_IN_PAST:
+                item.set_status(Base.ProjectStatus.NONE)
+
         # 检查数据是否为空
         if self.cache_manager.get_item_count() == 0:
             # 通知
