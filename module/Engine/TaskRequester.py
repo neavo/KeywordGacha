@@ -100,7 +100,7 @@ class TaskRequester(Base):
                     write = 8.00,
                     connect = 8.00,
                 ),
-                max_retries = 1,
+                max_retries = 0,
             )
         elif format == Base.APIFormat.GOOGLE:
             # https://github.com/googleapis/python-genai
@@ -124,7 +124,7 @@ class TaskRequester(Base):
                     write = 8.00,
                     connect = 8.00,
                 ),
-                max_retries = 1,
+                max_retries = 0,
             )
         else:
             return openai.OpenAI(
@@ -136,7 +136,7 @@ class TaskRequester(Base):
                     write = 8.00,
                     connect = 8.00,
                 ),
-                max_retries = 1,
+                max_retries = 0,
             )
 
     # 发起请求
