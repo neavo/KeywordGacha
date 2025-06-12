@@ -46,6 +46,7 @@
 - 双击 `app.exe` 启动应用
   - 在 `项目设置` 中设置原文语言、译文语言等必要信息
   - 将要翻译的文本文件复制到输入文件夹（默认为 `input` 文件夹），在 `开始任务` 中点击 `开始`
+- 结果保存在输出文件夹（默认为 `output` 文件夹），可以直接导入 [LinguaGacha](https://github.com/neavo/LinguaGacha) 等翻译器使用
 
 ## 文本格式 🏷️
 - 在任务开始时，应用将读取输入文件夹（及其子目录）内所有支持的文件，包括但是不限于：
@@ -62,6 +63,10 @@
 - 具体示例可见 [Wiki - 支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)，更多格式将持续添加，你也可以在 [ISSUES](https://github.com/neavo/KeywordGacha/issues) 中提出你的需求
 
 ## 近期更新 📅
+- 20250612 v0.20.1
+  - 新增 - 输出候选数据
+  - 新增 - 输出 KVJSON 文件
+
 - 20250611 v0.20.0
   - 久等了，欢迎使用 `基于原生 AI 技术` 的全新 `KeywordGacha`
     - 双语图形化界面
@@ -71,29 +76,19 @@
     - 支持 `Google` `OpenAI` `Anthropic` 全格式接口
     - 原生 AI 工作流，显著提升在强力模型上的提取效果
     - 更多变化，等你发掘 ！
-&ensp;
-- 20250611 v0.20.0
-  - Long-awaited, welcome to the all-new `KeywordGacha`, `powered by native AI technology`!
-    - Bilingual graphical interface
-    - Significantly reduced application size
-    - Supports `term type` customization
-    - Supports `multi-language` analysis and output
-    - Supports `Google`, `OpenAI`, `Anthropic` full-format APIs
-    - Native AI workflow, significantly enhancing extraction performance on powerful models
-    - More changes await your discovery!
 
 ## 常见问题 📥
 - 分析 `小说文本` 的最佳实践
   - 提前移除 `作者评论`、`出版社信息` 等与故事内容无关的文本
 
 - 处理 `游戏文本` 的最佳实践
-  - 如果抓取效果不好，可以多试几种导出工具和导出格式，有时候会有奇效
   - 推荐使用以下格式：
     - [RenPy](https://www.renpy.org) 导出游戏文本（.rpy）
     - [Translator++](https://dreamsavior.net/translator-plusplus) 项目文件（.trans）
     - [Translator++](https://dreamsavior.net/translator-plusplus) 导出游戏文本（.xlsx）
   - 避免使用以下格式：
     - [MTool](https://mtool.app) 导出游戏文本（.json）
+  - 如果抓取效果不好，可以多试几种导出工具和格式，有时候会有奇效
 
 ## 问题反馈 😥
 - 运行时的日志保存在程序目录下的 `*.log` 等日志文件内
