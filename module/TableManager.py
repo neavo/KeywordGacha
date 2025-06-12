@@ -107,10 +107,10 @@ class TableManager():
         sheet: openpyxl.worksheet.worksheet.Worksheet = book.active
 
         # 设置表头
-        sheet.column_dimensions["A"].width = 32
-        sheet.column_dimensions["B"].width = 32
-        sheet.column_dimensions["C"].width = 32
-        sheet.column_dimensions["D"].width = 32
+        sheet.column_dimensions["A"].width = 24
+        sheet.column_dimensions["B"].width = 24
+        sheet.column_dimensions["C"].width = 24
+        sheet.column_dimensions["D"].width = 24
         TableManager.set_cell_value(sheet, 1, 1, "src", 10)
         TableManager.set_cell_value(sheet, 1, 2, "dst", 10)
         TableManager.set_cell_value(sheet, 1, 3, "info", 10)
@@ -389,7 +389,7 @@ class TableManager():
         for row in range(1, sheet.max_row + 1):
             # 读取每一行的数据
             data: list[str] = [
-                sheet.cell(row = row, column = col).value
+                __class__.get_cell_value(sheet, row, col)
                 for col in range(1, 5)
             ]
 
@@ -397,10 +397,10 @@ class TableManager():
             if len(data) == 0 or data[0] is None:
                 continue
 
-            src: str = str(data[0]).strip()
-            dst: str = str(data[1]).strip() if data[1] is not None else ""
-            info: str = str(data[2]).strip() if data[2] is not None else ""
-            regex: str = str(data[3]).strip().lower() == "true" if data[3] is not None else False
+            src: str = data[0]
+            dst: str = data[1]
+            info: str = data[2]
+            regex: str = data[3].lower() == "true"
 
             if src == "src" and dst == "dst":
                 continue
@@ -417,6 +417,19 @@ class TableManager():
                 )
 
         return result
+
+    # 设置单元格值
+    @classmethod
+    def get_cell_value(cls, sheet: openpyxl.worksheet.worksheet.Worksheet, row: int, column: int) -> str:
+        result: str = ""
+
+        value = sheet.cell(row = row, column = column).value
+        if isinstance(value, str):
+            result = value
+        elif isinstance(value, (int, float)):
+            result = str(value)
+
+        return result.strip()
 
     # 设置单元格值
     @classmethod

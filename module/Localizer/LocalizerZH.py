@@ -106,6 +106,9 @@ class LocalizerZH():
     api_tester_running: str = "任务正在执行中，请稍后再试 …"
     ner_output_log_src: str = "原文："
     ner_output_log_dst: str = "译文："
+    ner_output_log_dst_choices: str = "译文候选："
+    ner_output_log_info: str = "备注："
+    ner_output_log_info_choices: str = "备注候选："
     ner_output_log_count: str = "出现次数："
     ner_output_log_context: str = "参考文本："
 
@@ -227,7 +230,9 @@ class LocalizerZH():
     basic_settings_page_max_round_content: str = "当完成一轮任务后，将在新的轮次中对失败的任务进行重试，直到全部完成或达到轮次阈值"
 
     # 专家设置
-    expert_settings_page_output_kvjson_title: str = "输出 KVJSON 格式的结果文件"
+    expert_settings_page_output_choices_title: str = "输出候选数据"
+    expert_settings_page_output_choices_description: str = "在输出结果时包含候选数据以供校对使用，默认禁用"
+    expert_settings_page_output_kvjson_title: str = "输出 KVJSON 文件"
     expert_settings_page_output_kvjson_description: str = "在输出结果时生成 KVJSON 格式的数据文件，默认禁用"
 
     # 质量类通用

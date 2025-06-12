@@ -28,7 +28,7 @@ class Config():
     platforms: list[dict[str, Any]] = None
 
     # AppSettingsPage
-    expert_mode: bool = True
+    expert_mode: bool = False
     proxy_url: str = ""
     proxy_enable: bool = False
     font_hinting: bool = True
@@ -43,6 +43,7 @@ class Config():
 
     # ExpertSettingsPage
     output_kvjson: bool = False
+    output_choices: bool = False
 
     # ProjectPage
     source_language: BaseLanguage.Enum = BaseLanguage.Enum.JA
@@ -107,7 +108,8 @@ class Config():
 
     # 重置专家模式
     def reset_expert_settings(self) -> None:
-        pass
+        output_kvjson: bool = False
+        output_choices: bool = False
 
     # 获取平台配置
     def get_platform(self, id: int) -> dict[str, Any]:

@@ -160,7 +160,7 @@ class NERAnalyzerTask(Base):
         file_rows = self.generate_log_rows(file_log)
         log_func("\n" + "\n\n".join(file_rows) + "\n", file = True, console = False)
 
-        # 根据线程数判断是否需要打印表格
+        # 打印日志到控制台
         rich.get_console().print(
             self.generate_log_table(
                 self.generate_log_rows(console_log),

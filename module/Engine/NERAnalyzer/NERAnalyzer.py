@@ -384,9 +384,13 @@ class NERAnalyzer(Base):
         with self.lock:
             v: dict[str, str] = {}
             for v in glossary:
-                src: str = v.get("src", "")
-                dst: str = self.convert_chinese_character_form(v.get("dst", ""))
-                info: str = self.convert_chinese_character_form(v.get("info", ""))
+                src: str = v.get("src").strip()
+                dst: str = v.get("dst").strip()
+                info: str = v.get("info").strip()
+
+                # 简繁转换
+                dst = self.convert_chinese_character_form(dst)
+                info = self.convert_chinese_character_form(info)
 
                 # 伪名还原
                 src, fake_name_injected = FakeNameHelper.restore(src)
@@ -403,7 +407,9 @@ class NERAnalyzer(Base):
 
                     if fake_name_injected == True:
                         dst = ""
-                    elif src == dst or src == "" or dst == "":
+                    elif src == "" or dst == "":
+                        continue
+                    elif src == dst and info == "":
                         continue
                     elif self.check(src, dst, info) == False:
                         continue
@@ -450,27 +456,33 @@ class NERAnalyzer(Base):
 
     # 找出最佳结果
     def find_best(self, src: str, choices: list[dict[str, str]]) -> dict[str, str]:
-        count: dict[str, int] = {}
+        dst_count: dict[str, int] = {}
+        dst_choices: set[str] = set()
         for choice in choices:
-            dst: str = choice.get("dst", "")
-            count[dst] = count.setdefault(dst, 0) + 1
-        dst = max(count, key = count.get)
+            dst: str = choice.get("dst")
+            dst_choices.add(dst)
+            dst_count[dst] = dst_count.setdefault(dst, 0) + 1
+        dst = max(dst_count, key = dst_count.get)
 
-        count: dict[str, int] = {}
+        info_count: dict[str, int] = {}
+        info_choices: set[str] = set()
         for choice in choices:
-            info: str = choice.get("info", "")
-            count[info] = count.setdefault(info, 0) + 1
-        info = max(count, key = count.get)
+            info: str = choice.get("info")
+            info_choices.add(info)
+            info_count[info] = info_count.setdefault(info, 0) + 1
+        info = max(info_count, key = info_count.get)
 
         return {
             "src": src,
             "dst": dst,
+            "dst_choices": dst_choices,
             "info": info,
+            "info_choices": info_choices,
         }
 
     # 搜索参考文本，并按出现次数排序
     def search_for_context(self, glossary: list[dict[str, str]], items: list[Item], end: bool) -> list[dict[str, str | int | list[str]]]:
-        lines: list[str] = [item.get_src() for item in items if item.get_status() == Base.ProjectStatus.PROCESSED]
+        lines: list[str] = [item.get_src().strip() for item in items if item.get_status() == Base.ProjectStatus.PROCESSED]
         lines_cp: list[str] = lines.copy()
 
         # 按实体词语的长度降序排序
@@ -502,6 +514,9 @@ class NERAnalyzer(Base):
 
         # 打印日志
         self.info(Localizer.get().engine_task_context_search.replace("{COUNT}", str(len(glossary))))
+
+        # 排除零结果
+        glossary = [v for v in glossary if v.get("count") > 0]
 
         # 按出现次数降序排序
         return sorted(glossary, key = lambda x: x.get("count"), reverse = True)

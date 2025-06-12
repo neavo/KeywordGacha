@@ -106,6 +106,9 @@ class LocalizerEN(LocalizerZH):
     api_tester_running: str = "Task is running, please try again later …"
     ner_output_log_src: str = "Original: "
     ner_output_log_dst: str = "Translation: "
+    ner_output_log_dst_choices: str = "Translation Choices:"
+    ner_output_log_info: str = "Infomation: "
+    ner_output_log_info_choices: str = "Infomation Choices: "
     ner_output_log_count: str = "Count: "
     ner_output_log_context: str = "Context: "
 
@@ -227,8 +230,10 @@ class LocalizerEN(LocalizerZH):
     basic_settings_page_max_round_content: str = "After completing a round of tasks, failed tasks will be retried in a new round until all are completed or the round threshold is reached"
 
     # 专家设置
-    expert_settings_page_output_kvjson_title: str = "Output KVJSON Result File"
-    expert_settings_page_output_kvjson_description: str = "Generate a KVJSON formatted data file when outputting results, disabled by default"
+    expert_settings_page_output_choices_title: str = "Output Choices Data"
+    expert_settings_page_output_choices_description: str = "Include choices data in the output for proofreading, disabled by default"
+    expert_settings_page_output_kvjson_title: str = "Output KVJSON File"
+    expert_settings_page_output_kvjson_description: str = "Generate KVJSON format data file when outputting results, disabled by default"
 
     # 质量类通用
     quality_import: str = "Import"
