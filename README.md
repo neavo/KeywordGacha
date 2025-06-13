@@ -63,6 +63,9 @@
 - 具体示例可见 [Wiki - 支持的文件格式](https://github.com/neavo/KeywordGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)，更多格式将持续添加，你也可以在 [ISSUES](https://github.com/neavo/KeywordGacha/issues) 中提出你的需求
 
 ## 近期更新 📅
+- 20250612 v0.20.2
+  - 修正 - 不能继续任务的问题
+
 - 20250612 v0.20.1
   - 新增 - 输出候选数据
   - 新增 - 输出 KVJSON 文件
