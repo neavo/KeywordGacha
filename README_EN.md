@@ -83,22 +83,10 @@
 - See [Wiki - Supported Formats](https://github.com/neavo/LinguaGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F) for examples. Submit format requests via [ISSUES](https://github.com/neavo/LinguaGacha/issues)
 
 ## Recent Updates 📅
-- 20260302 v0.58.4
-  - Optimizations and improvements #451 #452
-
-- 20260302 v0.58.4
-  - Optimizations and improvements #454
-
-- 20260301 v0.58.2
-  - Optimizations and improvements #446 #447 #448
-
-- 20260226 v0.58.0
-  - feat - Force Thinking (Lab)
-    - Improves translation quality by slightly increasing Token consumption
-    - Consumes fewer than using a reasoning model directly, with performance close to or better
-
-- 20260226 v0.57.2
-  - Optimizations and improvements #438
+- 20260303 v0.59.0
+  - feat - Quality Rule Effectiveness Statistics
+    - `Glossary` `Text Replacement` `Text Protection`
+  - Optimizations and Improvements #453 #457
 
 ### Development Guide 🛠️
 - This project is managed using [**uv**](https://github.com/astral-sh/uv)
