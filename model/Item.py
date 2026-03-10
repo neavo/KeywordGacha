@@ -235,7 +235,7 @@ class Item():
 
     # 获取 Token 数量
     def get_token_count(self) -> int:
-        return len(tiktoken.get_encoding("o200k_base").encode(self.get_src()))
+        return len(tiktoken.get_encoding("o200k_base").encode(self.get_src(), disallowed_special=()))
 
     # 获取第一个角色姓名原文
     def get_first_name_src(self) -> str:
