@@ -1,4 +1,5 @@
 import os
+import shutil
 import webbrowser
 
 from PyQt5.QtWidgets import QWidget
@@ -41,6 +42,7 @@ class ProjectPage(QWidget, Base):
         self.add_widget_source_language(self.vbox, config, window)
         self.add_widget_target_language(self.vbox, config, window)
         self.add_widget_input_folder(self.vbox, config, window)
+        self.add_widget_import_epub(self.vbox, config, window)
         self.add_widget_output_folder(self.vbox, config, window)
         self.add_widget_output_folder_open_on_finish(self.vbox, config, window)
         self.add_widget_traditional_chinese(self.vbox, config, window)
@@ -129,6 +131,44 @@ class ProjectPage(QWidget, Base):
             PushButtonCard(
                 title = Localizer.get().project_page_input_folder_title,
                 description = "",
+                init = init,
+                clicked = clicked,
+            )
+        )
+
+    # 导入 EPUB 文件
+    def add_widget_import_epub(self, parent: QLayout, config: Config, windows: FluentWindow) -> None:
+
+        def init(widget: PushButtonCard) -> None:
+            widget.get_push_button().setText(Localizer.get().project_page_import_epub_button)
+            widget.get_push_button().setIcon(FluentIcon.DOCUMENT)
+
+        def clicked(widget: PushButtonCard) -> None:
+            # 选择 EPUB 文件
+            path, _ = QFileDialog.getOpenFileName(
+                None,
+                Localizer.get().project_page_import_epub_button,
+                "",
+                Localizer.get().project_page_import_epub_filter,
+            )
+            if path is None or path == "":
+                return
+
+            # 复制文件到输入文件夹
+            input_folder = Config().load().input_folder
+            os.makedirs(input_folder, exist_ok = True)
+            shutil.copy2(path, os.path.join(input_folder, os.path.basename(path)))
+
+            # 提示成功
+            self.emit(Base.Event.TOAST, {
+                "type": Base.ToastType.SUCCESS,
+                "message": Localizer.get().project_page_import_epub_success,
+            })
+
+        parent.addWidget(
+            PushButtonCard(
+                title = Localizer.get().project_page_import_epub_title,
+                description = Localizer.get().project_page_import_epub_content,
                 init = init,
                 clicked = clicked,
             )

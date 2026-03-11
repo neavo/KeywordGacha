@@ -50,7 +50,7 @@ class Config():
     target_language: BaseLanguage.Enum = BaseLanguage.Enum.ZH
     input_folder: str = "./input"
     output_folder: str = "./output"
-    output_folder_open_on_finish: bool = False
+    output_folder_open_on_finish: bool = True
     traditional_chinese_enable: bool = False
 
     # pre_replacement_page
