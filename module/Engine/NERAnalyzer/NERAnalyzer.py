@@ -61,15 +61,18 @@ class NERAnalyzer(Base):
     def project_check_run(self, event: Base.Event, data: dict) -> None:
 
         def task(event: str, data: dict) -> None:
+            extras = {}
             if Engine.get().get_status() != Base.TaskStatus.IDLE:
                 status = Base.ProjectStatus.NONE
             else:
                 cache_manager = CacheManager(service = False)
                 cache_manager.load_project_from_file(Config().load().output_folder)
                 status = cache_manager.get_project().get_status()
+                extras = cache_manager.get_project().get_extras()
 
             self.emit(Base.Event.PROJECT_CHECK_DONE, {
                 "status" : status,
+                "extras" : extras,
             })
         threading.Thread(target = task, args = (event, data)).start()
 
@@ -258,6 +261,7 @@ class NERAnalyzer(Base):
             with ProgressBar(transient = True) as progress:
                 pid = progress.new()
                 executor = concurrent.futures.ThreadPoolExecutor(max_workers = max_workers, thread_name_prefix = Engine.TASK_PREFIX)
+                futures = []
                 stopping = False
                 for task in tasks:
                     # 检测是否需要停止任务
@@ -266,15 +270,28 @@ class NERAnalyzer(Base):
                         stopping = True
                         break
 
-                    task_limiter.wait()
+                    # 等待限流器，如果等待期间检测到停止信号则中断
+                    if task_limiter.wait() == False:
+                        stopping = True
+                        break
+
                     future = executor.submit(task.start)
                     future.add_done_callback(lambda future: self.task_done_callback(future, pid, progress))
-
-                # 停止时不等待已提交的任务完成，取消未开始的任务
-                executor.shutdown(wait = not stopping, cancel_futures = stopping)
+                    futures.append(future)
 
                 if stopping:
+                    # 停止时取消未开始的任务，不等待已提交的任务完成
+                    executor.shutdown(wait = False, cancel_futures = True)
                     return None
+
+                # 等待所有任务完成，同时响应停止信号
+                executor.shutdown(wait = False)
+                while not all(f.done() for f in futures):
+                    if Engine.get().get_status() == Base.TaskStatus.STOPPING:
+                        for f in futures:
+                            f.cancel()
+                        return None
+                    time.sleep(0.25)
 
             # 判断是否需要继续翻译
             if self.cache_manager.get_item_count_by_status(Base.ProjectStatus.NONE) == 0:

@@ -1,5 +1,4 @@
 import time
-from enum import StrEnum
 from typing import Callable
 
 from PyQt5.QtCore import Qt
@@ -176,6 +175,13 @@ class TaskPage(QWidget, Base):
         self.update_status(self.data)
 
     def update_button_status(self, event: Base.Event, data: dict) -> None:
+        # 从 PROJECT_CHECK_DONE 事件中恢复上次任务的进度数据
+        if event == Base.Event.PROJECT_CHECK_DONE:
+            extras = data.get("extras", {})
+            if isinstance(extras, dict) and extras:
+                self.data = extras
+                self.restore_dashboard(extras)
+
         if Engine.get().get_status() == Base.TaskStatus.IDLE:
             self.indeterminate_hide()
             self.action_start.setEnabled(True)
@@ -284,22 +290,19 @@ class TaskPage(QWidget, Base):
         if Engine.get().get_status() not in (Base.TaskStatus.STOPPING, Base.TaskStatus.NERING):
             return None
 
-        display_mode = getattr(self, "token_display_mode", self.TokenDisplayMode.OUTPUT)
-        if display_mode == self.TokenDisplayMode.OUTPUT:
-            token = self.data.get("total_output_tokens", 0)
-        else:
-            token = self.data.get("total_input_tokens", 0)
-            if token == 0:
-                token = self.data.get("total_tokens", 0) - self.data.get("total_output_tokens", 0)
-        if token < 1000:
-            self.token.set_unit("Token")
-            self.token.set_value(f"{token}")
-        elif token < 1000 * 1000:
-            self.token.set_unit("KToken")
-            self.token.set_value(f"{(token / 1000):.2f}")
-        else:
-            self.token.set_unit("MToken")
-            self.token.set_value(f"{(token / 1000 / 1000):.2f}")
+        # 输入 Token
+        input_tokens = self.data.get("total_input_tokens", 0)
+        if input_tokens == 0:
+            input_tokens = self.data.get("total_tokens", 0) - self.data.get("total_output_tokens", 0)
+        self.set_token_display(self.token_input, input_tokens)
+
+        # 输出 Token
+        output_tokens = self.data.get("total_output_tokens", 0)
+        self.set_token_display(self.token_output, output_tokens)
+
+        # 总计 Token
+        total_tokens = input_tokens + output_tokens
+        self.set_token_display(self.token_total, total_tokens)
 
         speed = self.data.get("total_output_tokens", 0) / max(1, time.time() - self.data.get("start_time", 0))
         self.waveform.add_value(speed)
@@ -309,6 +312,76 @@ class TaskPage(QWidget, Base):
         else:
             self.speed.set_unit("KT/S")
             self.speed.set_value(f"{(speed / 1000):.2f}")
+
+    # 从缓存中恢复仪表盘数据（启动时 IDLE 状态下的一次性更新）
+    def restore_dashboard(self, extras: dict) -> None:
+        # 恢复已用时间
+        total_time = int(extras.get("time", 0))
+        if total_time > 0:
+            if total_time < 60:
+                self.time.set_unit("S")
+                self.time.set_value(f"{total_time}")
+            elif total_time < 60 * 60:
+                self.time.set_unit("M")
+                self.time.set_value(f"{(total_time / 60):.2f}")
+            else:
+                self.time.set_unit("H")
+                self.time.set_value(f"{(total_time / 60 / 60):.2f}")
+
+        # 恢复行数
+        line = extras.get("line", 0)
+        if line > 0:
+            if line < 1000:
+                self.line_card.set_unit("Line")
+                self.line_card.set_value(f"{line}")
+            elif line < 1000 * 1000:
+                self.line_card.set_unit("KLine")
+                self.line_card.set_value(f"{(line / 1000):.2f}")
+            else:
+                self.line_card.set_unit("MLine")
+                self.line_card.set_value(f"{(line / 1000 / 1000):.2f}")
+
+        # 恢复剩余行数
+        total_line = extras.get("total_line", 0)
+        remaining_line = total_line - line
+        if remaining_line > 0:
+            if remaining_line < 1000:
+                self.remaining_line.set_unit("Line")
+                self.remaining_line.set_value(f"{remaining_line}")
+            elif remaining_line < 1000 * 1000:
+                self.remaining_line.set_unit("KLine")
+                self.remaining_line.set_value(f"{(remaining_line / 1000):.2f}")
+            else:
+                self.remaining_line.set_unit("MLine")
+                self.remaining_line.set_value(f"{(remaining_line / 1000 / 1000):.2f}")
+
+        # 恢复 Token 数据
+        input_tokens = extras.get("total_input_tokens", 0)
+        if input_tokens == 0:
+            input_tokens = extras.get("total_tokens", 0) - extras.get("total_output_tokens", 0)
+        output_tokens = extras.get("total_output_tokens", 0)
+        total_tokens = input_tokens + output_tokens
+        self.set_token_display(self.token_input, input_tokens)
+        self.set_token_display(self.token_output, output_tokens)
+        self.set_token_display(self.token_total, total_tokens)
+
+        # 恢复进度环
+        if total_line > 0:
+            percent = line / total_line
+            self.ring.setValue(int(percent * 10000))
+            self.ring.setFormat(f"{Localizer.get().task_page_status_idle}\n{percent * 100:.2f}%")
+
+    # 设置 Token 卡片显示
+    def set_token_display(self, card: DashboardCard, token: int) -> None:
+        if token < 1000:
+            card.set_unit("Token")
+            card.set_value(f"{token}")
+        elif token < 1000 * 1000:
+            card.set_unit("KToken")
+            card.set_value(f"{(token / 1000):.2f}")
+        else:
+            card.set_unit("MToken")
+            card.set_value(f"{(token / 1000 / 1000):.2f}")
 
     # 更新进度环
     def update_status(self, data: dict) -> None:
@@ -462,33 +535,34 @@ class TaskPage(QWidget, Base):
         self.speed.setFixedSize(204, 204)
         parent.addWidget(self.speed)
 
-    # 累计消耗
+    # 输入消耗
     def add_token_card(self, parent: QLayout, config: Config, window: FluentWindow) -> None:
+        self.token_input = DashboardCard(
+            parent = self,
+            title = Localizer.get().task_page_card_token_input,
+            value = Localizer.get().none,
+            unit = "",
+        )
+        self.token_input.setFixedSize(204, 204)
+        parent.addWidget(self.token_input)
 
-        class TokenDisplayMode(StrEnum):
-            INPUT = "INPUT"
-            OUTPUT = "OUTPUT"
-
-        self.token_display_mode = TokenDisplayMode.OUTPUT
-        self.TokenDisplayMode = TokenDisplayMode
-
-        def on_token_card_clicked(card: DashboardCard) -> None:
-            if self.token_display_mode == TokenDisplayMode.OUTPUT:
-                self.token_display_mode = TokenDisplayMode.INPUT
-                card.title_label.setText(Localizer.get().task_page_card_token_input)
-            else:
-                self.token_display_mode = TokenDisplayMode.OUTPUT
-                card.title_label.setText(Localizer.get().task_page_card_token_output)
-
-        self.token = DashboardCard(
+        self.token_output = DashboardCard(
             parent = self,
             title = Localizer.get().task_page_card_token_output,
             value = Localizer.get().none,
             unit = "",
-            clicked = on_token_card_clicked,
         )
-        self.token.setFixedSize(204, 204)
-        parent.addWidget(self.token)
+        self.token_output.setFixedSize(204, 204)
+        parent.addWidget(self.token_output)
+
+        self.token_total = DashboardCard(
+            parent = self,
+            title = Localizer.get().task_page_card_token,
+            value = Localizer.get().none,
+            unit = "",
+        )
+        self.token_total.setFixedSize(204, 204)
+        parent.addWidget(self.token_total)
 
     # 并行任务
     def add_task_card(self, parent: QLayout, config: Config, window: FluentWindow) -> None:
