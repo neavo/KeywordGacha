@@ -37,6 +37,24 @@ jobs:
         $version = "$base_version-$short_sha"
         echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
+    - name: Generate Release Notes
+      id: release_notes
+      shell: pwsh
+      run: |
+        # 找到上一个 MANUAL_BUILD tag，获取从那以后的所有 commit
+        $prev_tag = git describe --tags --abbrev=0 --match "MANUAL_BUILD_*" 2>$null
+        if ($prev_tag) {
+          $log = git log "$prev_tag..HEAD" --pretty=format:"- %s" --no-merges
+        } else {
+          $log = git log -20 --pretty=format:"- %s" --no-merges
+        }
+        # 写入多行输出
+        $notes = $log -join "`n"
+        # GitHub Actions 多行输出
+        "notes<<EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        $notes | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
     - name: Install Requirements
       shell: cmd
       run: |
@@ -74,6 +92,7 @@ jobs:
       with:
         tag_name: MANUAL_BUILD_${{ steps.check_version.outputs.version }}
         release_name: KeywordGacha_${{ steps.check_version.outputs.version }}
+        body: ${{ steps.release_notes.outputs.notes }}
         draft: true
         prerelease: false
 
