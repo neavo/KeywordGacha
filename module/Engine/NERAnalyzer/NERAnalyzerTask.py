@@ -10,6 +10,7 @@ from base.Base import Base
 from base.LogManager import LogManager
 from model.Item import Item
 from module.Config import Config
+from module.Engine.Engine import Engine
 from module.Engine.TaskRequester import TaskRequester
 from module.FakeNameHelper import FakeNameHelper
 from module.Localizer.Localizer import Localizer
@@ -35,6 +36,10 @@ class NERAnalyzerTask(Base):
 
     # 请求
     def request(self, items: list[Item]) -> dict[str, str]:
+        # 检测是否需要停止任务
+        if Engine.get().get_status() == Base.TaskStatus.STOPPING:
+            return {}
+
         # 任务开始的时间
         start_time = time.time()
 
@@ -81,6 +86,10 @@ class NERAnalyzerTask(Base):
 
         # 生成请求提示词
         messages, console_log = self.prompt_builder.generate_prompt(srcs)
+
+        # 发起请求前再次检测是否需要停止任务
+        if Engine.get().get_status() == Base.TaskStatus.STOPPING:
+            return {}
 
         # 发起请求
         requester = TaskRequester(self.config, self.platform)

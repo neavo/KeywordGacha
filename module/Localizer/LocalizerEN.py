@@ -200,6 +200,8 @@ class LocalizerEN(LocalizerZH):
     task_page_card_remaining_line: str = "Remaining Lines"
     task_page_card_speed: str = "Average Speed"
     task_page_card_token: str = "Total Tokens"
+    task_page_card_token_input: str = "Input Tokens"
+    task_page_card_token_output: str = "Output Tokens"
     task_page_card_task: str = "Real Time Tasks"
     task_page_alert_pause: str = "Stopped tasks can be resumed at any time. Confirm to stop the task … ?"
     task_page_continue: str = "Continue Task"

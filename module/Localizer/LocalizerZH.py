@@ -200,6 +200,8 @@ class LocalizerZH():
     task_page_card_remaining_line: str = "剩余行数"
     task_page_card_speed: str = "平均速度"
     task_page_card_token: str = "累计消耗"
+    task_page_card_token_input: str = "输入消耗"
+    task_page_card_token_output: str = "输出消耗"
     task_page_card_task: str = "实时任务数"
     task_page_alert_pause: str = "停止的任务可以随时继续执行，是否确定停止任务 … ？"
     task_page_continue: str = "继续任务"

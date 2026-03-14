@@ -11,7 +11,7 @@ from module.Localizer.Localizer import Localizer
 class CacheManager(Base):
 
     # 缓存文件保存周期（秒）
-    SAVE_INTERVAL = 15
+    SAVE_INTERVAL = 3
 
     # 类线程锁
     LOCK = threading.Lock()

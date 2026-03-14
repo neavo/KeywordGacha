@@ -1,4 +1,5 @@
 import time
+from enum import StrEnum
 from typing import Callable
 
 from PyQt5.QtCore import Qt
@@ -283,7 +284,13 @@ class TaskPage(QWidget, Base):
         if Engine.get().get_status() not in (Base.TaskStatus.STOPPING, Base.TaskStatus.NERING):
             return None
 
-        token = self.data.get("total_tokens", 0)
+        display_mode = getattr(self, "token_display_mode", self.TokenDisplayMode.OUTPUT)
+        if display_mode == self.TokenDisplayMode.OUTPUT:
+            token = self.data.get("total_output_tokens", 0)
+        else:
+            token = self.data.get("total_input_tokens", 0)
+            if token == 0:
+                token = self.data.get("total_tokens", 0) - self.data.get("total_output_tokens", 0)
         if token < 1000:
             self.token.set_unit("Token")
             self.token.set_value(f"{token}")
@@ -457,11 +464,28 @@ class TaskPage(QWidget, Base):
 
     # 累计消耗
     def add_token_card(self, parent: QLayout, config: Config, window: FluentWindow) -> None:
+
+        class TokenDisplayMode(StrEnum):
+            INPUT = "INPUT"
+            OUTPUT = "OUTPUT"
+
+        self.token_display_mode = TokenDisplayMode.OUTPUT
+        self.TokenDisplayMode = TokenDisplayMode
+
+        def on_token_card_clicked(card: DashboardCard) -> None:
+            if self.token_display_mode == TokenDisplayMode.OUTPUT:
+                self.token_display_mode = TokenDisplayMode.INPUT
+                card.title_label.setText(Localizer.get().task_page_card_token_input)
+            else:
+                self.token_display_mode = TokenDisplayMode.OUTPUT
+                card.title_label.setText(Localizer.get().task_page_card_token_output)
+
         self.token = DashboardCard(
             parent = self,
-            title = Localizer.get().task_page_card_token,
+            title = Localizer.get().task_page_card_token_output,
             value = Localizer.get().none,
             unit = "",
+            clicked = on_token_card_clicked,
         )
         self.token.setFixedSize(204, 204)
         parent.addWidget(self.token)

@@ -104,6 +104,16 @@ class NERAnalyzer(Base):
         Engine.get().set_status(Base.TaskStatus.STOPPING)
 
         def task(event: str, data: dict) -> None:
+            # 立即保存一次缓存，防止等待期间进程被杀导致进度丢失
+            try:
+                self.cache_manager.save_to_file(
+                    project = self.cache_manager.get_project(),
+                    items = self.cache_manager.get_items(),
+                    output_folder = self.config.output_folder,
+                )
+            except Exception:
+                pass
+
             while True:
                 time.sleep(0.5)
 
@@ -188,6 +198,7 @@ class NERAnalyzer(Base):
                 "total_line": 0,
                 "line": 0,
                 "total_tokens": 0,
+                "total_input_tokens": 0,
                 "total_output_tokens": 0,
                 "time": 0,
                 "glossary": [],
@@ -248,17 +259,25 @@ class NERAnalyzer(Base):
             # 开始执行翻译任务
             task_limiter = TaskLimiter(rps = max_workers, rpm = rpm_threshold)
             with ProgressBar(transient = True) as progress:
-                with concurrent.futures.ThreadPoolExecutor(max_workers = max_workers, thread_name_prefix = Engine.TASK_PREFIX) as executor:
-                    pid = progress.new()
-                    for task in tasks:
-                        # 检测是否需要停止任务
-                        # 目的是绕过限流器，快速结束所有剩余任务
-                        if Engine.get().get_status() == Base.TaskStatus.STOPPING:
-                            return None
+                pid = progress.new()
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers = max_workers, thread_name_prefix = Engine.TASK_PREFIX)
+                stopping = False
+                for task in tasks:
+                    # 检测是否需要停止任务
+                    # 目的是绕过限流器，快速结束所有剩余任务
+                    if Engine.get().get_status() == Base.TaskStatus.STOPPING:
+                        stopping = True
+                        break
 
-                        task_limiter.wait()
-                        future = executor.submit(task.start)
-                        future.add_done_callback(lambda future: self.task_done_callback(future, pid, progress))
+                    task_limiter.wait()
+                    future = executor.submit(task.start)
+                    future.add_done_callback(lambda future: self.task_done_callback(future, pid, progress))
+
+                # 停止时不等待已提交的任务完成，取消未开始的任务
+                executor.shutdown(wait = not stopping, cancel_futures = stopping)
+
+                if stopping:
+                    return None
 
             # 判断是否需要继续翻译
             if self.cache_manager.get_item_count_by_status(Base.ProjectStatus.NONE) == 0:
@@ -549,6 +568,7 @@ class NERAnalyzer(Base):
                 new["total_line"] = self.extras.get("total_line", 0)
                 new["line"] = self.extras.get("line", 0) + result.get("row_count", 0)
                 new["total_tokens"] = self.extras.get("total_tokens", 0) + result.get("input_tokens", 0) + result.get("output_tokens", 0)
+                new["total_input_tokens"] = self.extras.get("total_input_tokens", 0) + result.get("input_tokens", 0)
                 new["total_output_tokens"] = self.extras.get("total_output_tokens", 0) + result.get("output_tokens", 0)
                 new["time"] = time.time() - self.extras.get("start_time", 0)
                 self.extras = new
