@@ -36,8 +36,8 @@ class Config():
 
     # BasicSettingsPage
     token_threshold: int = 2048
-    max_workers: int = 0
-    rpm_threshold: int = 0
+    max_workers: int = 8
+    rpm_threshold: int = 450
     request_timeout: int = 120
     max_round: int = 16
 
@@ -46,7 +46,7 @@ class Config():
     output_choices: bool = False
 
     # ProjectPage
-    source_language: BaseLanguage.Enum = BaseLanguage.Enum.JA
+    source_language: BaseLanguage.Enum = BaseLanguage.Enum.EN
     target_language: BaseLanguage.Enum = BaseLanguage.Enum.ZH
     input_folder: str = "./input"
     output_folder: str = "./output"

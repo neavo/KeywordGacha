@@ -11,11 +11,15 @@ from PyQt5.QtWidgets import QHeaderView
 from PyQt5.QtWidgets import QLayout
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
+from qfluentwidgets import Action
 from qfluentwidgets import CaptionLabel
+from qfluentwidgets import FluentIcon
 from qfluentwidgets import FluentWindow
 from qfluentwidgets import SimpleCardWidget
 from qfluentwidgets import StrongBodyLabel
 from qfluentwidgets import TableWidget
+
+from widget.CommandBarCard import CommandBarCard
 
 from base.Base import Base
 from module.CacheManager import CacheManager
@@ -91,6 +95,7 @@ class WorkbenchPage(QWidget, Base):
         # 构建 UI
         self.build_stats_section(self.container)
         self.build_table_section(self.container)
+        self.build_footer_section(self.container)
 
         # 节流刷新定时器
         self.refresh_timer = QTimer(self)
@@ -284,3 +289,19 @@ class WorkbenchPage(QWidget, Base):
         self.table.verticalHeader().hide()
 
         parent.addWidget(self.table, 1)
+
+    def build_footer_section(self, parent: QLayout) -> None:
+        self.command_bar_card = CommandBarCard()
+
+        def on_export_translation() -> None:
+            self.emit(Base.Event.NER_ANALYZER_EXPORT, {})
+            self.emit(Base.Event.TOAST, {
+                "type": Base.ToastType.SUCCESS,
+                "message": Localizer.get().workbench_export_success,
+            })
+
+        self.command_bar_card.add_action(
+            Action(FluentIcon.SHARE, Localizer.get().workbench_export_translation, self, triggered = on_export_translation),
+        )
+
+        parent.addWidget(self.command_bar_card)

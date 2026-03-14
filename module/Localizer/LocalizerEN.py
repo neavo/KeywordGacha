@@ -306,4 +306,6 @@ class LocalizerEN(LocalizerZH):
     workbench_col_excluded: str = "Excluded"
     workbench_col_remaining: str = "Remaining"
     workbench_no_data: str = "No data yet, please start a task first"
+    workbench_export_translation: str = "Export Translation"
+    workbench_export_success: str = "Translation exported successfully"
     log_cache_migrated: str = "Migrated legacy cache to database"

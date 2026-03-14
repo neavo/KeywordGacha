@@ -306,4 +306,6 @@ class LocalizerZH():
     workbench_col_excluded: str = "已排除"
     workbench_col_remaining: str = "未处理"
     workbench_no_data: str = "暂无数据，请先开始任务"
+    workbench_export_translation: str = "生成译文"
+    workbench_export_success: str = "译文导出成功"
     log_cache_migrated: str = "已将旧版缓存迁移至数据库"
