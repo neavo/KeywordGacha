@@ -57,6 +57,7 @@ class LocalizerZH():
     app_platform_page: str = "接口管理"
     app_project_page: str = "项目设置"
     app_task_page: str = "开始任务"
+    app_workbench_page: str = "工作台"
     app_basic_settings_page: str = "基础设置"
     app_expert_settings_page: str = "专家设置"
     app_pre_replacement_page: str = "前置替换"
@@ -291,3 +292,18 @@ class LocalizerZH():
         ""
         ""
     )
+
+    # 工作台
+    workbench_stat_files: str = "文件数"
+    workbench_stat_total: str = "总行数"
+    workbench_stat_processed: str = "已处理"
+    workbench_stat_remaining: str = "未处理"
+    workbench_unit_file: str = "个"
+    workbench_unit_line: str = "行"
+    workbench_col_file_path: str = "文件路径"
+    workbench_col_total: str = "总行数"
+    workbench_col_processed: str = "已处理"
+    workbench_col_excluded: str = "已排除"
+    workbench_col_remaining: str = "未处理"
+    workbench_no_data: str = "暂无数据，请先开始任务"
+    log_cache_migrated: str = "已将旧版缓存迁移至数据库"

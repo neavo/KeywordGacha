@@ -57,6 +57,7 @@ class LocalizerEN(LocalizerZH):
     app_platform_page: str = "API"
     app_project_page: str = "Project Settings"
     app_task_page: str = "Start Task"
+    app_workbench_page: str = "Workbench"
     app_basic_settings_page: str = "Basic Settings"
     app_expert_settings_page: str = "Expert Settings"
     app_pre_replacement_page: str = "Pre-Replacement"
@@ -291,3 +292,18 @@ class LocalizerEN(LocalizerZH):
         "<br>"
         "The custom prompts on this page will only be used when the <font color='darkgoldenrod'><b>translation language is set to non-Chinese</b></font>"
     )
+
+    # Workbench
+    workbench_stat_files: str = "Files"
+    workbench_stat_total: str = "Total Lines"
+    workbench_stat_processed: str = "Processed"
+    workbench_stat_remaining: str = "Remaining"
+    workbench_unit_file: str = "files"
+    workbench_unit_line: str = "lines"
+    workbench_col_file_path: str = "File Path"
+    workbench_col_total: str = "Total"
+    workbench_col_processed: str = "Processed"
+    workbench_col_excluded: str = "Excluded"
+    workbench_col_remaining: str = "Remaining"
+    workbench_no_data: str = "No data yet, please start a task first"
+    log_cache_migrated: str = "Migrated legacy cache to database"

@@ -1,17 +1,14 @@
 import json
 import os
 import threading
-import time
 
 from base.Base import Base
 from model.Project import Project
 from model.Item import Item
+from module.KGDatabase import KGDatabase
 from module.Localizer.Localizer import Localizer
 
 class CacheManager(Base):
-
-    # 缓存文件保存周期（秒）
-    SAVE_INTERVAL = 3
 
     # 类线程锁
     LOCK = threading.Lock()
@@ -23,101 +20,142 @@ class CacheManager(Base):
         self.project: Project = Project()
         self.items: list[Item] = []
 
-        # 初始化
-        self.require_flag: bool = False
-        self.require_path: str = ""
-        self.last_require_time: float = 0
+        # 数据库实例
+        self.db: KGDatabase = KGDatabase()
 
-        # 启动定时任务
-        if service == True:
-            threading.Thread(target = self.task).start()
+        # items 在内存列表中的 index 与数据库 id 的偏移量
+        self.id_offset: int = 1
 
-    # 保存缓存到文件的定时任务
-    def task(self) -> None:
-        while True:
-            # 休眠 1 秒
-            time.sleep(1.00)
+    # 打开数据库
+    def open_database(self, output_folder: str) -> None:
+        self.db.open(output_folder)
 
-            if (
-                time.time() - self.last_require_time >= __class__.SAVE_INTERVAL
-                and self.require_flag == True
-            ):
-                # 创建上级文件夹
-                folder_path = f"{self.require_path}/cache"
-                os.makedirs(folder_path, exist_ok = True)
+        # 兼容旧版本 JSON 缓存：如果有 JSON 文件但数据库为空，则迁移
+        self.migrate_from_json(output_folder)
 
-                # 保存缓存到文件
-                self.save_to_file(
-                    project = self.project,
-                    items = self.items,
-                    output_folder = self.require_path,
-                )
+    # 关闭数据库
+    def close_database(self) -> None:
+        self.db.close()
 
-                # 触发事件
-                self.emit(Base.Event.CACHE_SAVE, {})
+    # 从旧版 JSON 缓存迁移到 SQLite
+    def migrate_from_json(self, output_folder: str) -> None:
+        items_path = f"{output_folder}/cache/items.json"
+        project_path = f"{output_folder}/cache/project.json"
 
-                # 重置标志
-                self.require_flag = False
-                self.last_require_time = time.time()
+        if not os.path.isfile(items_path):
+            return
 
-    # 保存缓存到文件
+        # 数据库已有数据则不迁移
+        if self.db.get_item_count() > 0:
+            return
+
+        try:
+            # 读取 JSON 数据
+            with open(items_path, "r", encoding = "utf-8-sig") as reader:
+                items = [Item.from_dict(item) for item in json.load(reader)]
+
+            project = Project()
+            if os.path.isfile(project_path):
+                with open(project_path, "r", encoding = "utf-8-sig") as reader:
+                    project = Project.from_dict(json.load(reader))
+
+            # 写入 SQLite
+            self.db.set_items(items)
+            self.db.set_project(project)
+
+            # 迁移成功后删除 JSON 文件
+            os.remove(items_path)
+            if os.path.isfile(project_path):
+                os.remove(project_path)
+
+            self.info(Localizer.get().log_cache_migrated)
+        except Exception as e:
+            self.debug(Localizer.get().log_read_file_fail, e)
+
+    # 将所有数据保存到数据库
+    def save_to_database(self) -> None:
+        if not self.db.is_open():
+            return
+
+        try:
+            self.db.set_items(self.items)
+            self.db.set_project(self.project)
+            self.id_offset = self.db.get_id_offset()
+        except Exception as e:
+            self.debug(Localizer.get().log_write_file_fail, e)
+
+    # 保存项目数据到数据库
+    def save_project_to_database(self) -> None:
+        if not self.db.is_open():
+            return
+
+        try:
+            self.db.set_project(self.project)
+        except Exception as e:
+            self.debug(Localizer.get().log_write_file_fail, e)
+
+    # 立即保存一批已处理的 items 到数据库
+    def save_items_immediate(self, items: list[Item]) -> None:
+        if not self.db.is_open():
+            return
+
+        try:
+            # 计算每个 item 在内存列表中的 index
+            item_set = set(id(item) for item in items)
+            indices = [i for i, item in enumerate(self.items) if id(item) in item_set]
+
+            if indices:
+                batch_items = [self.items[i] for i in indices]
+                self.db.update_items(batch_items, self.id_offset, indices)
+
+            # 同时保存项目进度
+            self.db.set_project(self.project)
+        except Exception as e:
+            self.debug(Localizer.get().log_write_file_fail, e)
+
+    # 兼容旧接口 - 保存到文件（现在保存到数据库）
     def save_to_file(self, project: Project, items: list[Item], output_folder: str) -> None:
-        # 创建上级文件夹
-        os.makedirs(f"{output_folder}/cache", exist_ok = True)
+        if not self.db.is_open():
+            self.open_database(output_folder)
+        self.save_to_database()
 
-        # 保存缓存到文件
-        path = f"{output_folder}/cache/items.json"
-        with __class__.LOCK:
-            try:
-                with open(path, "w", encoding = "utf-8") as writer:
-                    writer.write(json.dumps([item.to_dict() for item in items], indent = None, ensure_ascii = False))
-            except Exception as e:
-                self.debug(Localizer.get().log_write_file_fail, e)
-
-        # 保存项目数据到文件
-        path = f"{output_folder}/cache/project.json"
-        with __class__.LOCK:
-            try:
-                with open(path, "w", encoding = "utf-8") as writer:
-                    writer.write(json.dumps(project.to_dict(), indent = None, ensure_ascii = False))
-            except Exception as e:
-                self.debug(Localizer.get().log_write_file_fail, e)
-
-        # 重置标志
-        self.require_flag = False
-        self.last_require_time = time.time()
-
-    # 请求保存缓存到文件
+    # 兼容旧接口 - 请求保存（现在立即保存项目）
     def require_save_to_file(self, output_path: str) -> None:
-        self.require_flag = True
-        self.require_path = output_path
+        # 不再需要延时，由 save_items_immediate 在回调中立即保存
+        pass
 
-    # 从文件读取数据
+    # 从数据库读取数据
+    def load_from_database(self, output_folder: str) -> None:
+        if not self.db.is_open():
+            self.open_database(output_folder)
+
+        self.items = self.db.get_all_items()
+        self.project = self.db.get_project()
+        self.id_offset = self.db.get_id_offset()
+
+    # 兼容旧接口 - 从文件读取
     def load_from_file(self, output_path: str) -> None:
-        self.load_items_from_file(output_path)
-        self.load_project_from_file(output_path)
+        self.load_from_database(output_path)
 
-    # 从文件读取项目数据
-    def load_items_from_file(self, output_path: str) -> None:
-        path = f"{output_path}/cache/items.json"
-        with __class__.LOCK:
-            try:
-                if os.path.isfile(path):
-                    with open(path, "r", encoding = "utf-8-sig") as reader:
-                        self.items = [Item.from_dict(item) for item in json.load(reader)]
-            except Exception as e:
-                self.debug(Localizer.get().log_read_file_fail, e)
-
-    # 从文件读取项目数据
+    # 兼容旧接口 - 只加载项目数据
     def load_project_from_file(self, output_path: str) -> None:
-        path = f"{output_path}/cache/project.json"
-        with __class__.LOCK:
-            try:
-                if os.path.isfile(path):
-                    with open(path, "r", encoding = "utf-8-sig") as reader:
+        if not self.db.is_open():
+            self.open_database(output_path)
+
+        # 检查数据库是否有数据
+        if self.db.get_item_count() > 0:
+            self.project = self.db.get_project()
+        else:
+            # 回退到 JSON（可能尚未迁移）
+            project_path = f"{output_path}/cache/project.json"
+            if os.path.isfile(project_path):
+                try:
+                    with open(project_path, "r", encoding = "utf-8-sig") as reader:
                         self.project = Project.from_dict(json.load(reader))
-            except Exception as e:
-                self.debug(Localizer.get().log_read_file_fail, e)
+                except Exception as e:
+                    self.debug(Localizer.get().log_read_file_fail, e)
+
+        self.close_database()
 
     # 设置缓存数据
     def set_items(self, items: list[Item]) -> None:
@@ -146,6 +184,18 @@ class CacheManager(Base):
     # 获取缓存数据数量（根据翻译状态）
     def get_item_count_by_status(self, status: int) -> int:
         return len([item for item in self.items if item.get_status() == status])
+
+    # 获取工作台文件摘要
+    def get_file_summary(self) -> list[dict]:
+        if self.db.is_open():
+            return self.db.get_file_summary()
+        return []
+
+    # 获取全局统计
+    def get_total_stats(self) -> dict:
+        if self.db.is_open():
+            return self.db.get_total_stats()
+        return {"total": 0, "processed": 0, "excluded": 0}
 
     # 生成缓存数据条目片段
     def generate_item_chunks(self, token_threshold: int) -> list[list[Item]]:

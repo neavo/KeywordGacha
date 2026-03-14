@@ -79,6 +79,7 @@ class NERAnalyzerTask(Base):
 
             return {
                 "glossary": [],
+                "items": items,
                 "row_count": len(items),
                 "input_tokens": 0,
                 "output_tokens": 0,
@@ -133,6 +134,7 @@ class NERAnalyzerTask(Base):
         # 返回任务结果
         return {
             "glossary": glossary,
+            "items": items,
             "row_count": len(items),
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,

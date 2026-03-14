@@ -33,6 +33,7 @@ from frontend.Quality.ReplacementPage import ReplacementPage
 from frontend.Setting.BasicSettingsPage import BasicSettingsPage
 from frontend.Setting.ExpertSettingsPage import ExpertSettingsPage
 from frontend.TaskPage import TaskPage
+from frontend.WorkbenchPage import WorkbenchPage
 from module.Config import Config
 from module.Localizer.Localizer import Localizer
 
@@ -274,6 +275,15 @@ class AppFluentWindow(FluentWindow, Base):
             FluentIcon.PLAY,
             Localizer.get().app_task_page,
             NavigationItemPosition.SCROLL
+        )
+
+        # 工作台
+        self.workbench_page = WorkbenchPage("workbench_page", self)
+        self.addSubInterface(
+            self.workbench_page,
+            FluentIcon.VIEW,
+            Localizer.get().app_workbench_page,
+            NavigationItemPosition.SCROLL,
         )
 
     # 添加设置类页面

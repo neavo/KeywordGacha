@@ -106,11 +106,7 @@ class NERAnalyzer(Base):
         def task(event: str, data: dict) -> None:
             # 立即保存一次缓存，防止等待期间进程被杀导致进度丢失
             try:
-                self.cache_manager.save_to_file(
-                    project = self.cache_manager.get_project(),
-                    items = self.cache_manager.get_items(),
-                    output_folder = self.config.output_folder,
-                )
+                self.cache_manager.save_to_database()
             except Exception:
                 pass
 
@@ -121,12 +117,8 @@ class NERAnalyzer(Base):
                     # 等待回调执行完毕
                     time.sleep(1.0)
 
-                    # 写入缓存
-                    self.cache_manager.save_to_file(
-                        project = self.cache_manager.get_project(),
-                        items = self.cache_manager.get_items(),
-                        output_folder = self.config.output_folder,
-                    )
+                    # 保存到数据库
+                    self.cache_manager.save_to_database()
 
                     # 日志
                     self.print("")
@@ -163,14 +155,19 @@ class NERAnalyzer(Base):
         PromptBuilder.reset()
         FakeNameHelper.reset()
 
+        # 打开数据库
+        self.cache_manager.open_database(self.config.output_folder)
+
         # 生成缓存列表
         if status == Base.ProjectStatus.PROCESSING:
-            self.cache_manager.load_from_file(self.config.output_folder)
+            self.cache_manager.load_from_database(self.config.output_folder)
         else:
             shutil.rmtree(f"{self.config.output_folder}/cache", ignore_errors = True)
+            self.cache_manager.open_database(self.config.output_folder)
             project, items = FileManager(self.config).read_from_path()
             self.cache_manager.set_items(items)
             self.cache_manager.set_project(project)
+            self.cache_manager.save_to_database()
 
         # 检查数据是否为空
         if self.cache_manager.get_item_count() == 0:
@@ -312,12 +309,8 @@ class NERAnalyzer(Base):
         # 等待回调执行完毕
         time.sleep(1.0)
 
-        # 写入缓存
-        self.cache_manager.save_to_file(
-            project = self.cache_manager.get_project(),
-            items = self.cache_manager.get_items(),
-            output_folder = self.config.output_folder,
-        )
+        # 保存最终数据到数据库
+        self.cache_manager.save_to_database()
 
         # 检查结果并写入文件
         self.save_ouput(
@@ -579,8 +572,10 @@ class NERAnalyzer(Base):
             # 更新翻译状态
             self.cache_manager.get_project().set_status(Base.ProjectStatus.PROCESSING)
 
-            # 请求保存缓存文件
-            self.cache_manager.require_save_to_file(self.config.output_folder)
+            # 立即保存已处理的 items 到数据库
+            result_items = result.get("items", [])
+            if result_items:
+                self.cache_manager.save_items_immediate(result_items)
 
             # 日志
             progress.update(
@@ -591,5 +586,8 @@ class NERAnalyzer(Base):
 
             # 触发翻译进度更新事件
             self.emit(Base.Event.NER_ANALYZER_UPDATE, self.extras)
+
+            # 触发工作台刷新事件
+            self.emit(Base.Event.WORKBENCH_REFRESH, {})
         except Exception as e:
             self.error(f"{Localizer.get().log_task_fail}", e)

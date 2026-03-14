@@ -33,6 +33,7 @@ class Base():
         APP_UPDATE_EXTRACT = "APP_UPDATE_EXTRACT"                           # 更新 - 解压
         CACHE_SAVE = "CACHE_SAVE"                                           # 保存缓存
         GLOSSARY_REFRESH = "GLOSSARY_REFRESH"                               # 术语表刷新
+        WORKBENCH_REFRESH = "WORKBENCH_REFRESH"                             # 工作台刷新
 
     # 接口格式
     class APIFormat(StrEnum):
