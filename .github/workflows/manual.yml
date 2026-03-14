@@ -32,7 +32,9 @@ jobs:
       id: check_version
       shell: pwsh
       run: |
-        $version = Get-Content -Path version.txt
+        $base_version = (Get-Content -Path version.txt).Trim()
+        $short_sha = git rev-parse --short HEAD
+        $version = "$base_version-$short_sha"
         echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
     - name: Install Requirements
