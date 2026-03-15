@@ -117,6 +117,6 @@ jobs:
         $status = "${{ job.status }}"
         $version = "${{ steps.check_version.outputs.version }}"
         $icon = if ($status -eq "success") { "✅" } else { "❌" }
-        $text = "$icon KeywordGacha build $status`nVersion: $version"
+        $text = "[GitHub] $icon KeywordGacha build $status`nVersion: $version"
         $uri = "https://api.telegram.org/bot$($env:TELEGRAM_BOT_TOKEN)/sendMessage"
         Invoke-RestMethod -Uri $uri -Method Post -Body @{ chat_id = $env:TELEGRAM_CHAT_ID; text = $text } | Out-Null
