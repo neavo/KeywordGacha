@@ -105,3 +105,18 @@ jobs:
         asset_path: ./KeywordGacha_${{ steps.check_version.outputs.version }}.zip
         asset_name: KeywordGacha_${{ steps.check_version.outputs.version }}.zip
         asset_content_type: application/zip
+
+    - name: Notify Telegram
+      if: always()
+      shell: pwsh
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: |
+        if (-not $env:TELEGRAM_BOT_TOKEN -or -not $env:TELEGRAM_CHAT_ID) { exit 0 }
+        $status = "${{ job.status }}"
+        $version = "${{ steps.check_version.outputs.version }}"
+        $icon = if ($status -eq "success") { "✅" } else { "❌" }
+        $text = "$icon KeywordGacha build $status`nVersion: $version"
+        $uri = "https://api.telegram.org/bot$($env:TELEGRAM_BOT_TOKEN)/sendMessage"
+        Invoke-RestMethod -Uri $uri -Method Post -Body @{ chat_id = $env:TELEGRAM_CHAT_ID; text = $text } | Out-Null
