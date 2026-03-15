@@ -295,10 +295,6 @@ class WorkbenchPage(QWidget, Base):
 
         def on_export_translation() -> None:
             self.emit(Base.Event.NER_ANALYZER_EXPORT, {})
-            self.emit(Base.Event.TOAST, {
-                "type": Base.ToastType.SUCCESS,
-                "message": Localizer.get().workbench_export_success,
-            })
 
         self.command_bar_card.add_action(
             Action(FluentIcon.SHARE, Localizer.get().workbench_export_translation, self, triggered = on_export_translation),

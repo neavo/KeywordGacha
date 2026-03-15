@@ -89,17 +89,41 @@ class NERAnalyzer(Base):
                 "message": Localizer.get().engine_task_running,
             })
 
-    # 停止事件
+    # 导出事件
     def ner_analyzer_export(self, event: Base.Event, data: dict) -> None:
-        if Engine.get().get_status() != Base.TaskStatus.NERING:
+        if Engine.get().get_status() == Base.TaskStatus.STOPPING:
             return None
 
-        # 复制一份以避免影响原始数据
         def task(event: str, data: dict) -> None:
-            self.save_ouput(
-                copy.deepcopy(self.cache_manager.get_project().get_extras().get("glossary", [])),
-                end = False,
-            )
+            # 运行中使用内存中的数据
+            if Engine.get().get_status() == Base.TaskStatus.NERING:
+                glossary = copy.deepcopy(self.cache_manager.get_project().get_extras().get("glossary", []))
+            else:
+                # 空闲时从数据库加载，并初始化 config 和 items 以供 save_ouput 使用
+                try:
+                    config = Config().load()
+                    self.config = config
+                    cm = CacheManager(service = False)
+                    cm.open_database(config.output_folder)
+                    cm.load_from_database(config.output_folder)
+                    glossary = copy.deepcopy(cm.get_project().get_extras().get("glossary", []))
+                    self.cache_manager.set_items(cm.get_items())
+                    cm.close_database()
+                except Exception:
+                    glossary = []
+
+            if len(glossary) == 0:
+                self.emit(Base.Event.TOAST, {
+                    "type": Base.ToastType.WARNING,
+                    "message": Localizer.get().engine_no_items,
+                })
+                return None
+
+            self.save_ouput(glossary, end = False)
+            self.emit(Base.Event.TOAST, {
+                "type": Base.ToastType.SUCCESS,
+                "message": Localizer.get().engine_task_save_done.replace("{PATH}", Config().load().output_folder),
+            })
         threading.Thread(target = task, args = (event, data)).start()
 
     # 请求停止事件
@@ -204,14 +228,21 @@ class NERAnalyzer(Base):
                 "glossary": [],
             }
 
-        # 更新翻译进度
-        self.emit(Base.Event.NER_ANALYZER_UPDATE, self.extras)
-
         # 规则过滤
         self.rule_filter(self.cache_manager.get_items())
 
         # 语言过滤
         self.language_filter(self.cache_manager.get_items())
+
+        # 第一轮且不是继续翻译时，记录任务的总行数
+        if status == Base.ProjectStatus.NONE:
+            self.extras["total_line"] = self.cache_manager.get_item_count_by_status(Base.ProjectStatus.NONE)
+
+        # 将初始 extras 保存到 project，确保停止时能持久化
+        self.cache_manager.get_project().set_extras(self.extras)
+
+        # 更新翻译进度
+        self.emit(Base.Event.NER_ANALYZER_UPDATE, self.extras)
 
         # 开始循环
         for current_round in range(self.config.max_round):
@@ -219,10 +250,6 @@ class NERAnalyzer(Base):
             # 目的是避免用户正好在两轮之间停止任务
             if Engine.get().get_status() == Base.TaskStatus.STOPPING:
                 return None
-
-            # 第一轮且不是继续翻译时，记录任务的总行数
-            if current_round == 0 and status == Base.ProjectStatus.NONE:
-                self.extras["total_line"] = self.cache_manager.get_item_count_by_status(Base.ProjectStatus.NONE)
 
             # 第二轮开始切分
             if current_round > 0:

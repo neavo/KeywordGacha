@@ -182,11 +182,13 @@ class TaskPage(QWidget, Base):
                 self.data = extras
                 self.restore_dashboard(extras)
 
+        has_data = isinstance(self.data, dict) and self.data.get("line", 0) > 0
+
         if Engine.get().get_status() == Base.TaskStatus.IDLE:
             self.indeterminate_hide()
             self.action_start.setEnabled(True)
             self.action_stop.setEnabled(False)
-            self.action_export.setEnabled(False)
+            self.action_export.setEnabled(has_data)
         elif Engine.get().get_status() == Base.TaskStatus.TESTING:
             self.action_start.setEnabled(False)
             self.action_stop.setEnabled(False)
@@ -629,10 +631,6 @@ class TaskPage(QWidget, Base):
     def add_command_bar_action_export(self, parent: CommandBarCard, config: Config, window: FluentWindow) -> None:
         def triggered() -> None:
             self.emit(Base.Event.NER_ANALYZER_EXPORT, {})
-            self.emit(Base.Event.TOAST, {
-                "type": Base.ToastType.SUCCESS,
-                "message": Localizer.get().task_success,
-            })
 
         self.action_export = parent.add_action(
             Action(FluentIcon.SHARE, Localizer.get().task_page_export, parent, triggered = triggered),
