@@ -51,11 +51,26 @@ class NERAnalyzer(Base):
         # 线程锁
         self.lock = threading.Lock()
 
+        # 启动时尝试从数据库恢复历史数据
+        self.try_restore_from_database()
+
         # 注册事件
         self.subscribe(Base.Event.PROJECT_CHECK_RUN, self.project_check_run)
         self.subscribe(Base.Event.NER_ANALYZER_RUN, self.ner_analyzer_run)
         self.subscribe(Base.Event.NER_ANALYZER_EXPORT, self.ner_analyzer_export)
         self.subscribe(Base.Event.NER_ANALYZER_REQUIRE_STOP, self.ner_analyzer_require_stop)
+
+    # 启动时尝试从数据库恢复历史数据
+    def try_restore_from_database(self) -> None:
+        try:
+            config = Config().load()
+            db_path = f"{config.output_folder}/cache/cache.db"
+            if os.path.isfile(db_path):
+                self.config = config
+                self.cache_manager.open_database(config.output_folder)
+                self.cache_manager.load_from_database(config.output_folder)
+        except Exception:
+            pass
 
     # 项目检查事件
     def project_check_run(self, event: Base.Event, data: dict) -> None:
@@ -65,10 +80,15 @@ class NERAnalyzer(Base):
             if Engine.get().get_status() != Base.TaskStatus.IDLE:
                 status = Base.ProjectStatus.NONE
             else:
-                cache_manager = CacheManager(service = False)
-                cache_manager.load_project_from_file(Config().load().output_folder)
-                status = cache_manager.get_project().get_status()
-                extras = cache_manager.get_project().get_extras()
+                # 优先使用已加载的数据（启动时自动恢复的）
+                if self.cache_manager.db.is_open() and self.cache_manager.get_item_count() > 0:
+                    status = self.cache_manager.get_project().get_status()
+                    extras = self.cache_manager.get_project().get_extras()
+                else:
+                    cache_manager = CacheManager(service = False)
+                    cache_manager.load_project_from_file(Config().load().output_folder)
+                    status = cache_manager.get_project().get_status()
+                    extras = cache_manager.get_project().get_extras()
 
             self.emit(Base.Event.PROJECT_CHECK_DONE, {
                 "status" : status,
@@ -181,6 +201,9 @@ class NERAnalyzer(Base):
         TaskRequester.reset()
         PromptBuilder.reset()
         FakeNameHelper.reset()
+
+        # 关闭可能已打开的数据库连接（启动时自动恢复的）
+        self.cache_manager.close_database()
 
         # 打开数据库
         self.cache_manager.open_database(self.config.output_folder)
