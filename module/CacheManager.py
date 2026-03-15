@@ -185,6 +185,15 @@ class CacheManager(Base):
     def get_item_count_by_status(self, status: int) -> int:
         return len([item for item in self.items if item.get_status() == status])
 
+    # 删除指定文件的所有数据
+    def delete_file(self, file_path: str) -> int:
+        # 从内存中移除
+        self.items = [item for item in self.items if item.get_file_path() != file_path]
+        # 从数据库中删除
+        if self.db.is_open():
+            return self.db.delete_items_by_file_path(file_path)
+        return 0
+
     # 获取工作台文件摘要
     def get_file_summary(self) -> list[dict]:
         if self.db.is_open():

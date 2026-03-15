@@ -144,6 +144,13 @@ class KGDatabase(Base):
             row = cursor.fetchone()
             return row[0] if row[0] is not None else 1
 
+    def delete_items_by_file_path(self, file_path: str) -> int:
+        """删除指定文件路径的所有 items，返回删除的行数"""
+        with self.lock:
+            cursor = self.conn.execute("DELETE FROM items WHERE file_path = ?", (file_path,))
+            self.conn.commit()
+            return cursor.rowcount
+
     # ========== Workbench ==========
 
     def get_file_summary(self) -> list[dict]:

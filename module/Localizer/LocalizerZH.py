@@ -308,4 +308,8 @@ class LocalizerZH():
     workbench_no_data: str = "暂无数据，请先开始任务"
     workbench_export_translation: str = "生成译文"
     workbench_export_success: str = "译文导出成功"
+    workbench_delete_file: str = "删除文件"
+    workbench_delete_confirm: str = "确定要删除此文件吗？\n将同时删除源文件和数据库记录。"
+    workbench_delete_success: str = "已删除 {COUNT} 条记录"
+    workbench_delete_no_selection: str = "请先选择要删除的文件"
     log_cache_migrated: str = "已将旧版缓存迁移至数据库"

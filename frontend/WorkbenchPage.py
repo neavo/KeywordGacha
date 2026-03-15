@@ -1,3 +1,4 @@
+import os
 import threading
 
 from PyQt5.QtCore import Qt
@@ -16,6 +17,7 @@ from qfluentwidgets import Action
 from qfluentwidgets import CaptionLabel
 from qfluentwidgets import FluentIcon
 from qfluentwidgets import FluentWindow
+from qfluentwidgets import MessageBox
 from qfluentwidgets import SimpleCardWidget
 from qfluentwidgets import StrongBodyLabel
 from qfluentwidgets import TableWidget
@@ -93,6 +95,9 @@ class WorkbenchPage(QWidget, Base):
 
         # 缓存管理器引用（使用 NERAnalyzer 的实例）
         self.cache_manager: CacheManager = None
+
+        # 当前文件列表（用于删除时获取 file_path）
+        self.current_file_summary: list[dict] = []
 
         # 主容器
         self.container = QVBoxLayout(self)
@@ -197,6 +202,7 @@ class WorkbenchPage(QWidget, Base):
         return None
 
     def apply_snapshot(self, file_summary: list[dict], total_stats: dict) -> None:
+        self.current_file_summary = file_summary
         total = total_stats.get("total", 0)
         processed = total_stats.get("processed", 0)
         excluded = total_stats.get("excluded", 0)
@@ -299,6 +305,71 @@ class WorkbenchPage(QWidget, Base):
 
         parent.addWidget(self.table, 1)
 
+    def on_delete_file(self) -> None:
+        # 任务运行中禁止删除
+        if Engine.get().get_status() != Base.TaskStatus.IDLE:
+            return
+
+        # 获取选中行
+        selected = self.table.selectedItems()
+        if not selected:
+            self.emit(Base.Event.TOAST, {
+                "type": Base.ToastType.WARNING,
+                "message": Localizer.get().workbench_delete_no_selection,
+            })
+            return
+
+        row = selected[0].row()
+        if row < 0 or row >= len(self.current_file_summary):
+            return
+
+        file_path = self.current_file_summary[row].get("file_path", "")
+
+        # 确认对话框
+        message_box = MessageBox(
+            Localizer.get().warning,
+            Localizer.get().workbench_delete_confirm + f"\n\n{file_path}",
+            self.window(),
+        )
+        message_box.yesButton.setText(Localizer.get().confirm)
+        message_box.cancelButton.setText(Localizer.get().cancel)
+
+        if not message_box.exec():
+            return
+
+        # 执行删除
+        cache_manager = self.get_cache_manager()
+        if cache_manager is None:
+            return
+
+        count = cache_manager.delete_file(file_path)
+
+        # 同步更新 project extras 中的 total_line
+        try:
+            project = cache_manager.get_project()
+            extras = project.get_extras()
+            if isinstance(extras, dict) and extras:
+                extras["total_line"] = max(0, extras.get("total_line", 0) - self.current_file_summary[row].get("total", 0))
+                project.set_extras(extras)
+                cache_manager.save_project_to_database()
+        except Exception:
+            pass
+
+        # 删除 input 文件夹中的源文件，防止下次启动新任务时被重新读入
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
+
+        self.emit(Base.Event.TOAST, {
+            "type": Base.ToastType.SUCCESS,
+            "message": Localizer.get().workbench_delete_success.replace("{COUNT}", str(count)),
+        })
+
+        # 刷新
+        self.request_refresh()
+
     def build_footer_section(self, parent: QLayout) -> None:
         self.command_bar_card = CommandBarCard()
 
@@ -307,6 +378,10 @@ class WorkbenchPage(QWidget, Base):
 
         self.command_bar_card.add_action(
             Action(FluentIcon.SHARE, Localizer.get().workbench_export_translation, self, triggered = on_export_translation),
+        )
+
+        self.command_bar_card.add_action(
+            Action(FluentIcon.DELETE, Localizer.get().workbench_delete_file, self, triggered = self.on_delete_file),
         )
 
         parent.addWidget(self.command_bar_card)

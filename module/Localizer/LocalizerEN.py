@@ -308,4 +308,8 @@ class LocalizerEN(LocalizerZH):
     workbench_no_data: str = "No data yet, please start a task first"
     workbench_export_translation: str = "Export Translation"
     workbench_export_success: str = "Translation exported successfully"
+    workbench_delete_file: str = "Delete File"
+    workbench_delete_confirm: str = "Delete this file?\nBoth the source file and database records will be removed."
+    workbench_delete_success: str = "Deleted {COUNT} records"
+    workbench_delete_no_selection: str = "Please select a file to delete"
     log_cache_migrated: str = "Migrated legacy cache to database"
