@@ -261,8 +261,11 @@ class NERAnalyzer(Base):
         if status == Base.ProjectStatus.NONE:
             self.extras["total_line"] = self.cache_manager.get_item_count_by_status(Base.ProjectStatus.NONE)
 
-        # 将初始 extras 保存到 project，确保停止时能持久化
+        # 将初始 extras 和状态保存到 project，确保停止时能持久化
         self.cache_manager.get_project().set_extras(self.extras)
+        if status == Base.ProjectStatus.NONE:
+            self.cache_manager.get_project().set_status(Base.ProjectStatus.PROCESSING)
+            self.cache_manager.save_to_database()
 
         # 更新翻译进度
         self.emit(Base.Event.NER_ANALYZER_UPDATE, self.extras)
