@@ -2,6 +2,7 @@ import threading
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QColor
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QAbstractItemView
@@ -75,9 +76,15 @@ class WorkbenchPage(QWidget, Base):
 
     REFRESH_THROTTLE_MS: int = 500
 
+    # 用于从后台线程安全更新 UI 的信号
+    snapshot_ready = pyqtSignal(list, dict)
+
     def __init__(self, text: str, window: FluentWindow) -> None:
         super().__init__(window)
         self.setObjectName(text.replace(" ", "-"))
+
+        # 连接信号到 UI 更新方法
+        self.snapshot_ready.connect(self.apply_snapshot)
 
         # 刷新控制
         self.refresh_pending: bool = False
@@ -165,8 +172,8 @@ class WorkbenchPage(QWidget, Base):
                 file_summary = []
                 total_stats = {"total": 0, "processed": 0, "excluded": 0}
 
-            # 在主线程更新 UI
-            QTimer.singleShot(0, lambda fs=file_summary, ts=total_stats: self.apply_snapshot(fs, ts))
+            # 通过信号在主线程更新 UI
+            self.snapshot_ready.emit(file_summary, total_stats)
 
     def get_cache_manager(self) -> CacheManager:
         try:
