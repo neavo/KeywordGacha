@@ -69,8 +69,9 @@ class NERAnalyzer(Base):
                 self.config = config
                 self.cache_manager.open_database(config.output_folder)
                 self.cache_manager.load_from_database(config.output_folder)
-        except Exception:
-            pass
+                self.info(f"[Restore] items = {self.cache_manager.get_item_count()}, db_open = {self.cache_manager.db.is_open()}")
+        except Exception as e:
+            self.error("[Restore] Failed to restore from database", e)
 
     # 项目检查事件
     def project_check_run(self, event: Base.Event, data: dict) -> None:

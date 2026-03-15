@@ -159,7 +159,9 @@ class WorkbenchPage(QWidget, Base):
             try:
                 file_summary = cache_manager.get_file_summary()
                 total_stats = cache_manager.get_total_stats()
-            except Exception:
+                self.info(f"[Workbench] files = {len(file_summary)}, total = {total_stats.get('total', 0)}, db_open = {cache_manager.db.is_open()}")
+            except Exception as e:
+                self.error("[Workbench] Failed to query database", e)
                 file_summary = []
                 total_stats = {"total": 0, "processed": 0, "excluded": 0}
 
