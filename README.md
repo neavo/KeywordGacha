@@ -59,7 +59,7 @@
 - 功能说明
   - [命令行模式](https://github.com/neavo/LinguaGacha/wiki/CLIMode)
   - [术语表](https://github.com/neavo/LinguaGacha/wiki/Glossary)　　[文本保护](https://github.com/neavo/LinguaGacha/wiki/TextPreserve)　　[文本替换](https://github.com/neavo/LinguaGacha/wiki/Replacement)　　
-  - [补充翻译](https://github.com/neavo/LinguaGacha/wiki/IncrementalTranslation)　　[MTool 优化器](https://github.com/neavo/LinguaGacha/wiki/MToolOptimizer)
+  - [强制思考](https://github.com/neavo/LinguaGacha/wiki/ForceThinking)　　[MTool 优化器](https://github.com/neavo/LinguaGacha/wiki/MToolOptimizer)
   - [百宝箱 - 繁简转换](https://github.com/neavo/LinguaGacha/wiki/TSConversion) [百宝箱 - 姓名字段提取](https://github.com/neavo/LinguaGacha/wiki/NameFieldExtraction)
 - 你可以在 [Wiki](https://github.com/neavo/LinguaGacha/wiki) 找到各项功能的更详细介绍，也欢迎在 [讨论区](https://github.com/neavo/LinguaGacha/discussions) 投稿你的使用心得
 
@@ -78,6 +78,12 @@
 - 具体示例可见 [Wiki - 支持的文件格式](https://github.com/neavo/LinguaGacha/wiki/%E6%94%AF%E6%8C%81%E7%9A%84%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F)，更多格式将持续添加，你也可以在 [ISSUES](https://github.com/neavo/LinguaGacha/issues) 中提出你的需求
 
 ## 近期更新 📅
+- 20260317 v0.60.0
+  - 功能 - 新增 `分析任务（术语表提取）`
+    - 移除 `自动补全术语表`
+  - 改进 - 支持 质量规则文本反查
+  - 改进 - 支持 Gemini-3.1-Flash 思考等级设置
+
 - 20260304 v0.59.1
   - 优化与改进 #451
 
