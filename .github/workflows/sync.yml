@@ -60,7 +60,8 @@ jobs:
         id: prepare_tree
         shell: bash
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          # 使用自定义 PAT，避免 github.token 无法跨仓库更新工作流文件。
+          GITHUB_TOKEN: ${{ secrets.CI_SYNC_TOKEN }}
           SOURCE_REPO: ${{ inputs.source_repo }}
           SOURCE_REF: ${{ inputs.source_ref }}
           TARGET_REPO: ${{ steps.resolve_meta.outputs.target_repo }}
@@ -110,7 +111,8 @@ jobs:
       - name: Push Prepared Tree
         shell: bash
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          # 使用自定义 PAT，避免 github.token 无法跨仓库更新工作流文件。
+          GITHUB_TOKEN: ${{ secrets.CI_SYNC_TOKEN }}
           TARGET_REPO: ${{ steps.resolve_meta.outputs.target_repo }}
           TARGET_BRANCH: ${{ inputs.target_branch }}
           SOURCE_DIR: ${{ steps.prepare_tree.outputs.source_dir }}
