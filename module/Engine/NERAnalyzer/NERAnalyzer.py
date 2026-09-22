@@ -257,6 +257,12 @@ class NERAnalyzer(Base):
                             return None
 
                         task_limiter.wait()
+
+                        # 失败后的全局冷却（上游限流 / 被放弃的任务可能仍在上游运行）
+                        # 返回 False 表示任务已被要求停止
+                        if TaskRequester.wait_cooldown() == False:
+                            return None
+
                         future = executor.submit(task.start)
                         future.add_done_callback(lambda future: self.task_done_callback(future, pid, progress))
 

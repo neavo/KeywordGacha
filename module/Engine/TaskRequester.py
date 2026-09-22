@@ -1,6 +1,7 @@
 import json
 import re
 import threading
+import time
 from functools import lru_cache
 
 import anthropic
@@ -38,6 +39,28 @@ class TaskRequester(Base):
     # 正则
     RE_LINE_BREAK: re.Pattern = re.compile(r"\n+")
 
+    # 正则：重试等待（Retry-After 响应头或错误文本中的 "Retry after 112s"）
+    RE_RETRY_AFTER: re.Pattern = re.compile(r"retry[-\s]?after[\s:=]*(\d+(?:\.\d+)?)", flags = re.IGNORECASE)
+
+    # 正则：限流/占用的错误文本特征
+    RE_RATE_LIMITED: re.Pattern = re.compile(r"busy|cooldown|rate.?limit", flags = re.IGNORECASE)
+
+    # 正则：上游被另一个任务占用
+    RE_BUSY: re.Pattern = re.compile(r"busy", flags = re.IGNORECASE)
+
+    # 失败后的全局冷却（秒）
+    #   上游限流（429/503 或文本命中 busy/cooldown/rate limit）→ COOLDOWN_ON_RATE_LIMIT
+    #   请求超时（被放弃的任务可能仍在上游运行）→ request_timeout / 4，取 15 ~ 300
+    #   其他异常（连接错误等）→ COOLDOWN_ON_ERROR
+    #   Retry-After（响应头或错误文本）优先，上限 COOLDOWN_MAX
+    COOLDOWN_ON_ERROR: float = 10.0
+    COOLDOWN_ON_RATE_LIMIT: float = 30.0
+    COOLDOWN_MAX: float = 900.0
+
+    # 冷却状态（类变量）
+    COOLDOWN_UNTIL: float = 0.0
+    COOLDOWN_LOCK: threading.Lock = threading.Lock()
+
     # 类线程锁
     LOCK: threading.Lock = threading.Lock()
 
@@ -52,6 +75,7 @@ class TaskRequester(Base):
     @classmethod
     def reset(cls) -> None:
         cls.API_KEY_INDEX: int = 0
+        cls.COOLDOWN_UNTIL: float = 0.0
         cls.get_client.cache_clear()
 
     @classmethod
@@ -70,6 +94,64 @@ class TaskRequester(Base):
             cls.API_KEY_INDEX = cls.API_KEY_INDEX + 1
 
         return key
+
+    # 解析异常中的重试等待秒数（Retry-After 响应头或错误文本）
+    @classmethod
+    def parse_retry_after(cls, e: Exception) -> float:
+        response = getattr(e, "response", None)
+        if response is not None:
+            try:
+                value = response.headers.get("retry-after")
+                if value is not None:
+                    return float(value)
+            except Exception:
+                pass
+
+        match = __class__.RE_RETRY_AFTER.search(str(e))
+        if match is not None:
+            return float(match.group(1))
+
+        return 0.0
+
+    # 请求失败后的全局冷却:避免继续冲击限流中或仍在处理上一个任务的上游
+    def handle_request_failure(self, e: Exception) -> None:
+        retry_after = __class__.parse_retry_after(e)
+        status = getattr(getattr(e, "response", None), "status_code", None)
+
+        if retry_after > 0:
+            seconds = retry_after
+
+            # 上游被另一个任务占用时，其给出的等待可能远短于任务本身耗时，加个下限
+            if __class__.RE_BUSY.search(str(e)) is not None:
+                seconds = max(seconds, __class__.COOLDOWN_ON_RATE_LIMIT)
+        elif status in (429, 503) or __class__.RE_RATE_LIMITED.search(str(e)) is not None:
+            seconds = __class__.COOLDOWN_ON_RATE_LIMIT
+        elif isinstance(e, (openai.APITimeoutError, httpx.TimeoutException)):
+            seconds = min(max(15.0, self.config.request_timeout / 4), 300.0)
+        else:
+            seconds = __class__.COOLDOWN_ON_ERROR
+
+        seconds = min(seconds, __class__.COOLDOWN_MAX)
+        with __class__.COOLDOWN_LOCK:
+            __class__.COOLDOWN_UNTIL = max(__class__.COOLDOWN_UNTIL, time.time() + seconds)
+
+        self.info(Localizer.get().engine_request_cooldown.replace("{SECONDS}", f"{seconds:.0f}"))
+
+    # 等待冷却结束（返回 False 表示引擎已不在运行任务）
+    @classmethod
+    def wait_cooldown(cls) -> bool:
+        from module.Engine.Engine import Engine
+
+        while True:
+            with __class__.COOLDOWN_LOCK:
+                remaining = __class__.COOLDOWN_UNTIL - time.time()
+
+            if remaining <= 0:
+                return True
+            if Engine.get().get_status() not in (Base.TaskStatus.NERING, Base.TaskStatus.TESTING):
+                return False
+
+            time.sleep(min(0.5, remaining))
 
     # 获取客户端
     @classmethod
@@ -141,6 +223,11 @@ class TaskRequester(Base):
 
     # 发起请求
     def request(self, messages: list[dict]) -> tuple[bool, str, int, int]:
+        # 等待冷却结束（上游限流 / 被放弃的任务可能仍在上游运行）
+        # 这里拦截而不是只在提交循环拦截：执行器会预取任务，已排队的任务绕不过提交循环的闸门
+        if __class__.wait_cooldown() == False:
+            return True, None, None, None, None
+
         args: dict[str, float] = {}
         if self.platform.get("top_p_custom_enable") == True:
             args["top_p"] = self.platform.get("top_p")
@@ -215,6 +302,7 @@ class TaskRequester(Base):
             response_result = response.choices[0].message.content
         except Exception as e:
             self.error(f"{Localizer.get().log_task_fail}", e)
+            self.handle_request_failure(e)
             return True, None, None, None, None
 
         # 获取输入消耗
@@ -234,7 +322,7 @@ class TaskRequester(Base):
             {str(i): line.strip() for i, line in enumerate(response_result.strip().splitlines())},
             indent = None,
             ensure_ascii = False,
-        )
+        ) if response_result.strip() != "" else ""
 
         return False, "", response_result, input_tokens, output_tokens
 
@@ -298,6 +386,7 @@ class TaskRequester(Base):
                 response_result = message.content.strip()
         except Exception as e:
             self.error(f"{Localizer.get().log_task_fail}", e)
+            self.handle_request_failure(e)
             return True, None, None, None, None
 
         # 获取输入消耗
@@ -387,6 +476,7 @@ class TaskRequester(Base):
                     response_result = result_messages[-1].text.strip()
         except Exception as e:
             self.error(f"{Localizer.get().log_task_fail}", e)
+            self.handle_request_failure(e)
             return True, None, None, None, None
 
         # 获取输入消耗
@@ -464,6 +554,7 @@ class TaskRequester(Base):
                 response_think = ""
         except Exception as e:
             self.error(f"{Localizer.get().log_task_fail}", e)
+            self.handle_request_failure(e)
             return True, None, None, None, None
 
         # 获取输入消耗

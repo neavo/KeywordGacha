@@ -84,6 +84,8 @@ class LocalizerEN(LocalizerZH):
     engine_task_done: str = "All data has been processed, task finished …"
     engine_task_fail: str = "Reached the maximum task rounds, but some data remains unprocessed. Please check the results …"
     engine_task_stop: str = "Task stopped …"
+    engine_request_cooldown: str = "Request failed (upstream rate limit or error), pausing for {SECONDS} seconds …"
+    engine_response_empty: str = "Upstream returned empty content; this chunk will be retried in the next round …"
     engine_task_save: str = "Generating output file, please wait …"
     engine_task_save_done: str = "Task results have been saved to the {PATH} directory …"
     engine_task_generation: str = "Task generation completed, {COUNT} tasks generated in total …"

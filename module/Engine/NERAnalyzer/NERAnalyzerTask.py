@@ -95,6 +95,17 @@ class NERAnalyzerTask(Base):
                 "output_tokens": 0,
             }
 
+        # 上游限流降级等情况下可能返回 200 但内容为空，此时按失败处理
+        # 否则整块数据会被标记为已处理却提取不到任何术语（静默丢失）
+        if response_result is None or response_result.strip() == "":
+            self.info(Localizer.get().engine_response_empty)
+            return {
+                "glossary": [],
+                "row_count": 0,
+                "input_tokens": input_tokens if input_tokens is not None else 0,
+                "output_tokens": output_tokens if output_tokens is not None else 0,
+            }
+
         # 提取回复内容
         _, glossary = ResponseDecoder().decode(response_result)
 

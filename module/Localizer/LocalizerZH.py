@@ -84,6 +84,8 @@ class LocalizerZH():
     engine_task_done: str = "所有数据均已处理，任务已结束 …"
     engine_task_fail: str = "已到最大任务轮次，仍有部分数据未处理，请检查处理结果 …"
     engine_task_stop: str = "任务已停止 …"
+    engine_request_cooldown: str = "请求失败（上游限流或异常），暂停 {SECONDS} 秒后继续 …"
+    engine_response_empty: str = "上游返回了空内容，本片段将在下一轮重新处理 …"
     engine_task_save: str = "正在生成输出文件，等稍候 …"
     engine_task_save_done: str = "任务结果已保存至 {PATH} 目录 …"
     engine_task_generation: str = "任务生成已完成，共生成 {COUNT} 个任务 …"
